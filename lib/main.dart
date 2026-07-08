@@ -1,122 +1,109 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'screens/login_screen.dart';
+import 'screens/home_screen.dart';
 
-void main() {
+// Global flag to track if we are in offline preview mode
+bool isOfflineMode = false;
+String offlineReason = '';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Try loading dotenv
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    isOfflineMode = true;
+    offlineReason = '找不到 .env 檔案';
+  }
+
+  if (!isOfflineMode) {
+    final supabaseUrl = dotenv.maybeGet('SUPABASE_URL');
+    final supabaseKey = dotenv.maybeGet('SUPABASE_ANON_KEY');
+
+    // If placeholders or empty values are detected, fall back to offline preview
+    if (supabaseUrl == null || 
+        supabaseKey == null || 
+        supabaseUrl.isEmpty ||
+        supabaseKey.isEmpty ||
+        supabaseUrl.contains('your-project-id')) {
+      isOfflineMode = true;
+      offlineReason = '檢測到預設金鑰占位字串';
+    } else {
+      try {
+        await Supabase.initialize(
+          url: supabaseUrl,
+          anonKey: supabaseKey,
+        );
+      } catch (e) {
+        isOfflineMode = true;
+        offlineReason = 'Supabase 初始化連線失敗';
+      }
+    }
+  }
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    // High-end dark theme configuration with business teal tone
+    final darkTheme = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      primaryColor: const Color(0xFF00ADB5), // Teal / Blue-green
+      scaffoldBackgroundColor: const Color(0xFF0D1117), // Deep Dark Slate Blue
+      colorScheme: const ColorScheme.dark(
+        primary: Color(0xFF00ADB5),
+        secondary: Color(0xFF00F5FF), // Ice Blue
+        surface: Color(0xFF161B22), // Card grey-blue
+        background: Color(0xFF0D1117),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF161B22),
+        elevation: 0,
+      ),
+      cardTheme: const CardThemeData(
+        color: Color(0xFF161B22),
+        elevation: 2,
+      ),
+    );
+
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: '保險客戶管理助手',
+      debugShowCheckedModeBanner: false,
+      theme: darkTheme,
+      home: const AuthGateway(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+class AuthGateway extends StatelessWidget {
+  const AuthGateway({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
-    );
+    if (isOfflineMode) {
+      // In offline mode, route directly to LoginScreen which shows the skip button
+      return const LoginScreen();
+    }
+
+    // In online mode, check Supabase Auth session
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        return const HomeScreen();
+      } else {
+        return const LoginScreen();
+      }
+    } catch (_) {
+      // Fallback in case of Auth error
+      return const LoginScreen();
+    }
   }
 }
