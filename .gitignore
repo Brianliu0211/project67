@@ -59,3 +59,4 @@ ios/Runner/GoogleService-Info.plist
 *.jks
 *.p12
 *.pem
+/.obsidian
