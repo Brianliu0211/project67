@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import 'login_screen.dart';
+import 'customer_management_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -176,12 +177,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: const Icon(Icons.logout, color: Colors.redAccent),
                       onPressed: _handleSignOut,
                     )
-                  : ListTile(
-                      leading: const Icon(Icons.logout, color: Colors.redAccent),
-                      title: const Text('登出系統', style: TextStyle(color: Colors.redAccent)),
-                      onTap: _handleSignOut,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
+                  : Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        leading: const Icon(Icons.logout, color: Colors.redAccent),
+                        title: const Text('登出系統', style: TextStyle(color: Colors.redAccent)),
+                        onTap: _handleSignOut,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      ),
                     ),
             ),
           ],
@@ -223,13 +227,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (isWideScreen) _buildWebHeader(),
                 
                 // Weekly Calendar Strip
-                _buildWeeklyCalendarStrip(),
+                if (_activeMenu == '今日行程') _buildWeeklyCalendarStrip(),
                 
                 // Main Working Area
                 Expanded(
                   child: _activeMenu == '今日行程'
                       ? _buildScheduleTimeline()
-                      : _buildFallbackScreen(),
+                      : _activeMenu == '客戶管理'
+                          ? const CustomerManagementTab()
+                          : _buildFallbackScreen(),
                 ),
               ],
             ),
