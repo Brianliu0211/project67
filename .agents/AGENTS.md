@@ -22,12 +22,12 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 - **Rule**: When the user says **「開工」**, or when you (the AI Agent) and the user agree on a development plan, you **MUST** automatically perform the following actions:
 
 ### Actions
-1. **討論開發計畫**: Confirm with the developer what feature/task they are about to implement.
-2. **建議分支名稱**: Generate a clean branch name following the format `feature/username-featurename` (e.g., `feature/lobo-login-ui` or `feature/beast-db-sync`).
-3. **提供分支指令/介面操作對照**: Present step-by-step instructions for:
-   - **GitHub Desktop**: How to switch to `main`, pull, create a new branch, and publish it.
-   - **Git CLI**: The exact shell commands (`git checkout main`, `git pull`, `git checkout -b ...`, `git push -u ...`).
-
+1. **確認開發者身分與工作區**：主動詢問開發者為 **蘿蔔 (lobo)** 還是 **巨獸 (beast)**，以鎖定對應的分支前綴與沙盒路徑。
+2. **對齊進度表任務**：讀取 `docs/進度.md` 並展示當前未完成的任務列表，請開發者選擇本次要進行的任務。
+3. **建議分支名稱**：生成格式為 `feature/username-featurename` 的分支名稱（例如：`feature/lobo-customer-list-ui`）。
+4. **提供分支指令/介面操作指引（主要提供 GitHub Desktop，Git CLI 僅作備用）**：
+   - **GitHub Desktop**：主要引導切換至 `main`（提醒處理未提交變更）、Pull 並建立新特徵分支推送。
+   - **Git CLI（備用，可置於 details 摺疊區塊或在要求時才提供）**：提供包含防呆與套件同步的完整指令。
 
 ---
 
@@ -40,11 +40,11 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 1. **撰寫開發日誌**: Create a new development log in `docs/03_開發日誌/` following the established specification, documenting all technical changes made during the current session.
 2. **更新進度表**: Review and update [進度.md](file:///c:/Users/brain/OneDrive/文件/GitHub/project67/docs/進度.md) — check off (`[x]`) any completed items, and add any new items that were discovered during the session.
 3. **產出 Git Commit 訊息**: Generate a ready-to-paste **Summary** and **Description** for GitHub Desktop, strictly following the conventions defined in [Git提交訊息規範.md](file:///c:/Users/brain/OneDrive/文件/GitHub/project67/docs/00_公共規格/Git提交訊息規範.md).
-4. **提示上傳與 GitHub 合併步驟**: Provide a clear step-by-step guidance on how to:
-   - Push the local branch to remote (via GitHub Desktop or CLI).
+4. **提示上傳與 GitHub 合併步驟**: Provide a clear step-by-step guidance focusing on GitHub Desktop (omit verbose CLI commands by default unless requested) on how to:
+   - Push the local branch to remote (via GitHub Desktop).
    - Create a Pull Request (PR) on GitHub.
    - Perform the merge (Merge Pull Request) on GitHub.
-   - Switch back to `main` locally, pull the merged code, and delete the temporary feature branch.
+   - Switch back to `main` locally, pull the merged code, and delete the temporary feature branch via GitHub Desktop.
 
 ## Git Commit Message Convention
 
