@@ -45,6 +45,7 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
    - Create a Pull Request (PR) on GitHub.
    - Perform the merge (Merge Pull Request) on GitHub.
    - Switch back to `main` locally, pull the merged code, and delete the temporary feature branch via GitHub Desktop.
+5. **提醒本地網頁編譯（過渡期規則）**：在輸出合併步驟前，**必須**強烈提醒開發者在 Commit 之前先在本地執行 `flutter build web --release`，並連同 `build/web/` 產物一併提交（此規則在 Phase 0.95 自動化部署完成前持續有效）。
 
 ## 「讓我看看」Automation (Local Web Preview Command)
 
@@ -61,4 +62,3 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 
 ### Rule
 - **Rule**: Whenever you generate Git commit messages (whether triggered by 「收工」 or by user request), you **MUST** follow the format and type labels defined in [Git提交訊息規範.md](file:///c:/Users/brain/OneDrive/文件/GitHub/project67/docs/00_公共規格/Git提交訊息規範.md).
-
