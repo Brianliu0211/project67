@@ -29,7 +29,9 @@ void main() async {
         supabaseKey == null || 
         supabaseUrl.isEmpty ||
         supabaseKey.isEmpty ||
-        supabaseUrl.contains('your-project-id')) {
+        supabaseUrl.contains('your-project-id') ||
+        supabaseUrl.contains('algufuoxkeizxwkofmmp') ||
+        supabaseKey.startsWith('sb_publishable_')) {
       isOfflineMode = true;
       offlineReason = '檢測到預設金鑰占位字串';
     } else {
