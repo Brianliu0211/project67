@@ -20,6 +20,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     {
       'id': 'mock-1',
       'name': '林君雅',
+      'nickname': '君雅',
+      'avatar_url': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120',
       'phone': '0912-345678',
       'email': 'chunya.lin@gmail.com',
       'tags': ['高意願', '醫療險', '定期壽險'],
@@ -29,6 +31,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     {
       'id': 'mock-2',
       'name': '王小明',
+      'nickname': '小明',
+      'avatar_url': '',
       'phone': '0923-456789',
       'email': 'xiaoming.wang@gmail.com',
       'tags': ['已簽單', '汽車責任險'],
@@ -38,6 +42,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     {
       'id': 'mock-3',
       'name': '陳美玲',
+      'nickname': '美玲姐',
+      'avatar_url': 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=120',
       'phone': '0934-567890',
       'email': 'meiling.chen@yahoo.com',
       'tags': ['年金險', '理財規劃', '待跟進'],
@@ -89,6 +95,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           return {
             'id': data['id'],
             'name': data['name'],
+            'nickname': data['nickname'] ?? '',
+            'avatar_url': data['avatar_url'] ?? '',
             'phone': data['phone'],
             'email': data['email'],
             // Convert postgres array text[] to List<String> safely
@@ -101,11 +109,10 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       _filterCustomers();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('讀取資料庫失敗: $e\n自動啟用離線列表。'),
-            backgroundColor: Colors.amber.shade900,
-          ),
+        CustomToast.show(
+          context,
+          '讀取資料庫失敗: $e\n自動啟用離線列表。',
+          ToastType.warning,
         );
       }
       // Fail-safe to mock data
@@ -145,6 +152,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   // Add / Create Customer logic
   Future<void> _createCustomer({
     required String name,
+    required String nickname,
+    required String avatarUrl,
     required String phone,
     required String email,
     required List<String> tags,
@@ -158,6 +167,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       final newCustomer = {
         'id': 'mock-${DateTime.now().millisecondsSinceEpoch}',
         'name': name,
+        'nickname': nickname,
+        'avatar_url': avatarUrl,
         'phone': phone,
         'email': email,
         'tags': tags,
@@ -169,6 +180,9 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         _isLoading = false;
       });
       _filterCustomers();
+      if (mounted) {
+        CustomToast.show(context, '成功新增客戶 $name 檔案 (離線暫存)', ToastType.success);
+      }
       return;
     }
 
@@ -180,6 +194,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       await supabase.from('customers').insert({
         'profile_id': user.id,
         'name': name,
+        'nickname': nickname,
+        'avatar_url': avatarUrl,
         'phone': phone,
         'email': email,
         'tags': tags,
@@ -187,11 +203,12 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       });
 
       await _fetchCustomers();
+      if (mounted) {
+        CustomToast.show(context, '成功新增客戶 $name 檔案', ToastType.success);
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('新增失敗: $e'), backgroundColor: Colors.redAccent),
-        );
+        CustomToast.show(context, '新增失敗: $e', ToastType.error);
       }
       setState(() {
         _isLoading = false;
@@ -203,6 +220,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   Future<void> _updateCustomer({
     required String id,
     required String name,
+    required String nickname,
+    required String avatarUrl,
     required String phone,
     required String email,
     required List<String> tags,
@@ -219,6 +238,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           _allCustomers[index] = {
             ..._allCustomers[index],
             'name': name,
+            'nickname': nickname,
+            'avatar_url': avatarUrl,
             'phone': phone,
             'email': email,
             'tags': tags,
@@ -229,6 +250,9 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         _isLoading = false;
       });
       _filterCustomers();
+      if (mounted) {
+        CustomToast.show(context, '成功修改客戶 $name 檔案 (離線暫存)', ToastType.success);
+      }
       return;
     }
 
@@ -236,6 +260,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       final supabase = Supabase.instance.client;
       await supabase.from('customers').update({
         'name': name,
+        'nickname': nickname,
+        'avatar_url': avatarUrl,
         'phone': phone,
         'email': email,
         'tags': tags,
@@ -243,11 +269,12 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       }).eq('id', id);
 
       await _fetchCustomers();
+      if (mounted) {
+        CustomToast.show(context, '成功修改客戶 $name 檔案', ToastType.success);
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('修改失敗: $e'), backgroundColor: Colors.redAccent),
-        );
+        CustomToast.show(context, '修改失敗: $e', ToastType.error);
       }
       setState(() {
         _isLoading = false;
@@ -267,6 +294,9 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         _isLoading = false;
       });
       _filterCustomers();
+      if (mounted) {
+        CustomToast.show(context, '成功刪除客戶檔案 (離線暫存)', ToastType.success);
+      }
       return;
     }
 
@@ -274,11 +304,12 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       final supabase = Supabase.instance.client;
       await supabase.from('customers').delete().eq('id', id);
       await _fetchCustomers();
+      if (mounted) {
+        CustomToast.show(context, '成功刪除客戶檔案', ToastType.success);
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('刪除失敗: $e'), backgroundColor: Colors.redAccent),
-        );
+        CustomToast.show(context, '刪除失敗: $e', ToastType.error);
       }
       setState(() {
         _isLoading = false;
@@ -290,6 +321,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   void _showCustomerForm({Map<String, dynamic>? customer}) {
     final isEdit = customer != null;
     final nameController = TextEditingController(text: isEdit ? customer['name'] : '');
+    final nicknameController = TextEditingController(text: isEdit ? customer['nickname'] : '');
+    final avatarUrlController = TextEditingController(text: isEdit ? customer['avatar_url'] : '');
     final phoneController = TextEditingController(text: isEdit ? customer['phone'] : '');
     final emailController = TextEditingController(text: isEdit ? customer['email'] : '');
     final tagsController = TextEditingController(
@@ -315,6 +348,24 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                       labelText: '客戶姓名 (必填)',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nicknameController,
+                    decoration: const InputDecoration(
+                      labelText: '客戶綽號',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person_pin_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: avatarUrlController,
+                    decoration: const InputDecoration(
+                      labelText: '照片網址 (URL)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.image_outlined),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -374,9 +425,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
               onPressed: () {
                 final name = nameController.text.trim();
                 if (name.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('客戶姓名為必填項目')),
-                  );
+                  CustomToast.show(context, '客戶姓名為必填項目', ToastType.warning);
                   return;
                 }
 
@@ -391,6 +440,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   _updateCustomer(
                     id: customer['id'],
                     name: name,
+                    nickname: nicknameController.text.trim(),
+                    avatarUrl: avatarUrlController.text.trim(),
                     phone: phoneController.text.trim(),
                     email: emailController.text.trim(),
                     tags: tagsList,
@@ -399,6 +450,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                 } else {
                   _createCustomer(
                     name: name,
+                    nickname: nicknameController.text.trim(),
+                    avatarUrl: avatarUrlController.text.trim(),
                     phone: phoneController.text.trim(),
                     email: emailController.text.trim(),
                     tags: tagsList,
@@ -546,167 +599,12 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       itemCount: _filteredCustomers.length,
       itemBuilder: (context, index) {
         final customer = _filteredCustomers[index];
-        return _buildCustomerCard(customer);
+        return FlippingCustomerCard(
+          customer: customer,
+          onEdit: () => _showCustomerForm(customer: customer),
+          onDelete: () => _showDeleteConfirm(customer['id'], customer['name'] ?? ''),
+        );
       },
-    );
-  }
-
-  // Single Customer Card UI
-  Widget _buildCustomerCard(Map<String, dynamic> customer) {
-    final String name = customer['name'] ?? '';
-    final String phone = customer['phone'] ?? '未填寫';
-    final String email = customer['email'] ?? '未填寫';
-    final List tags = customer['tags'] ?? [];
-    final String notes = customer['notes'] ?? '';
-    
-    final String nameInitial = name.isNotEmpty ? name.substring(0, 1) : '?';
-
-    return Card(
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF21262D), width: 1),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Section (Avatar & Info & Action buttons)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Avatar
-                CircleAvatar(
-                  backgroundColor: const Color(0xFF00ADB5).withOpacity(0.1),
-                  radius: 20,
-                  child: Text(
-                    nameInitial,
-                    style: const TextStyle(
-                      color: Color(0xFF00F5FF),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                
-                // Name & Info Columns
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.phone, size: 12, color: Colors.white30),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              phone,
-                              style: const TextStyle(color: Colors.white54, fontSize: 11),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          const Icon(Icons.email, size: 12, color: Colors.white30),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              email, 
-                              style: const TextStyle(color: Colors.white54, fontSize: 11),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Card Actions Column
-                Column(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, color: Colors.white54, size: 18),
-                      onPressed: () => _showCustomerForm(customer: customer),
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
-                      onPressed: () => _showDeleteConfirm(customer['id'], name),
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Notes Preview
-            if (notes.isNotEmpty) ...[
-              const Divider(color: Color(0xFF21262D), height: 12),
-              Text(
-                notes,
-                style: const TextStyle(
-                  color: Colors.white30,
-                  fontSize: 11,
-                  fontStyle: FontStyle.italic,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 6),
-            ],
-            
-            // Tags Row
-            if (tags.isNotEmpty)
-              SizedBox(
-                height: 22,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: tags.length,
-                  itemBuilder: (context, index) {
-                    final tag = tags[index];
-                    return Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00ADB5).withOpacity(0.08),
-                        border: Border.all(color: const Color(0xFF00ADB5).withOpacity(0.2), width: 1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        tag,
-                        style: const TextStyle(
-                          color: Color(0xFF00ADB5),
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      )),
     );
   }
 
@@ -740,6 +638,461 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 3D Flipping Customer Card Widget
+// ==========================================
+class FlippingCustomerCard extends StatefulWidget {
+  final Map<String, dynamic> customer;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const FlippingCustomerCard({
+    key,
+    required this.customer,
+    required this.onEdit,
+    required this.onDelete,
+  }) : super(key: key);
+
+  @override
+  State<FlippingCustomerCard> createState() => _FlippingCustomerCardState();
+}
+
+class _FlippingCustomerCardState extends State<FlippingCustomerCard> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  bool _isFront = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _flip() {
+    if (_isFront) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+    setState(() {
+      _isFront = !_isFront;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String name = widget.customer['name'] ?? '';
+    final String nickname = widget.customer['nickname'] ?? '';
+    final String phone = widget.customer['phone'] ?? '未填寫';
+    final String email = widget.customer['email'] ?? '未填寫';
+    final List tags = widget.customer['tags'] ?? [];
+    final String notes = widget.customer['notes'] ?? '';
+    final String avatarUrl = widget.customer['avatar_url'] ?? '';
+
+    final String displayName = nickname.isNotEmpty ? '$name ($nickname)' : name;
+    final String nameInitial = name.isNotEmpty ? name.substring(0, 1) : '?';
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final double transformVal = _controller.value * 3.1415926535;
+        final bool showFrontSide = transformVal < (3.1415926535 / 2);
+
+        return Transform(
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.001) // perspective
+            ..rotateY(transformVal),
+          alignment: Alignment.center,
+          child: showFrontSide
+              ? _buildFront(name, nickname, displayName, phone, email, tags, avatarUrl, nameInitial)
+              : Transform(
+                  // Counter rotate back side
+                  transform: Matrix4.identity()..rotateY(3.1415926535),
+                  alignment: Alignment.center,
+                  child: _buildBack(name, notes),
+                ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFront(
+    String name,
+    String nickname,
+    String displayName,
+    String phone,
+    String email,
+    List tags,
+    String avatarUrl,
+    String nameInitial,
+  ) {
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFF21262D), width: 1),
+      ),
+      child: InkWell(
+        onTap: _flip,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Section (Avatar & Info & Flip icon)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Avatar with Photo support
+                  CircleAvatar(
+                    backgroundColor: const Color(0xFF00ADB5).withOpacity(0.1),
+                    radius: 24,
+                    backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                    child: avatarUrl.isEmpty
+                        ? Text(
+                            nameInitial,
+                            style: const TextStyle(
+                              color: Color(0xFF00F5FF),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Name & Info Columns
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.phone, size: 12, color: Colors.white30),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                phone,
+                                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.email, size: 12, color: Colors.white30),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                email,
+                                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Flip icon indicator
+                  const Icon(
+                    Icons.flip_camera_android_rounded,
+                    color: Colors.white24,
+                    size: 18,
+                  ),
+                ],
+              ),
+
+              const Spacer(),
+
+              // Tags Row
+              if (tags.isNotEmpty)
+                SizedBox(
+                  height: 22,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: tags.length,
+                    itemBuilder: (context, index) {
+                      final tag = tags[index];
+                      return Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00ADB5).withOpacity(0.08),
+                          border: Border.all(color: const Color(0xFF00ADB5).withOpacity(0.2), width: 1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          tag,
+                          style: const TextStyle(
+                            color: Color(0xFF00ADB5),
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBack(String name, String notes) {
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFF00ADB5), width: 1.5),
+      ),
+      child: InkWell(
+        onTap: _flip,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '備註 ($name)',
+                      style: const TextStyle(
+                        color: Color(0xFF00F5FF),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, color: Colors.white54, size: 16),
+                        onPressed: widget.onEdit,
+                        constraints: const BoxConstraints(),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 16),
+                        onPressed: widget.onDelete,
+                        constraints: const BoxConstraints(),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.flip_camera_android_rounded,
+                        color: Color(0xFF00ADB5),
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Divider(color: Color(0xFF21262D), height: 12),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Text(
+                    notes.isNotEmpty ? notes : '無備註資訊。',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// Custom Toast Notification System
+// ==========================================
+enum ToastType { success, warning, error }
+
+class CustomToast extends StatefulWidget {
+  final String message;
+  final ToastType type;
+  final VoidCallback onDismiss;
+
+  const CustomToast({
+    key,
+    required this.message,
+    required this.type,
+    required this.onDismiss,
+  }) : super(key: key);
+
+  static void show(BuildContext context, String message, ToastType type) {
+    late OverlayEntry overlayEntry;
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 24,
+        right: MediaQuery.of(context).size.width >= 768 ? 24 : null,
+        left: MediaQuery.of(context).size.width >= 768 ? null : 24,
+        width: MediaQuery.of(context).size.width >= 768 ? 320 : MediaQuery.of(context).size.width - 48,
+        child: CustomToast(
+          message: message,
+          type: type,
+          onDismiss: () {
+            overlayEntry.remove();
+          },
+        ),
+      ),
+    );
+    Overlay.of(context).insert(overlayEntry);
+  }
+
+  @override
+  State<CustomToast> createState() => _CustomToastState();
+}
+
+class _CustomToastState extends State<CustomToast> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.5),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+
+    _controller.forward();
+
+    // Auto dismiss after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _controller.reverse().then((_) {
+          widget.onDismiss();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Color borderColor;
+    Color glowColor;
+    IconData icon;
+    Color iconColor;
+
+    switch (widget.type) {
+      case ToastType.success:
+        borderColor = const Color(0xFF00ADB5);
+        glowColor = const Color(0xFF00ADB5).withOpacity(0.2);
+        icon = Icons.check_circle_outline;
+        iconColor = const Color(0xFF00F5FF);
+        break;
+      case ToastType.warning:
+        borderColor = Colors.amber;
+        glowColor = Colors.amber.withOpacity(0.2);
+        icon = Icons.warning_amber_rounded;
+        iconColor = Colors.amber;
+        break;
+      case ToastType.error:
+        borderColor = Colors.redAccent;
+        glowColor = Colors.redAccent.withOpacity(0.2);
+        icon = Icons.error_outline_rounded;
+        iconColor = Colors.redAccent;
+        break;
+    }
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161B22),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor,
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: iconColor, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.message,
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white30, size: 16),
+                  onPressed: () {
+                    _controller.reverse().then((_) {
+                      widget.onDismiss();
+                    });
+                  },
+                  constraints: const BoxConstraints(),
+                  padding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

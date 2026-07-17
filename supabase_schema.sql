@@ -26,6 +26,8 @@ CREATE TABLE public.customers (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     name TEXT NOT NULL,
+    nickname TEXT,
+    avatar_url TEXT,
     phone TEXT,
     email TEXT,
     tags TEXT[] DEFAULT '{}'::TEXT[] NOT NULL,
