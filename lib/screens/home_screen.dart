@@ -15,6 +15,56 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime _selectedDate = DateTime(2026, 7, 8); // Default to current mock time July 8, 2026
   String _activeMenu = '今日行程';
   bool _isSidebarCollapsed = false;
+  String _userName = '載入中...';
+  String _userEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    if (isOfflineMode) {
+      setState(() {
+        _userName = '王大同 業務代表';
+        _userEmail = 'offline@insurance.helper';
+      });
+      return;
+    }
+
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        // Query from profiles table
+        final data = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (mounted) {
+          setState(() {
+            if (data != null && data['full_name'] != null) {
+              _userName = data['full_name'];
+            } else {
+              _userName = user.userMetadata?['full_name'] ?? '新業務代表';
+            }
+            _userEmail = data?['email'] ?? user.email ?? '';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        final user = Supabase.instance.client.auth.currentUser;
+        setState(() {
+          _userName = user?.userMetadata?['full_name'] ?? user?.email ?? '業務代表';
+          _userEmail = user?.email ?? '';
+        });
+      }
+    }
+  }
 
   // Sign out handler
   Future<void> _handleSignOut() async {
@@ -27,11 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       await Supabase.instance.client.auth.signOut();
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      }
+      // AuthGateway reactively handles returning to LoginScreen.
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -99,10 +145,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Row(
                 children: [
-                  const CircleAvatar(
-                    backgroundColor: Color(0xFF00ADB5),
+                  CircleAvatar(
+                    backgroundColor: const Color(0xFF00ADB5),
                     radius: 20,
-                    child: Icon(Icons.person, color: Colors.white),
+                    child: Text(
+                      _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   if (!_isSidebarCollapsed) ...[
                     const SizedBox(width: 12),
@@ -110,9 +162,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            '王大同 業務代表',
-                            style: TextStyle(
+                          Text(
+                            _userName,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
@@ -121,11 +173,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            isOfflineMode ? '離線模式' : '已連線 (Supabase)',
+                            isOfflineMode ? '離線模式' : _userEmail,
                             style: TextStyle(
-                              color: isOfflineMode ? Colors.amber : Colors.green,
+                              color: isOfflineMode ? Colors.amber : Colors.white54,
                               fontSize: 11,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
