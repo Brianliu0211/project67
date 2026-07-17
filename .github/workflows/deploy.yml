@@ -31,8 +31,10 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Create Dummy Env File
-        run: touch .env
+      - name: Create Env File with Secrets
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
 
       - name: Build Web
         run: flutter build web --release
