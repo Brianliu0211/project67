@@ -12,6 +12,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
@@ -19,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -26,6 +28,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (isOfflineMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('離線模式下無法註冊/登入。請填寫您的 .env 金鑰，或使用上方橫幅的「直接跳過登入」。'),
+          backgroundColor: Colors.amber,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -38,6 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
         await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
+          data: {
+            'full_name': _nameController.text.trim(),
+          },
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -50,11 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          );
-        }
+        // AuthGateway will automatically switch to HomeScreen because of the reactive stream listener.
       }
     } catch (e) {
       if (mounted) {
@@ -159,6 +170,25 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 20),
                               
+                              // Name Input (Only shown on Sign Up)
+                              if (_isSignUp) ...[
+                                TextFormField(
+                                  controller: _nameController,
+                                  decoration: const InputDecoration(
+                                    labelText: '姓名',
+                                    prefixIcon: Icon(Icons.person_outline),
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return '請輸入姓名';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+
                               // Email Input
                               TextFormField(
                                 controller: _emailController,
@@ -230,6 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onPressed: () {
                                   setState(() {
                                     _isSignUp = !_isSignUp;
+                                    _nameController.clear();
                                     _formKey.currentState?.reset();
                                   });
                                 },

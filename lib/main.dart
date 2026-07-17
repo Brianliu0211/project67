@@ -69,7 +69,7 @@ class MyApp extends StatelessWidget {
         backgroundColor: Color(0xFF161B22),
         elevation: 0,
       ),
-      cardTheme: const CardTheme(
+      cardTheme: const CardThemeData(
         color: Color(0xFF161B22),
         elevation: 2,
       ),
@@ -94,17 +94,26 @@ class AuthGateway extends StatelessWidget {
       return const LoginScreen();
     }
 
-    // In online mode, check Supabase Auth session
-    try {
-      final session = Supabase.instance.client.auth.currentSession;
-      if (session != null) {
-        return const HomeScreen();
-      } else {
-        return const LoginScreen();
-      }
-    } catch (_) {
-      // Fallback in case of Auth error
-      return const LoginScreen();
-    }
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF00ADB5),
+              ),
+            ),
+          );
+        }
+
+        final session = snapshot.data?.session ?? Supabase.instance.client.auth.currentSession;
+        if (session != null) {
+          return const HomeScreen();
+        } else {
+          return const LoginScreen();
+        }
+      },
+    );
   }
 }
