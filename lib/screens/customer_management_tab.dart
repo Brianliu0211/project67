@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
@@ -692,6 +693,298 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
     });
   }
 
+  void _showZoomDetails(BuildContext context) {
+    final String name = widget.customer['name'] ?? '';
+    final String nickname = widget.customer['nickname'] ?? '';
+    final String phone = widget.customer['phone'] ?? '未填寫';
+    final String email = widget.customer['email'] ?? '未填寫';
+    final List tags = widget.customer['tags'] ?? [];
+    final String notes = widget.customer['notes'] ?? '';
+    final String avatarUrl = widget.customer['avatar_url'] ?? '';
+
+    final String displayName = nickname.isNotEmpty ? '$name ($nickname)' : name;
+    final String nameInitial = name.isNotEmpty ? name.substring(0, 1) : '?';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: const Color(0xFF161B22),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF21262D), width: 1.5),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680, maxHeight: 500),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final bool isWide = constraints.maxWidth > 500;
+                
+                final Widget profileSection = Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Large Avatar
+                    CircleAvatar(
+                      backgroundColor: const Color(0xFF00ADB5).withOpacity(0.1),
+                      radius: 48,
+                      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                      child: avatarUrl.isEmpty
+                          ? Text(
+                              nameInitial,
+                              style: const TextStyle(
+                                color: Color(0xFF00F5FF),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 36,
+                              ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (nickname.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '本名：$name',
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    // Action Buttons Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildActionButton(
+                          icon: Icons.phone,
+                          label: '撥打',
+                          color: const Color(0xFF00ADB5),
+                          onPressed: () {
+                            if (phone != '未填寫') {
+                              Clipboard.setData(ClipboardData(text: phone));
+                              CustomToast.show(context, '已複製電話號碼至剪貼簿: $phone', ToastType.success);
+                            } else {
+                              CustomToast.show(context, '電話未填寫', ToastType.warning);
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        _buildActionButton(
+                          icon: Icons.email,
+                          label: '郵件',
+                          color: const Color(0xFF00ADB5),
+                          onPressed: () {
+                            if (email != '未填寫') {
+                              Clipboard.setData(ClipboardData(text: email));
+                              CustomToast.show(context, '已複製電子信信箱至剪貼簿: $email', ToastType.success);
+                            } else {
+                              CustomToast.show(context, '信箱未填寫', ToastType.warning);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+
+                final Widget detailsSection = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildInfoRow(Icons.phone_iphone_rounded, '電話', phone, context),
+                    const Divider(color: Color(0xFF21262D), height: 16),
+                    _buildInfoRow(Icons.email_outlined, '信箱', email, context),
+                    const Divider(color: Color(0xFF21262D), height: 16),
+                    const Text(
+                      '分類標籤',
+                      style: TextStyle(color: Color(0xFF00F5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    if (tags.isNotEmpty)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: tags.map((tag) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00ADB5).withOpacity(0.08),
+                            border: Border.all(color: const Color(0xFF00ADB5).withOpacity(0.2), width: 1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            tag.toString(),
+                            style: const TextStyle(
+                              color: Color(0xFF00ADB5),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )).toList(),
+                      )
+                    else
+                      const Text('無標籤設定', style: TextStyle(color: Colors.white30, fontSize: 12)),
+                    const Divider(color: Color(0xFF21262D), height: 24),
+                    const Text(
+                      '備註說明',
+                      style: TextStyle(color: Color(0xFF00F5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Flexible(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D1117),
+                          border: Border.all(color: const Color(0xFF21262D), width: 1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: SingleChildScrollView(
+                          child: Text(
+                            notes.isNotEmpty ? notes : '無備註資訊。',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+
+                return Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header with close button
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '客戶詳細資訊',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                            onPressed: () => Navigator.of(context).pop(),
+                            constraints: const BoxConstraints(),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (isWide)
+                        Flexible(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 220,
+                                child: profileSection,
+                              ),
+                              const VerticalDivider(color: Color(0xFF21262D), width: 32),
+                              Expanded(
+                                child: detailsSection,
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Flexible(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                profileSection,
+                                const SizedBox(height: 24),
+                                detailsSection,
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 14, color: Colors.white),
+      label: Text(label, style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color.withOpacity(0.15),
+        foregroundColor: color,
+        shadowColor: Colors.transparent,
+        side: BorderSide(color: color.withOpacity(0.3), width: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String title, String value, BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: Colors.white30),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(color: Colors.white30, fontSize: 11),
+              ),
+              const SizedBox(height: 2),
+              GestureDetector(
+                onTap: () {
+                  if (value != '未填寫') {
+                    Clipboard.setData(ClipboardData(text: value));
+                    CustomToast.show(context, '已複製 $title: $value', ToastType.success);
+                  }
+                },
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    color: value == '未填寫' ? Colors.white30 : const Color(0xFF00ADB5),
+                    fontSize: 13,
+                    decoration: value == '未填寫' ? null : TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final String name = widget.customer['name'] ?? '';
@@ -821,11 +1114,24 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                     ),
                   ),
 
-                  // Flip icon indicator
-                  const Icon(
-                    Icons.flip_camera_android_rounded,
-                    color: Colors.white24,
-                    size: 18,
+                  // Action icons on the right (Zoom & Flip)
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.fullscreen_rounded, color: Colors.white38, size: 20),
+                        tooltip: '放大詳情',
+                        onPressed: () => _showZoomDetails(context),
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                      ),
+                      const SizedBox(height: 8),
+                      const Icon(
+                        Icons.flip_camera_android_rounded,
+                        color: Colors.white24,
+                        size: 18,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -900,6 +1206,13 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      IconButton(
+                        icon: const Icon(Icons.fullscreen_rounded, color: Color(0xFF00ADB5), size: 16),
+                        tooltip: '放大詳情',
+                        onPressed: () => _showZoomDetails(context),
+                        constraints: const BoxConstraints(),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.edit_outlined, color: Colors.white54, size: 16),
                         onPressed: widget.onEdit,
