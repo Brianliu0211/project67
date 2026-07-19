@@ -12,7 +12,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  DateTime _selectedDate = DateTime(2026, 7, 8); // Default to current mock time July 8, 2026
+  DateTime _selectedDate = DateTime.now(); // Default to dynamic current time
   String _activeMenu = '今日行程';
   bool _isSidebarCollapsed = false;
   String _userName = '載入中...';
@@ -439,72 +439,96 @@ class _HomeScreenState extends State<HomeScreen> {
           
           // Weekly Row
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(7, (index) {
-              final DateTime date = weekDates[index];
-              final bool isSelected = date.year == _selectedDate.year &&
-                  date.month == _selectedDate.month &&
-                  date.day == _selectedDate.day;
-              
-              final bool isToday = date.day == DateTime.now().day &&
-                  date.month == DateTime.now().month &&
-                  date.year == DateTime.now().year;
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left, color: Color(0xFF00ADB5)),
+                tooltip: '上一週',
+                onPressed: () {
+                  setState(() {
+                    _selectedDate = _selectedDate.subtract(const Duration(days: 7));
+                  });
+                },
+              ),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(7, (index) {
+                    final DateTime date = weekDates[index];
+                    final bool isSelected = date.year == _selectedDate.year &&
+                        date.month == _selectedDate.month &&
+                        date.day == _selectedDate.day;
+                    
+                    final bool isToday = date.day == DateTime.now().day &&
+                        date.month == DateTime.now().month &&
+                        date.year == DateTime.now().year;
 
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedDate = date;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected 
-                          ? const Color(0xFF00ADB5) 
-                          : isToday 
-                              ? const Color(0xFF00ADB5).withOpacity(0.1) 
-                              : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: isToday && !isSelected
-                          ? Border.all(color: const Color(0xFF00ADB5), width: 1)
-                          : Border.all(color: Colors.transparent),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: const Color(0xFF00ADB5).withOpacity(0.4),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              )
-                            ]
-                          : null,
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          weekdaysZh[index],
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white38,
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedDate = date;
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected 
+                                ? const Color(0xFF00ADB5) 
+                                : isToday 
+                                    ? const Color(0xFF00ADB5).withOpacity(0.1) 
+                                    : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: isToday && !isSelected
+                                ? Border.all(color: const Color(0xFF00ADB5), width: 1)
+                                : Border.all(color: Colors.transparent),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF00ADB5).withOpacity(0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                weekdaysZh[index],
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.white38,
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${date.day}',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${date.day}',
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  }),
                 ),
-              );
-            }),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, color: Color(0xFF00ADB5)),
+                tooltip: '下一週',
+                onPressed: () {
+                  setState(() {
+                    _selectedDate = _selectedDate.add(const Duration(days: 7));
+                  });
+                },
+              ),
+            ],
           )
         ],
       ),
