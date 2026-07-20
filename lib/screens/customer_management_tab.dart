@@ -354,6 +354,45 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       );
     }
 
+    void submitForm() {
+      final name = nameController.text.trim();
+      if (name.isEmpty) {
+        CustomToast.show(context, '客戶姓名為必填項目', ToastType.warning);
+        return;
+      }
+
+      final tagsList = tagsController.text
+          .split(RegExp(r'[,，]'))
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+
+      if (isEdit) {
+        _updateCustomer(
+          id: customer['id'],
+          name: name,
+          nickname: nicknameController.text.trim(),
+          avatarUrl: avatarUrlController.text.trim(),
+          phone: phoneController.text.trim(),
+          email: emailController.text.trim(),
+          tags: tagsList,
+          notes: notesController.text.trim(),
+        );
+      } else {
+        _createCustomer(
+          name: name,
+          nickname: nicknameController.text.trim(),
+          avatarUrl: avatarUrlController.text.trim(),
+          phone: phoneController.text.trim(),
+          email: emailController.text.trim(),
+          tags: tagsList,
+          notes: notesController.text.trim(),
+        );
+      }
+
+      Navigator.pop(context);
+    }
+
     showDialog(
       context: context,
       builder: (context) {
@@ -373,18 +412,24 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   TextField(
                     controller: nameController,
                     style: TextStyle(color: textColor),
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: buildInputDecoration('客戶姓名 (必填)', Icons.person_outline),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: nicknameController,
                     style: TextStyle(color: textColor),
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: buildInputDecoration('客戶綽號', Icons.person_pin_outlined),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: avatarUrlController,
                     style: TextStyle(color: textColor),
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: buildInputDecoration('照片網址 (URL)', Icons.image_outlined),
                   ),
                   const SizedBox(height: 16),
@@ -392,6 +437,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                     controller: phoneController,
                     style: TextStyle(color: textColor),
                     keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: buildInputDecoration('電話號碼', Icons.phone_outlined),
                   ),
                   const SizedBox(height: 16),
@@ -399,12 +446,16 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                     controller: emailController,
                     style: TextStyle(color: textColor),
                     keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: buildInputDecoration('Email 信箱', Icons.email_outlined),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: tagsController,
                     style: TextStyle(color: textColor),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => submitForm(),
                     decoration: buildInputDecoration('標籤 (逗號區隔)', Icons.local_offer_outlined, hintText: '例如: 高意願, 醫療險, 車險'),
                   ),
                   const SizedBox(height: 16),
@@ -428,44 +479,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
               ),
-              onPressed: () {
-                final name = nameController.text.trim();
-                if (name.isEmpty) {
-                  CustomToast.show(context, '客戶姓名為必填項目', ToastType.warning);
-                  return;
-                }
-
-                final tagsList = tagsController.text
-                    .split(RegExp(r'[,，]'))
-                    .map((t) => t.trim())
-                    .where((t) => t.isNotEmpty)
-                    .toList();
-
-                if (isEdit) {
-                  _updateCustomer(
-                    id: customer['id'],
-                    name: name,
-                    nickname: nicknameController.text.trim(),
-                    avatarUrl: avatarUrlController.text.trim(),
-                    phone: phoneController.text.trim(),
-                    email: emailController.text.trim(),
-                    tags: tagsList,
-                    notes: notesController.text.trim(),
-                  );
-                } else {
-                  _createCustomer(
-                    name: name,
-                    nickname: nicknameController.text.trim(),
-                    avatarUrl: avatarUrlController.text.trim(),
-                    phone: phoneController.text.trim(),
-                    email: emailController.text.trim(),
-                    tags: tagsList,
-                    notes: notesController.text.trim(),
-                  );
-                }
-
-                Navigator.pop(context);
-              },
+              onPressed: submitForm,
               child: const Text('儲存'),
             ),
           ],
