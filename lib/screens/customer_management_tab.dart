@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
+import '../services/app_settings.dart';
 
 class CustomerManagementTab extends StatefulWidget {
   const CustomerManagementTab({super.key});
@@ -321,6 +322,12 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   // Display Add/Edit Dialog Form
   void _showCustomerForm({Map<String, dynamic>? customer}) {
     final isEdit = customer != null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+    final Color dialogBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color subTextColor = isDark ? Colors.white70 : Colors.black54;
+
     final nameController = TextEditingController(text: isEdit ? customer['name'] : '');
     final nicknameController = TextEditingController(text: isEdit ? customer['nickname'] : '');
     final avatarUrlController = TextEditingController(text: isEdit ? customer['avatar_url'] : '');
@@ -330,6 +337,23 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         text: isEdit ? (customer['tags'] as List).join(', ') : '');
     final notesController = TextEditingController(text: isEdit ? customer['notes'] : '');
 
+    InputDecoration buildInputDecoration(String labelText, IconData iconData, {String? hintText}) {
+      return InputDecoration(
+        labelText: labelText,
+        labelStyle: TextStyle(color: subTextColor),
+        hintText: hintText,
+        hintStyle: TextStyle(color: subTextColor),
+        prefixIcon: Icon(iconData, color: subTextColor),
+        border: const OutlineInputBorder(),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: isDark ? Colors.white30 : Colors.grey.shade400),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: primaryColor, width: 2),
+        ),
+      );
+    }
+
     void submitForm() {
       final name = nameController.text.trim();
       if (name.isEmpty) {
@@ -337,7 +361,6 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         return;
       }
 
-      // Parse tags comma string to string list
       final tagsList = tagsController.text
           .split(RegExp(r'[,，]'))
           .map((t) => t.trim())
@@ -374,8 +397,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF161B22),
-          title: Text(isEdit ? '編輯客戶檔案' : '新增客戶檔案', style: const TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: dialogBg,
+          title: Text(
+            isEdit ? '編輯客戶檔案' : '新增客戶檔案',
+            style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+          ),
           content: SingleChildScrollView(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
@@ -385,81 +411,59 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                 children: [
                   TextField(
                     controller: nameController,
+                    style: TextStyle(color: textColor),
                     textInputAction: TextInputAction.next,
                     onSubmitted: (_) => submitForm(),
-                    decoration: const InputDecoration(
-                      labelText: '客戶姓名 (必填)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
+                    decoration: buildInputDecoration('客戶姓名 (必填)', Icons.person_outline),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: nicknameController,
+                    style: TextStyle(color: textColor),
                     textInputAction: TextInputAction.next,
                     onSubmitted: (_) => submitForm(),
-                    decoration: const InputDecoration(
-                      labelText: '客戶綽號',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person_pin_outlined),
-                    ),
+                    decoration: buildInputDecoration('客戶綽號', Icons.person_pin_outlined),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: avatarUrlController,
+                    style: TextStyle(color: textColor),
                     textInputAction: TextInputAction.next,
                     onSubmitted: (_) => submitForm(),
-                    decoration: const InputDecoration(
-                      labelText: '照片網址 (URL)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.image_outlined),
-                    ),
+                    decoration: buildInputDecoration('照片網址 (URL)', Icons.image_outlined),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: phoneController,
+                    style: TextStyle(color: textColor),
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
                     onSubmitted: (_) => submitForm(),
-                    decoration: const InputDecoration(
-                      labelText: '電話號碼',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.phone_outlined),
-                    ),
+                    decoration: buildInputDecoration('電話號碼', Icons.phone_outlined),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: emailController,
+                    style: TextStyle(color: textColor),
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
                     onSubmitted: (_) => submitForm(),
-                    decoration: const InputDecoration(
-                      labelText: 'Email 信箱',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.email_outlined),
-                    ),
+                    decoration: buildInputDecoration('Email 信箱', Icons.email_outlined),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: tagsController,
+                    style: TextStyle(color: textColor),
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => submitForm(),
-                    decoration: const InputDecoration(
-                      labelText: '標籤 (逗號區隔)',
-                      hintText: '例如: 高意願, 醫療險, 車險',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.local_offer_outlined),
-                    ),
+                    decoration: buildInputDecoration('標籤 (逗號區隔)', Icons.local_offer_outlined, hintText: '例如: 高意願, 醫療險, 車險'),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: notesController,
+                    style: TextStyle(color: textColor),
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: '備註紀錄',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.note_alt_outlined),
-                    ),
+                    decoration: buildInputDecoration('備註紀錄', Icons.note_alt_outlined),
                   ),
                 ],
               ),
@@ -468,11 +472,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('取消', style: TextStyle(color: Colors.white54)),
+              child: Text('取消', style: TextStyle(color: subTextColor)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00ADB5),
+                backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
               ),
               onPressed: submitForm,
@@ -486,17 +490,22 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
 
   // Show delete confirmation dialog
   void _showDeleteConfirm(String id, String name) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color dialogBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color subTextColor = isDark ? Colors.white54 : Colors.black54;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF161B22),
-          title: const Text('確認刪除', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Text('確定要刪除客戶「$name」的完整檔案嗎？此操作無法還原。'),
+          backgroundColor: dialogBg,
+          title: Text('確認刪除', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+          content: Text('確定要刪除客戶「$name」的完整檔案嗎？此操作無法還原。', style: TextStyle(color: textColor)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('取消', style: TextStyle(color: Colors.white54)),
+              child: Text('取消', style: TextStyle(color: subTextColor)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
@@ -516,6 +525,13 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isWideScreen = screenWidth >= 768;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+
+    final Color searchBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color searchBorder = isDark ? const Color(0xFF30363D) : Colors.grey.shade300;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color iconColor = isDark ? Colors.white54 : Colors.black45;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -530,23 +546,25 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   height: 48,
                   child: TextField(
                     controller: _searchController,
+                    style: TextStyle(color: textColor),
                     decoration: InputDecoration(
                       hintText: '搜尋客戶姓名或標籤...',
-                      prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                      fillColor: const Color(0xFF161B22),
+                      hintStyle: TextStyle(color: iconColor),
+                      prefixIcon: Icon(Icons.search, color: iconColor),
+                      fillColor: searchBg,
                       filled: true,
                       contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(color: Color(0xFF30363D)),
+                        borderSide: BorderSide(color: searchBorder),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(color: Color(0xFF30363D)),
+                        borderSide: BorderSide(color: searchBorder),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: const BorderSide(color: Color(0xFF00ADB5), width: 1.5),
+                        borderSide: BorderSide(color: primaryColor, width: 1.5),
                       ),
                     ),
                   ),
@@ -556,7 +574,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
               ElevatedButton.icon(
                 onPressed: () => _showCustomerForm(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00ADB5),
+                  backgroundColor: primaryColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -573,11 +591,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           // Customer Grid/List Area
           Expanded(
             child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF00ADB5)),
+                ? Center(
+                    child: CircularProgressIndicator(color: primaryColor),
                   )
                 : _filteredCustomers.isEmpty
-                    ? _buildEmptyState()
+                    ? _buildEmptyState(isDark, primaryColor)
                     : _buildCustomerGrid(isWideScreen, screenWidth),
           ),
         ],
@@ -587,7 +605,6 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
 
   // Grid/List Layout
   Widget _buildCustomerGrid(bool isWideScreen, double screenWidth) {
-    // RWD grid columns calculation
     int crossAxisCount = 1;
     double childAspectRatio = 2.0;
 
@@ -600,7 +617,6 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         childAspectRatio = 1.5;
       }
     } else {
-      // Mobile
       childAspectRatio = 1.8;
     }
 
@@ -624,7 +640,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   }
 
   // Empty State Widget
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isDark, Color primaryColor) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -632,24 +648,24 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           Icon(
             Icons.people_outline,
             size: 64,
-            color: const Color(0xFF00ADB5).withOpacity(0.2),
+            color: primaryColor.withOpacity(0.3),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             '尚未建立客戶或查無此人',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.white70,
+              color: isDark ? Colors.white70 : Colors.black87,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '點選右上角的「新增客戶」按鈕開始建立客戶資料。\n您也可以輸入其他關鍵字搜尋。',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.white30,
+              color: isDark ? Colors.white30 : Colors.black54,
             ),
           ),
         ],
@@ -667,11 +683,11 @@ class FlippingCustomerCard extends StatefulWidget {
   final VoidCallback onDelete;
 
   const FlippingCustomerCard({
-    key,
+    super.key,
     required this.customer,
     required this.onEdit,
     required this.onDelete,
-  }) : super(key: key);
+  });
 
   @override
   State<FlippingCustomerCard> createState() => _FlippingCustomerCardState();
@@ -719,14 +735,21 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
     final String displayName = nickname.isNotEmpty ? '$name ($nickname)' : name;
     final String nameInitial = name.isNotEmpty ? name.substring(0, 1) : '?';
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+    final Color dialogBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color borderColor = isDark ? const Color(0xFF21262D) : Colors.grey.shade300;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color subTextColor = isDark ? Colors.white54 : Colors.black54;
+
     showDialog(
       context: context,
       builder: (context) {
         return Dialog(
-          backgroundColor: const Color(0xFF161B22),
+          backgroundColor: dialogBg,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF21262D), width: 1.5),
+            side: BorderSide(color: borderColor, width: 1.5),
           ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 680, maxHeight: 500),
@@ -739,14 +762,14 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                   children: [
                     // Large Avatar
                     CircleAvatar(
-                      backgroundColor: const Color(0xFF00ADB5).withOpacity(0.1),
+                      backgroundColor: primaryColor.withOpacity(0.12),
                       radius: 48,
                       backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
                       child: avatarUrl.isEmpty
                           ? Text(
                               nameInitial,
-                              style: const TextStyle(
-                                color: Color(0xFF00F5FF),
+                              style: TextStyle(
+                                color: primaryColor,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 36,
                               ),
@@ -756,8 +779,8 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                     const SizedBox(height: 16),
                     Text(
                       displayName,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: textColor,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -767,7 +790,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                       const SizedBox(height: 4),
                       Text(
                         '本名：$name',
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        style: TextStyle(color: subTextColor, fontSize: 12),
                       ),
                     ],
                     const SizedBox(height: 20),
@@ -778,7 +801,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                         _buildActionButton(
                           icon: Icons.phone,
                           label: '撥打',
-                          color: const Color(0xFF00ADB5),
+                          color: primaryColor,
                           onPressed: () {
                             if (phone != '未填寫') {
                               Clipboard.setData(ClipboardData(text: phone));
@@ -792,7 +815,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                         _buildActionButton(
                           icon: Icons.email,
                           label: '郵件',
-                          color: const Color(0xFF00ADB5),
+                          color: primaryColor,
                           onPressed: () {
                             if (email != '未填寫') {
                               Clipboard.setData(ClipboardData(text: email));
@@ -812,29 +835,28 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildInfoRow(Icons.phone_iphone_rounded, '電話', phone, context),
-                    const Divider(color: Color(0xFF21262D), height: 16),
-                    _buildInfoRow(Icons.email_outlined, '信箱', email, context),
-                    const Divider(color: Color(0xFF21262D), height: 16),
-                    const Text(
-                      '分類標籤',
-                      style: TextStyle(color: Color(0xFF00F5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                    const SizedBox(height: 12),
+                    _buildInfoRow(Icons.mail_outline_rounded, 'Email', email, context),
+                    const SizedBox(height: 16),
+                    Text(
+                      '標籤分類',
+                      style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     if (tags.isNotEmpty)
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                        spacing: 6,
+                        runSpacing: 6,
                         children: tags.map((tag) => Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00ADB5).withOpacity(0.08),
-                            border: Border.all(color: const Color(0xFF00ADB5).withOpacity(0.2), width: 1),
-                            borderRadius: BorderRadius.circular(12),
+                            color: primaryColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             tag.toString(),
-                            style: const TextStyle(
-                              color: Color(0xFF00ADB5),
+                            style: TextStyle(
+                              color: primaryColor,
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
@@ -842,11 +864,11 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                         )).toList(),
                       )
                     else
-                      const Text('無標籤設定', style: TextStyle(color: Colors.white30, fontSize: 12)),
-                    const Divider(color: Color(0xFF21262D), height: 24),
-                    const Text(
+                      Text('暫無標籤', style: TextStyle(color: subTextColor, fontSize: 12)),
+                    const SizedBox(height: 16),
+                    Text(
                       '備註說明',
-                      style: TextStyle(color: Color(0xFF00F5FF), fontSize: 12, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Flexible(
@@ -854,15 +876,15 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0D1117),
-                          border: Border.all(color: const Color(0xFF21262D), width: 1),
+                          color: isDark ? const Color(0xFF0D1117) : Colors.grey.shade100,
+                          border: Border.all(color: borderColor, width: 1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: SingleChildScrollView(
                           child: Text(
                             notes.isNotEmpty ? notes : '無備註資訊。',
-                            style: const TextStyle(
-                              color: Colors.white70,
+                            style: TextStyle(
+                              color: textColor,
                               fontSize: 12,
                               height: 1.5,
                             ),
@@ -882,16 +904,16 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             '客戶詳細資訊',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: textColor,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                            icon: Icon(Icons.close, color: subTextColor, size: 20),
                             onPressed: () => Navigator.of(context).pop(),
                             constraints: const BoxConstraints(),
                             padding: EdgeInsets.zero,
@@ -908,7 +930,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                                 width: 220,
                                 child: profileSection,
                               ),
-                              const VerticalDivider(color: Color(0xFF21262D), width: 32),
+                              VerticalDivider(color: borderColor, width: 32),
                               Expanded(
                                 child: detailsSection,
                               ),
@@ -962,10 +984,17 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
   }
 
   Widget _buildInfoRow(IconData icon, String title, String value, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+    final Color iconColor = isDark ? Colors.white30 : Colors.black45;
+    final Color valueColor = value == '未填寫' 
+        ? (isDark ? Colors.white30 : Colors.black38) 
+        : primaryColor;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: Colors.white30),
+        Icon(icon, size: 16, color: iconColor),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -973,7 +1002,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
             children: [
               Text(
                 title,
-                style: const TextStyle(color: Colors.white30, fontSize: 11),
+                style: TextStyle(color: iconColor, fontSize: 11),
               ),
               const SizedBox(height: 2),
               GestureDetector(
@@ -986,7 +1015,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                 child: Text(
                   value,
                   style: TextStyle(
-                    color: value == '未填寫' ? Colors.white30 : const Color(0xFF00ADB5),
+                    color: valueColor,
                     fontSize: 13,
                     decoration: value == '未填寫' ? null : TextDecoration.underline,
                   ),
@@ -1046,11 +1075,20 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
     String avatarUrl,
     String nameInitial,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+    final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color cardBorder = isDark ? const Color(0xFF21262D) : Colors.grey.shade300;
+    final Color nameColor = isDark ? Colors.white : Colors.black87;
+    final Color infoColor = isDark ? Colors.white54 : Colors.black54;
+    final Color iconColor = isDark ? Colors.white30 : Colors.black38;
+
     return Card(
       margin: EdgeInsets.zero,
+      color: cardBg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF21262D), width: 1),
+        side: BorderSide(color: cardBorder, width: 1),
       ),
       child: InkWell(
         onTap: _flip,
@@ -1066,14 +1104,14 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                 children: [
                   // Avatar with Photo support
                   CircleAvatar(
-                    backgroundColor: const Color(0xFF00ADB5).withOpacity(0.1),
+                    backgroundColor: primaryColor.withOpacity(0.12),
                     radius: 24,
                     backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
                     child: avatarUrl.isEmpty
                         ? Text(
                             nameInitial,
-                            style: const TextStyle(
-                              color: Color(0xFF00F5FF),
+                            style: TextStyle(
+                              color: primaryColor,
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
                             ),
@@ -1089,8 +1127,8 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                       children: [
                         Text(
                           displayName,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: nameColor,
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1099,12 +1137,12 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(Icons.phone, size: 12, color: Colors.white30),
+                            Icon(Icons.phone, size: 12, color: iconColor),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 phone,
-                                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                style: TextStyle(color: infoColor, fontSize: 11),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -1113,12 +1151,12 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.email, size: 12, color: Colors.white30),
+                            Icon(Icons.email, size: 12, color: iconColor),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 email,
-                                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                style: TextStyle(color: infoColor, fontSize: 11),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -1133,16 +1171,16 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.fullscreen_rounded, color: Colors.white38, size: 20),
+                        icon: Icon(Icons.fullscreen_rounded, color: iconColor, size: 20),
                         tooltip: '放大詳情',
                         onPressed: () => _showZoomDetails(context),
                         constraints: const BoxConstraints(),
-                        padding: EdgeInsets.zero,
+                        padding: const EdgeInsets.all(4),
                       ),
-                      const SizedBox(height: 8),
-                      const Icon(
+                      const SizedBox(height: 4),
+                      Icon(
                         Icons.flip_camera_android_rounded,
-                        color: Colors.white24,
+                        color: primaryColor,
                         size: 18,
                       ),
                     ],
@@ -1154,32 +1192,26 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
 
               // Tags Row
               if (tags.isNotEmpty)
-                SizedBox(
-                  height: 22,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: tags.length,
-                    itemBuilder: (context, index) {
-                      final tag = tags[index];
-                      return Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00ADB5).withOpacity(0.08),
-                          border: Border.all(color: const Color(0xFF00ADB5).withOpacity(0.2), width: 1),
-                          borderRadius: BorderRadius.circular(12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: tags.take(3).map((tag) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        tag.toString(),
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                         ),
-                        child: Text(
-                          tag,
-                          style: const TextStyle(
-                            color: Color(0xFF00ADB5),
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  }).toList(),
                 ),
             ],
           ),
@@ -1189,11 +1221,18 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
   }
 
   Widget _buildBack(String name, String notes) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+    final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color subTextColor = isDark ? Colors.white54 : Colors.black54;
+
     return Card(
       margin: EdgeInsets.zero,
+      color: cardBg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF00ADB5), width: 1.5),
+        side: BorderSide(color: primaryColor, width: 1.5),
       ),
       child: InkWell(
         onTap: _flip,
@@ -1209,8 +1248,8 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                   Expanded(
                     child: Text(
                       '備註 ($name)',
-                      style: const TextStyle(
-                        color: Color(0xFF00F5FF),
+                      style: TextStyle(
+                        color: primaryColor,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1221,14 +1260,14 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.fullscreen_rounded, color: Color(0xFF00ADB5), size: 16),
+                        icon: Icon(Icons.fullscreen_rounded, color: primaryColor, size: 16),
                         tooltip: '放大詳情',
                         onPressed: () => _showZoomDetails(context),
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.edit_outlined, color: Colors.white54, size: 16),
+                        icon: Icon(Icons.edit_outlined, color: subTextColor, size: 16),
                         onPressed: widget.onEdit,
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -1240,22 +1279,24 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(
+                      Icon(
                         Icons.flip_camera_android_rounded,
-                        color: Color(0xFF00ADB5),
+                        color: primaryColor,
                         size: 16,
                       ),
                     ],
                   ),
                 ],
               ),
-              const Divider(color: Color(0xFF21262D), height: 12),
+              Divider(color: isDark ? const Color(0xFF21262D) : Colors.grey.shade300, height: 12),
               Expanded(
                 child: SingleChildScrollView(
                   child: Text(
                     notes.isNotEmpty ? notes : '無備註資訊。',
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: notes.isNotEmpty 
+                          ? (isDark ? Colors.white : Colors.black87) 
+                          : (isDark ? Colors.white38 : Colors.black45),
                       fontSize: 11,
                       height: 1.4,
                     ),

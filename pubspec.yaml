@@ -41,6 +41,9 @@ dependencies:
   # Environment variable manager
   flutter_dotenv: ^6.0.1
 
+  # Local preferences storage
+  shared_preferences: ^2.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
