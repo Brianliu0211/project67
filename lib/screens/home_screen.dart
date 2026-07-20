@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
+import '../services/app_settings.dart';
 import 'login_screen.dart';
 import 'customer_management_tab.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _isSidebarCollapsed = AppSettings.instance.isSidebarCollapsedByDefault;
     _loadUserProfile();
   }
 
@@ -89,20 +92,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Show date picker and update selected date
   Future<void> _selectDate(BuildContext context) async {
+    final primaryColor = AppSettings.instance.primaryColor;
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
       builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF00ADB5),
-              onPrimary: Colors.white,
-              surface: Color(0xFF161B22),
-              onSurface: Colors.white,
-            ),
+            colorScheme: isDark
+                ? ColorScheme.dark(
+                    primary: primaryColor,
+                    onPrimary: Colors.white,
+                    surface: const Color(0xFF161B22),
+                    onSurface: Colors.white,
+                  )
+                : ColorScheme.light(
+                    primary: primaryColor,
+                    onPrimary: Colors.white,
+                    surface: Colors.white,
+                    onSurface: Colors.black87,
+                  ),
           ),
           child: child!,
         );
@@ -117,7 +129,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Get week dates based on selected date
   List<DateTime> _getWeekDates(DateTime date) {
-    // Find the Monday of the week containing the date
     final int daysFromMonday = date.weekday - 1;
     final DateTime monday = date.subtract(Duration(days: daysFromMonday));
     return List.generate(7, (index) => monday.add(Duration(days: index)));
@@ -127,65 +138,85 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isWideScreen = screenWidth >= 768;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+
+    final Color sidebarBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color borderColor = isDark ? const Color(0xFF21262D) : Colors.grey.shade200;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color subTextColor = isDark ? Colors.white54 : Colors.black54;
 
     // Sidebar navigation content
     Widget sidebarContent() {
       return Container(
-        color: const Color(0xFF161B22),
-        width: _isSidebarCollapsed ? 70 : 260,
+        color: sidebarBg,
+        width: _isSidebarCollapsed ? 80 : 260,
         child: Column(
           children: [
             // Header Profile Area
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              decoration: const BoxDecoration(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
+              decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Color(0xFF21262D), width: 1),
+                  bottom: BorderSide(color: borderColor, width: 1),
                 ),
               ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFF00ADB5),
-                    radius: 20,
-                    child: Text(
-                      _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+              child: _isSidebarCollapsed
+                  ? Center(
+                      child: CircleAvatar(
+                        backgroundColor: primaryColor,
+                        radius: 20,
+                        child: Text(
+                          _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  if (!_isSidebarCollapsed) ...[
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _userName,
+                    )
+                  : Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: primaryColor,
+                          radius: 20,
+                          child: Text(
+                            _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            isOfflineMode ? '離線模式' : _userEmail,
-                            style: TextStyle(
-                              color: isOfflineMode ? Colors.amber : Colors.white54,
-                              fontSize: 11,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _userName,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                isOfflineMode ? '離線模式' : _userEmail,
+                                style: TextStyle(
+                                  color: isOfflineMode ? Colors.amber : subTextColor,
+                                  fontSize: 11,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ]
-                ],
-              ),
             ),
             
             const SizedBox(height: 16),
@@ -195,10 +226,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children: [
-                  _buildSidebarItem(Icons.calendar_today_outlined, '今日行程'),
-                  _buildSidebarItem(Icons.people_outline, '客戶管理'),
-                  _buildSidebarItem(Icons.hub_outlined, '人脈拓撲'),
-                  _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情'),
+                  _buildSidebarItem(Icons.calendar_today_outlined, '今日行程', isDark, primaryColor),
+                  _buildSidebarItem(Icons.people_outline, '客戶管理', isDark, primaryColor),
+                  _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
+                  _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
+                  _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
                 ],
               ),
             ),
@@ -213,16 +245,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 icon: Icon(
                   _isSidebarCollapsed ? Icons.chevron_right : Icons.chevron_left,
-                  color: Colors.white54,
+                  color: subTextColor,
                 ),
               ),
 
             // Sign out button
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: Color(0xFF21262D), width: 1),
+                  top: BorderSide(color: borderColor, width: 1),
                 ),
               ),
               child: _isSidebarCollapsed
@@ -252,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ? null
           : AppBar(
               title: Text(_activeMenu),
-              backgroundColor: const Color(0xFF161B22),
+              backgroundColor: sidebarBg,
               actions: [
                 if (isOfflineMode)
                   Container(
@@ -277,10 +309,10 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Wide Screen Header
-                if (isWideScreen) _buildWebHeader(),
+                if (isWideScreen) _buildWebHeader(isDark, textColor, subTextColor, borderColor),
                 
                 // Weekly Calendar Strip
-                if (_activeMenu == '今日行程') _buildWeeklyCalendarStrip(),
+                if (_activeMenu == '今日行程') _buildWeeklyCalendarStrip(isDark, textColor, subTextColor, borderColor, primaryColor),
                 
                 // Main Working Area
                 Expanded(
@@ -288,7 +320,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? _buildScheduleTimeline()
                       : _activeMenu == '客戶管理'
                           ? const CustomerManagementTab()
-                          : _buildFallbackScreen(),
+                          : _activeMenu == '系統設定'
+                              ? const SettingsScreen()
+                              : _buildFallbackScreen(),
                 ),
               ],
             ),
@@ -299,8 +333,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Helper to build sidebar item
-  Widget _buildSidebarItem(IconData icon, String title) {
+  Widget _buildSidebarItem(IconData icon, String title, bool isDark, Color primaryColor) {
     final bool isActive = _activeMenu == title;
+    final Color activeBg = primaryColor.withOpacity(0.15);
+    final Color inactiveText = isDark ? Colors.white70 : Colors.black87;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
@@ -315,7 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(8),
         child: Container(
           decoration: BoxDecoration(
-            color: isActive ? const Color(0xFF00ADB5).withOpacity(0.15) : Colors.transparent,
+            color: isActive ? activeBg : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -324,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Icon(
                 icon,
-                color: isActive ? const Color(0xFF00F5FF) : Colors.white70,
+                color: isActive ? primaryColor : inactiveText,
                 size: 20,
               ),
               if (!_isSidebarCollapsed) ...[
@@ -332,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   title,
                   style: TextStyle(
-                    color: isActive ? Colors.white : Colors.white70,
+                    color: isActive ? primaryColor : inactiveText,
                     fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                     fontSize: 14,
                   ),
@@ -346,19 +383,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Web Header (Desktop top bar)
-  Widget _buildWebHeader() {
+  Widget _buildWebHeader(bool isDark, Color textColor, Color subTextColor, Color borderColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      color: const Color(0xFF0D1117),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0D1117) : Colors.white,
+        border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             _activeMenu,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: textColor,
             ),
           ),
           Row(
@@ -383,9 +423,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-              const Text(
+              Text(
                 '保險客戶管理助手 v1.0.0',
-                style: TextStyle(color: Colors.white38, fontSize: 12),
+                style: TextStyle(color: subTextColor, fontSize: 12),
               ),
             ],
           )
@@ -395,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Horizontal Weekly Calendar Strip
-  Widget _buildWeeklyCalendarStrip() {
+  Widget _buildWeeklyCalendarStrip(bool isDark, Color textColor, Color subTextColor, Color borderColor, Color primaryColor) {
     final List<DateTime> weekDates = _getWeekDates(_selectedDate);
     final List<String> weekdaysZh = ['一', '二', '三', '四', '五', '六', '日'];
     
@@ -403,10 +443,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF161B22),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF161B22) : Colors.white,
         border: Border(
-          bottom: BorderSide(color: Color(0xFF21262D), width: 1),
+          bottom: BorderSide(color: borderColor, width: 1),
         ),
       ),
       child: Column(
@@ -422,14 +462,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     monthString,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.arrow_drop_down, color: Color(0xFF00ADB5), size: 24),
+                  Icon(Icons.arrow_drop_down, color: primaryColor, size: 24),
                 ],
               ),
             ),
@@ -441,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.chevron_left, color: Color(0xFF00ADB5)),
+                icon: Icon(Icons.chevron_left, color: primaryColor),
                 tooltip: '上一週',
                 onPressed: () {
                   setState(() {
@@ -474,18 +514,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
                             color: isSelected 
-                                ? const Color(0xFF00ADB5) 
+                                ? primaryColor 
                                 : isToday 
-                                    ? const Color(0xFF00ADB5).withOpacity(0.1) 
+                                    ? primaryColor.withOpacity(0.1) 
                                     : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                             border: isToday && !isSelected
-                                ? Border.all(color: const Color(0xFF00ADB5), width: 1)
+                                ? Border.all(color: primaryColor, width: 1)
                                 : Border.all(color: Colors.transparent),
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: const Color(0xFF00ADB5).withOpacity(0.4),
+                                      color: primaryColor.withOpacity(0.4),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     )
@@ -497,7 +537,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 weekdaysZh[index],
                                 style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.white38,
+                                  color: isSelected ? Colors.white : subTextColor,
                                   fontSize: 12,
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                 ),
@@ -506,7 +546,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 '${date.day}',
                                 style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.white,
+                                  color: isSelected ? Colors.white : textColor,
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -520,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.chevron_right, color: Color(0xFF00ADB5)),
+                icon: Icon(Icons.chevron_right, color: primaryColor),
                 tooltip: '下一週',
                 onPressed: () {
                   setState(() {
@@ -537,6 +577,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Vertical Day Timeline Schedule
   Widget _buildScheduleTimeline() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+    final Color gridColor = isDark ? const Color(0xFF21262D) : Colors.grey.shade300;
+    final Color hourTextColor = isDark ? Colors.white30 : Colors.black45;
+
     // We display 06:00 to 22:00
     final List<int> hours = List.generate(17, (index) => index + 6);
 
@@ -558,8 +603,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: 50,
                       child: Text(
                         hourLabel,
-                        style: const TextStyle(
-                          color: Colors.white30,
+                        style: TextStyle(
+                          color: hourTextColor,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -567,11 +612,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     
                     // Divider line
-                    const Expanded(
+                    Expanded(
                       child: Padding(
-                        padding: EdgeInsets.only(top: 8.0),
+                        padding: const EdgeInsets.only(top: 8.0),
                         child: Divider(
-                          color: Color(0xFF21262D),
+                          color: gridColor,
                           thickness: 1,
                           height: 1,
                         ),
@@ -583,12 +628,7 @@ class _HomeScreenState extends State<HomeScreen> {
             }).toList(),
           ),
 
-          // Custom Schedule Cards overlays
-          // Note: Timeline height starts from 06:00. Height of 1 hour is 60px.
-          // Position = (Hour - 6) * 60 + (Minute/60) * 60
-          
           // Card 1: 09:00 - 10:00: 「穿黑色衣服」（打卡點圓圈樣式）
-          // Position top: (9 - 6) * 60 = 180px. Height: 60px.
           Positioned(
             top: 180 + 8,
             left: 70,
@@ -597,13 +637,12 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _buildBulletSchedule(
               title: '穿黑色衣服',
               timeRange: '09:00 - 10:00',
-              bulletColor: const Color(0xFF00ADB5),
+              bulletColor: primaryColor,
+              isDark: isDark,
             ),
           ),
 
           // Card 2: 14:30 - 17:30: 「服學 正式活動」（滿版背景藍色卡片樣式）
-          // Position top: (14.5 - 6) * 60 = 8.5 * 60 = 510px.
-          // Height: 3 hours = 180px.
           Positioned(
             top: 510 + 8,
             left: 70,
@@ -614,9 +653,10 @@ class _HomeScreenState extends State<HomeScreen> {
               timeRange: '14:30 - 17:30',
               location: '台大第一學生活動中心',
               tag: '服務學習',
-              cardColor: const Color(0xFF1E3A8A).withOpacity(0.6), // Solid dark blue
-              borderColor: const Color(0xFF2563EB), // Blue border
-              accentColor: const Color(0xFF00F5FF), // Ice Blue accent
+              cardColor: isDark ? const Color(0xFF1E3A8A).withOpacity(0.6) : const Color(0xFFDBEAFE),
+              borderColor: isDark ? const Color(0xFF2563EB) : const Color(0xFF3B82F6),
+              accentColor: isDark ? const Color(0xFF00F5FF) : const Color(0xFF1D4ED8),
+              isDark: isDark,
             ),
           ),
         ],
@@ -629,13 +669,14 @@ class _HomeScreenState extends State<HomeScreen> {
     required String title,
     required String timeRange,
     required Color bulletColor,
+    required bool isDark,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22).withOpacity(0.8),
+        color: isDark ? const Color(0xFF161B22).withOpacity(0.8) : Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF30363D), width: 1),
+        border: Border.all(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade300, width: 1),
       ),
       child: Row(
         children: [
@@ -658,8 +699,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
           Text(
             timeRange,
-            style: const TextStyle(
-              color: Colors.white38,
+            style: TextStyle(
+              color: isDark ? Colors.white38 : Colors.black54,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -667,8 +708,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black87,
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
@@ -687,7 +728,11 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color cardColor,
     required Color borderColor,
     required Color accentColor,
+    required bool isDark,
   }) {
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color subTextColor = isDark ? Colors.white70 : Colors.black54;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -710,11 +755,11 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.access_time, size: 14, color: Colors.white70),
+                  Icon(Icons.access_time, size: 14, color: subTextColor),
                   const SizedBox(width: 6),
                   Text(
                     timeRange,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+                    style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -734,8 +779,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 10),
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textColor,
               fontSize: 18,
               fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
@@ -745,12 +790,12 @@ class _HomeScreenState extends State<HomeScreen> {
           const Spacer(),
           Row(
             children: [
-              const Icon(Icons.location_on_outlined, size: 14, color: Colors.white38),
+              Icon(Icons.location_on_outlined, size: 14, color: subTextColor),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   location,
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  style: TextStyle(color: subTextColor, fontSize: 12),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -763,6 +808,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Fallback Placeholder screen for non-calendar sections
   Widget _buildFallbackScreen() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -774,24 +822,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? Icons.hub_outlined 
                     : Icons.bar_chart_outlined,
             size: 64,
-            color: const Color(0xFF00ADB5).withOpacity(0.3),
+            color: primaryColor.withOpacity(0.4),
           ),
           const SizedBox(height: 16),
           Text(
             '$_activeMenu 功能骨架',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white70,
+              color: isDark ? Colors.white70 : Colors.black87,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '目前處於 Phase 1，此畫面為選單骨架頁面。\n後續 Phase 將逐步刻劃並串接資料庫實作。',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
-              color: Colors.white30,
+              color: isDark ? Colors.white30 : Colors.black54,
             ),
           ),
         ],
