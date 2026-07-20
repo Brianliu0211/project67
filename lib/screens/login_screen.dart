@@ -174,6 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               if (_isSignUp) ...[
                                 TextFormField(
                                   controller: _nameController,
+                                  textInputAction: TextInputAction.next,
                                   decoration: const InputDecoration(
                                     labelText: '姓名',
                                     prefixIcon: Icon(Icons.person_outline),
@@ -193,6 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               TextFormField(
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
                                   labelText: 'Email',
                                   prefixIcon: Icon(Icons.email_outlined),
@@ -214,6 +216,12 @@ class _LoginScreenState extends State<LoginScreen> {
                               TextFormField(
                                 controller: _passwordController,
                                 obscureText: true,
+                                textInputAction: TextInputAction.done,
+                                onFieldSubmitted: (_) {
+                                  if (!_isLoading) {
+                                    _handleSubmit();
+                                  }
+                                },
                                 decoration: const InputDecoration(
                                   labelText: '密碼',
                                   prefixIcon: Icon(Icons.lock_outline),
