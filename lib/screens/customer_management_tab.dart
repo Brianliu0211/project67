@@ -330,6 +330,46 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         text: isEdit ? (customer['tags'] as List).join(', ') : '');
     final notesController = TextEditingController(text: isEdit ? customer['notes'] : '');
 
+    void submitForm() {
+      final name = nameController.text.trim();
+      if (name.isEmpty) {
+        CustomToast.show(context, '客戶姓名為必填項目', ToastType.warning);
+        return;
+      }
+
+      // Parse tags comma string to string list
+      final tagsList = tagsController.text
+          .split(RegExp(r'[,，]'))
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+
+      if (isEdit) {
+        _updateCustomer(
+          id: customer['id'],
+          name: name,
+          nickname: nicknameController.text.trim(),
+          avatarUrl: avatarUrlController.text.trim(),
+          phone: phoneController.text.trim(),
+          email: emailController.text.trim(),
+          tags: tagsList,
+          notes: notesController.text.trim(),
+        );
+      } else {
+        _createCustomer(
+          name: name,
+          nickname: nicknameController.text.trim(),
+          avatarUrl: avatarUrlController.text.trim(),
+          phone: phoneController.text.trim(),
+          email: emailController.text.trim(),
+          tags: tagsList,
+          notes: notesController.text.trim(),
+        );
+      }
+
+      Navigator.pop(context);
+    }
+
     showDialog(
       context: context,
       builder: (context) {
@@ -345,6 +385,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                 children: [
                   TextField(
                     controller: nameController,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: const InputDecoration(
                       labelText: '客戶姓名 (必填)',
                       border: OutlineInputBorder(),
@@ -354,6 +396,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: nicknameController,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: const InputDecoration(
                       labelText: '客戶綽號',
                       border: OutlineInputBorder(),
@@ -363,6 +407,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: avatarUrlController,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: const InputDecoration(
                       labelText: '照片網址 (URL)',
                       border: OutlineInputBorder(),
@@ -373,6 +419,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   TextField(
                     controller: phoneController,
                     keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: const InputDecoration(
                       labelText: '電話號碼',
                       border: OutlineInputBorder(),
@@ -383,6 +431,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   TextField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => submitForm(),
                     decoration: const InputDecoration(
                       labelText: 'Email 信箱',
                       border: OutlineInputBorder(),
@@ -392,6 +442,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: tagsController,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => submitForm(),
                     decoration: const InputDecoration(
                       labelText: '標籤 (逗號區隔)',
                       hintText: '例如: 高意願, 醫療險, 車險',
@@ -423,45 +475,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                 backgroundColor: const Color(0xFF00ADB5),
                 foregroundColor: Colors.white,
               ),
-              onPressed: () {
-                final name = nameController.text.trim();
-                if (name.isEmpty) {
-                  CustomToast.show(context, '客戶姓名為必填項目', ToastType.warning);
-                  return;
-                }
-
-                // Parse tags comma string to string list
-                final tagsList = tagsController.text
-                    .split(RegExp(r'[,，]'))
-                    .map((t) => t.trim())
-                    .where((t) => t.isNotEmpty)
-                    .toList();
-
-                if (isEdit) {
-                  _updateCustomer(
-                    id: customer['id'],
-                    name: name,
-                    nickname: nicknameController.text.trim(),
-                    avatarUrl: avatarUrlController.text.trim(),
-                    phone: phoneController.text.trim(),
-                    email: emailController.text.trim(),
-                    tags: tagsList,
-                    notes: notesController.text.trim(),
-                  );
-                } else {
-                  _createCustomer(
-                    name: name,
-                    nickname: nicknameController.text.trim(),
-                    avatarUrl: avatarUrlController.text.trim(),
-                    phone: phoneController.text.trim(),
-                    email: emailController.text.trim(),
-                    tags: tagsList,
-                    notes: notesController.text.trim(),
-                  );
-                }
-
-                Navigator.pop(context);
-              },
+              onPressed: submitForm,
               child: const Text('儲存'),
             ),
           ],
