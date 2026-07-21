@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
 
@@ -160,17 +162,56 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     required String email,
     required List<String> tags,
     required String notes,
+    Uint8List? imageBytes,
+    String? imageName,
+    required bool isImageCleared,
   }) async {
     setState(() {
       _isLoading = true;
     });
+
+    String finalAvatarUrl = avatarUrl;
+    if (isImageCleared) {
+      finalAvatarUrl = '';
+    } else if (imageBytes != null && imageName != null) {
+      if (isOfflineMode) {
+        finalAvatarUrl = 'data:image/jpeg;base64,${base64Encode(imageBytes)}';
+      } else {
+        try {
+          final supabase = Supabase.instance.client;
+          final user = supabase.auth.currentUser;
+          if (user == null) throw Exception('使用者未登入');
+
+          final extension = imageName != null && imageName.contains('.') 
+              ? imageName.split('.').last 
+              : 'jpg';
+          final cleanExtension = RegExp(r'^[a-zA-Z0-9]+$').hasMatch(extension) ? extension : 'jpg';
+          final fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$cleanExtension';
+
+          await supabase.storage.from('customer-photos').uploadBinary(
+            fileName,
+            imageBytes,
+            fileOptions: const FileOptions(contentType: 'image/jpeg'),
+          );
+          finalAvatarUrl = supabase.storage.from('customer-photos').getPublicUrl(fileName);
+        } catch (e) {
+          if (mounted) {
+            CustomToast.show(context, '頭像上傳失敗: $e', ToastType.error);
+          }
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+    }
 
     if (isOfflineMode) {
       final newCustomer = {
         'id': 'mock-${DateTime.now().millisecondsSinceEpoch}',
         'name': name,
         'nickname': nickname,
-        'avatar_url': avatarUrl,
+        'avatar_url': finalAvatarUrl,
         'phone': phone,
         'email': email,
         'tags': tags,
@@ -197,7 +238,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         'profile_id': user.id,
         'name': name,
         'nickname': nickname,
-        'avatar_url': avatarUrl,
+        'avatar_url': finalAvatarUrl,
         'phone': phone,
         'email': email,
         'tags': tags,
@@ -228,10 +269,49 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     required String email,
     required List<String> tags,
     required String notes,
+    Uint8List? imageBytes,
+    String? imageName,
+    required bool isImageCleared,
   }) async {
     setState(() {
       _isLoading = true;
     });
+
+    String finalAvatarUrl = avatarUrl;
+    if (isImageCleared) {
+      finalAvatarUrl = '';
+    } else if (imageBytes != null && imageName != null) {
+      if (isOfflineMode) {
+        finalAvatarUrl = 'data:image/jpeg;base64,${base64Encode(imageBytes)}';
+      } else {
+        try {
+          final supabase = Supabase.instance.client;
+          final user = supabase.auth.currentUser;
+          if (user == null) throw Exception('使用者未登入');
+
+          final extension = imageName != null && imageName.contains('.') 
+              ? imageName.split('.').last 
+              : 'jpg';
+          final cleanExtension = RegExp(r'^[a-zA-Z0-9]+$').hasMatch(extension) ? extension : 'jpg';
+          final fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$cleanExtension';
+
+          await supabase.storage.from('customer-photos').uploadBinary(
+            fileName,
+            imageBytes,
+            fileOptions: const FileOptions(contentType: 'image/jpeg'),
+          );
+          finalAvatarUrl = supabase.storage.from('customer-photos').getPublicUrl(fileName);
+        } catch (e) {
+          if (mounted) {
+            CustomToast.show(context, '頭像上傳失敗: $e', ToastType.error);
+          }
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+    }
 
     if (isOfflineMode) {
       setState(() {
@@ -241,7 +321,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
             ..._allCustomers[index],
             'name': name,
             'nickname': nickname,
-            'avatar_url': avatarUrl,
+            'avatar_url': finalAvatarUrl,
             'phone': phone,
             'email': email,
             'tags': tags,
@@ -263,7 +343,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       await supabase.from('customers').update({
         'name': name,
         'nickname': nickname,
-        'avatar_url': avatarUrl,
+        'avatar_url': finalAvatarUrl,
         'phone': phone,
         'email': email,
         'tags': tags,
@@ -330,7 +410,6 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
 
     final nameController = TextEditingController(text: isEdit ? customer['name'] : '');
     final nicknameController = TextEditingController(text: isEdit ? customer['nickname'] : '');
-    final avatarUrlController = TextEditingController(text: isEdit ? customer['avatar_url'] : '');
     final phoneController = TextEditingController(text: isEdit ? customer['phone'] : '');
     final emailController = TextEditingController(text: isEdit ? customer['email'] : '');
     final tagsController = TextEditingController(
@@ -353,136 +432,203 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         ),
       );
     }
-
-    void submitForm() {
-      final name = nameController.text.trim();
-      if (name.isEmpty) {
-        CustomToast.show(context, '客戶姓名為必填項目', ToastType.warning);
-        return;
-      }
-
-      final tagsList = tagsController.text
-          .split(RegExp(r'[,，]'))
-          .map((t) => t.trim())
-          .where((t) => t.isNotEmpty)
-          .toList();
-
-      if (isEdit) {
-        _updateCustomer(
-          id: customer['id'],
-          name: name,
-          nickname: nicknameController.text.trim(),
-          avatarUrl: avatarUrlController.text.trim(),
-          phone: phoneController.text.trim(),
-          email: emailController.text.trim(),
-          tags: tagsList,
-          notes: notesController.text.trim(),
-        );
-      } else {
-        _createCustomer(
-          name: name,
-          nickname: nicknameController.text.trim(),
-          avatarUrl: avatarUrlController.text.trim(),
-          phone: phoneController.text.trim(),
-          email: emailController.text.trim(),
-          tags: tagsList,
-          notes: notesController.text.trim(),
-        );
-      }
-
-      Navigator.pop(context);
-    }
-
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: dialogBg,
-          title: Text(
-            isEdit ? '編輯客戶檔案' : '新增客戶檔案',
-            style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
-          ),
-          content: SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    style: TextStyle(color: textColor),
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) => submitForm(),
-                    decoration: buildInputDecoration('客戶姓名 (必填)', Icons.person_outline),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: nicknameController,
-                    style: TextStyle(color: textColor),
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) => submitForm(),
-                    decoration: buildInputDecoration('客戶綽號', Icons.person_pin_outlined),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: avatarUrlController,
-                    style: TextStyle(color: textColor),
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) => submitForm(),
-                    decoration: buildInputDecoration('照片網址 (URL)', Icons.image_outlined),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: phoneController,
-                    style: TextStyle(color: textColor),
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) => submitForm(),
-                    decoration: buildInputDecoration('電話號碼', Icons.phone_outlined),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: emailController,
-                    style: TextStyle(color: textColor),
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    onSubmitted: (_) => submitForm(),
-                    decoration: buildInputDecoration('Email 信箱', Icons.email_outlined),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: tagsController,
-                    style: TextStyle(color: textColor),
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => submitForm(),
-                    decoration: buildInputDecoration('標籤 (逗號區隔)', Icons.local_offer_outlined, hintText: '例如: 高意願, 醫療險, 車險'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: notesController,
-                    style: TextStyle(color: textColor),
-                    maxLines: 3,
-                    decoration: buildInputDecoration('備註紀錄', Icons.note_alt_outlined),
-                  ),
-                ],
+        XFile? selectedImageFile;
+        Uint8List? selectedImageBytes;
+        bool isImageCleared = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void submitForm() {
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                CustomToast.show(context, '客戶姓名為必填項目', ToastType.warning);
+                return;
+              }
+
+              final tagsList = tagsController.text
+                  .split(RegExp(r'[,，]'))
+                  .map((t) => t.trim())
+                  .where((t) => t.isNotEmpty)
+                  .toList();
+
+              if (isEdit) {
+                _updateCustomer(
+                  id: customer['id'],
+                  name: name,
+                  nickname: nicknameController.text.trim(),
+                  avatarUrl: customer['avatar_url'] ?? '',
+                  phone: phoneController.text.trim(),
+                  email: emailController.text.trim(),
+                  tags: tagsList,
+                  notes: notesController.text.trim(),
+                  imageBytes: selectedImageBytes,
+                  imageName: selectedImageFile?.name,
+                  isImageCleared: isImageCleared,
+                );
+              } else {
+                _createCustomer(
+                  name: name,
+                  nickname: nicknameController.text.trim(),
+                  avatarUrl: '',
+                  phone: phoneController.text.trim(),
+                  email: emailController.text.trim(),
+                  tags: tagsList,
+                  notes: notesController.text.trim(),
+                  imageBytes: selectedImageBytes,
+                  imageName: selectedImageFile?.name,
+                  isImageCleared: isImageCleared,
+                );
+              }
+              Navigator.pop(context);
+            }
+
+            return AlertDialog(
+              backgroundColor: dialogBg,
+              title: Text(
+                isEdit ? '編輯客戶檔案' : '新增客戶檔案',
+                style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('取消', style: TextStyle(color: subTextColor)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
+              content: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(40),
+                          onTap: () async {
+                            try {
+                              final picker = ImagePicker();
+                              final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+                              if (image != null) {
+                                final bytes = await image.readAsBytes();
+                                setDialogState(() {
+                                  selectedImageFile = image;
+                                  selectedImageBytes = bytes;
+                                  isImageCleared = false;
+                                });
+                              }
+                            } catch (e) {
+                              CustomToast.show(context, '選擇照片失敗: $e', ToastType.error);
+                            }
+                          },
+                          child: Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 40,
+                                backgroundColor: primaryColor.withOpacity(0.12),
+                                backgroundImage: selectedImageBytes != null
+                                    ? MemoryImage(selectedImageBytes!)
+                                    : (!isImageCleared && isEdit && customer['avatar_url'] != null && customer['avatar_url'].isNotEmpty)
+                                        ? _getAvatarProvider(customer['avatar_url'])
+                                        : null,
+                                child: (selectedImageBytes == null && (isImageCleared || !isEdit || customer['avatar_url'] == null || customer['avatar_url'].isEmpty))
+                                    ? Icon(Icons.person, size: 40, color: primaryColor)
+                                    : null,
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: primaryColor,
+                                  child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (selectedImageBytes != null || (!isImageCleared && isEdit && customer?['avatar_url'] != null && customer!['avatar_url'].isNotEmpty)) ...[
+                        const SizedBox(height: 8),
+                        Center(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 16),
+                            label: const Text('清除照片', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                            onPressed: () {
+                              setDialogState(() {
+                                selectedImageFile = null;
+                                selectedImageBytes = null;
+                                isImageCleared = true;
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: nameController,
+                        style: TextStyle(color: textColor),
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) => submitForm(),
+                        decoration: buildInputDecoration('客戶姓名 (必填)', Icons.person_outline),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: nicknameController,
+                        style: TextStyle(color: textColor),
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) => submitForm(),
+                        decoration: buildInputDecoration('客戶綽號', Icons.person_pin_outlined),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: phoneController,
+                        style: TextStyle(color: textColor),
+                        keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) => submitForm(),
+                        decoration: buildInputDecoration('電話號碼', Icons.phone_outlined),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: emailController,
+                        style: TextStyle(color: textColor),
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) => submitForm(),
+                        decoration: buildInputDecoration('Email 信箱', Icons.email_outlined),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: tagsController,
+                        style: TextStyle(color: textColor),
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => submitForm(),
+                        decoration: buildInputDecoration('標籤 (逗號區隔)', Icons.local_offer_outlined, hintText: '例如: 高意願, 醫療險, 車險'),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: notesController,
+                        style: TextStyle(color: textColor),
+                        maxLines: 3,
+                        decoration: buildInputDecoration('備註紀錄', Icons.note_alt_outlined),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              onPressed: submitForm,
-              child: const Text('儲存'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('取消', style: TextStyle(color: subTextColor)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: submitForm,
+                  child: const Text('儲存'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -764,7 +910,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                     CircleAvatar(
                       backgroundColor: primaryColor.withOpacity(0.12),
                       radius: 48,
-                      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                      backgroundImage: _getAvatarProvider(avatarUrl),
                       child: avatarUrl.isEmpty
                           ? Text(
                               nameInitial,
@@ -1106,7 +1252,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                   CircleAvatar(
                     backgroundColor: primaryColor.withOpacity(0.12),
                     radius: 24,
-                    backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                    backgroundImage: _getAvatarProvider(avatarUrl),
                     child: avatarUrl.isEmpty
                         ? Text(
                             nameInitial,
@@ -1464,4 +1610,18 @@ class _CustomToastState extends State<CustomToast> with SingleTickerProviderStat
       ),
     );
   }
+}
+
+// Helper to get image provider from URL or Base64 data URI
+ImageProvider? _getAvatarProvider(String avatarUrl) {
+  if (avatarUrl.isEmpty) return null;
+  if (avatarUrl.startsWith('data:image/') || avatarUrl.startsWith('data:application/')) {
+    try {
+      final base64String = avatarUrl.split(',').last;
+      return MemoryImage(base64Decode(base64String));
+    } catch (e) {
+      return null;
+    }
+  }
+  return NetworkImage(avatarUrl);
 }
