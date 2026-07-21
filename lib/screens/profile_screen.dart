@@ -7,6 +7,7 @@ import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
 import 'customer_management_tab.dart'; // To use CustomToast
+import '../widgets/animations.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onProfileUpdated;
@@ -82,6 +83,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _isLoading = true;
     });
+
+    // Simulate 500ms network delay to make the shimmer skeleton clearly visible during debug preview
+    await Future.delayed(const Duration(milliseconds: 500));
 
     if (isOfflineMode) {
       final prefs = await SharedPreferences.getInstance();
@@ -569,7 +573,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       body: _isLoading && _userEmail.isEmpty
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          ? const ProfileShimmer()
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Center(
@@ -622,6 +626,111 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
+    );
+  }
+}
+
+// Profile Shimmer Skeleton Loading Widget
+class ProfileShimmer extends StatelessWidget {
+  const ProfileShimmer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isWideScreen = screenWidth > 750;
+
+    final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color borderColor = isDark ? const Color(0xFF21262D) : Colors.grey.shade300;
+
+    Widget shimmerHeaderCard() {
+      return Card(
+        color: cardBg,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: borderColor),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: const [
+              ShimmerLoader(width: 96, height: 96, borderRadius: 48),
+              SizedBox(height: 16),
+              ShimmerLoader(width: 120, height: 18, borderRadius: 4),
+              SizedBox(height: 8),
+              ShimmerLoader(width: 160, height: 12, borderRadius: 4),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget shimmerForm() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ShimmerLoader(width: 150, height: 20, borderRadius: 4),
+          const SizedBox(height: 24),
+          for (int i = 0; i < 4; i++) ...[
+            const ShimmerLoader(width: 80, height: 14, borderRadius: 4),
+            const SizedBox(height: 8),
+            const ShimmerLoader(width: double.infinity, height: 44, borderRadius: 8),
+            const SizedBox(height: 20),
+          ],
+          const SizedBox(height: 8),
+          const Align(
+            alignment: Alignment.centerRight,
+            child: ShimmerLoader(width: 100, height: 40, borderRadius: 8),
+          ),
+        ],
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: isWideScreen
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 260,
+                      child: shimmerHeaderCard(),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: shimmerForm(),
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    shimmerHeaderCard(),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: shimmerForm(),
+                    ),
+                  ],
+                ),
+        ),
+      ),
     );
   }
 }
