@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
+import '../widgets/animations.dart';
 
 class CustomerManagementTab extends StatefulWidget {
   const CustomerManagementTab({super.key});
@@ -74,6 +75,9 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     setState(() {
       _isLoading = true;
     });
+
+    // Simulate 500ms network delay to make the shimmer skeleton clearly visible during debug preview
+    await Future.delayed(const Duration(milliseconds: 500));
 
     if (isOfflineMode) {
       // Offline fallback: load from state or initial mock list
@@ -737,9 +741,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           // Customer Grid/List Area
           Expanded(
             child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(color: primaryColor),
-                  )
+                ? _buildShimmerGrid(isWideScreen, screenWidth)
                 : _filteredCustomers.isEmpty
                     ? _buildEmptyState(isDark, primaryColor)
                     : _buildCustomerGrid(isWideScreen, screenWidth),
@@ -767,6 +769,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     }
 
     return GridView.builder(
+      padding: const EdgeInsets.only(top: 12, bottom: 24, left: 8, right: 8),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         crossAxisSpacing: 16,
@@ -776,11 +779,48 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       itemCount: _filteredCustomers.length,
       itemBuilder: (context, index) {
         final customer = _filteredCustomers[index];
-        return FlippingCustomerCard(
-          customer: customer,
-          onEdit: () => _showCustomerForm(customer: customer),
-          onDelete: () => _showDeleteConfirm(customer['id'], customer['name'] ?? ''),
+        return StaggeredFadeIn(
+          index: index,
+          child: HoverAnimatedCard(
+            child: FlippingCustomerCard(
+              customer: customer,
+              onEdit: () => _showCustomerForm(customer: customer),
+              onDelete: () => _showDeleteConfirm(customer['id'], customer['name'] ?? ''),
+            ),
+          ),
         );
+      },
+    );
+  }
+
+  // Shimmer Skeleton Loader Grid Layout
+  Widget _buildShimmerGrid(bool isWideScreen, double screenWidth) {
+    int crossAxisCount = 1;
+    double childAspectRatio = 2.0;
+
+    if (isWideScreen) {
+      if (screenWidth > 1200) {
+        crossAxisCount = 3;
+        childAspectRatio = 1.6;
+      } else {
+        crossAxisCount = 2;
+        childAspectRatio = 1.5;
+      }
+    } else {
+      childAspectRatio = 1.8;
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.only(top: 12, bottom: 24, left: 8, right: 8),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: childAspectRatio,
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return const CustomerCardShimmer();
       },
     );
   }
@@ -1624,4 +1664,61 @@ ImageProvider? _getAvatarProvider(String avatarUrl) {
     }
   }
   return NetworkImage(avatarUrl);
+}
+
+// Shimmer card widget for list loading states
+class CustomerCardShimmer extends StatelessWidget {
+  const CustomerCardShimmer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color cardBorder = isDark ? const Color(0xFF21262D) : Colors.grey.shade300;
+
+    return Card(
+      color: cardBg,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: cardBorder, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // Avatar Shimmer
+                const ShimmerLoader(width: 40, height: 40, borderRadius: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      // Name Shimmer
+                      ShimmerLoader(width: 120, height: 16, borderRadius: 4),
+                      SizedBox(height: 6),
+                      // Details Shimmer
+                      ShimmerLoader(width: 80, height: 12, borderRadius: 4),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            // Tags Shimmer
+            Row(
+              children: const [
+                ShimmerLoader(width: 50, height: 18, borderRadius: 4),
+                SizedBox(width: 8),
+                ShimmerLoader(width: 60, height: 18, borderRadius: 4),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

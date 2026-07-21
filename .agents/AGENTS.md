@@ -26,10 +26,11 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 - **Rule**: When the user says **「開工」**, or when you (the AI Agent) and the user agree on a development plan, you **MUST** automatically perform the following actions:
 
 ### Actions
-1. **確認開發者身分與工作區**：主動詢問開發者為 **蘿蔔 (lobo)** 還是 **巨獸 (beast)**，以鎖定對應的分支前綴與沙盒路徑。
-2. **對齊進度表任務**：讀取 `docs/進度.md` 並展示當前未完成的任務列表，請開發者選擇本次要進行的任務。
-3. **建議分支名稱**：生成格式為 `feature/username-featurename` 的分支名稱（例如：`feature/lobo-customer-list-ui`）。
-4. **提供分支指令/介面操作指引（主要提供 GitHub Desktop，Git CLI 僅作備用）**：
+1. **前置安全檢查 (Check Previous Closing Status)**：在執行任何開工動作前，**必須**先檢查本地 Git 倉庫狀態（如執行 `git status`）。若偵測到當前工作目錄有未提交的變更，或前次開發分支尚未執行收工與合併流程，**必須**主動發出黃色/橙色警示，提醒專案人員先進行「收工」或合併，待確認安全後始得繼續開工。
+2. **確認開發者身分與工作區**：主動詢問開發者為 **蘿蔔 (lobo)** 還是 **巨獸 (beast)**，以鎖定對應的分支前綴與沙盒路徑。
+3. **對齊進度表任務**：讀取 `docs/進度.md` 並展示當前未完成的任務列表，請開發者選擇本次要進行的任務。
+4. **建議分支名稱**：生成格式為 `feature/username-featurename` 的分支名稱（例如：`feature/lobo-customer-list-ui`）。
+5. **提供分支指令/介面操作指引（主要提供 GitHub Desktop，Git CLI 僅作備用）**：
    - **GitHub Desktop**：主要引導切換至 `main`（提醒處理未提交變更）、Pull 並建立新特徵分支推送。
    - **Git CLI（備用，可置於 details 摺疊區塊或在要求時才提供）**：提供包含防呆與套件同步的完整指令。
 

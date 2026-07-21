@@ -29,6 +29,34 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _isSidebarCollapsed = AppSettings.instance.isSidebarCollapsedByDefault;
     _loadUserProfile();
+    _loadSavedMenu();
+  }
+
+  Future<void> _loadSavedMenu() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedMenu = prefs.getString('last_active_menu');
+      if (savedMenu != null && mounted) {
+        setState(() {
+          _activeMenu = savedMenu;
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  void _changeActiveMenu(String menu) async {
+    if (!mounted) return;
+    setState(() {
+      _activeMenu = menu;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_active_menu', menu);
+    } catch (e) {
+      // ignore
+    }
   }
 
   Future<void> _loadUserProfile() async {
@@ -165,9 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Header Profile Area
             InkWell(
               onTap: () {
-                setState(() {
-                  _activeMenu = '個人帳號';
-                });
+                _changeActiveMenu('個人帳號');
                 if (MediaQuery.of(context).size.width < 768) {
                   Navigator.of(context).pop(); // Close drawer on mobile
                 }
@@ -369,9 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         onTap: () {
-          setState(() {
-            _activeMenu = title;
-          });
+          _changeActiveMenu(title);
           if (MediaQuery.of(context).size.width < 768) {
             Navigator.of(context).pop(); // Close drawer on mobile
           }
