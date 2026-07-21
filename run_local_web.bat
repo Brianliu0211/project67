@@ -1,8 +1,8 @@
 @echo off
 echo ==============================================
-echo   Starting Local Flutter Web Preview (Port 8080)
+echo   Starting Local Flutter Dev Server (Port 8080)
 echo ==============================================
-echo [1/3] Running Toolpack verification check...
+echo [1/2] Running Toolpack verification check...
 call verify_toolpack.bat nopause
 if %ERRORLEVEL% neq 0 (
   echo.
@@ -13,18 +13,12 @@ if %ERRORLEVEL% neq 0 (
   timeout /t 5
 )
 echo.
-echo [2/3] Compiling Web app in debug mode...
-call puro flutter build web --debug
-if %ERRORLEVEL% neq 0 (
-  echo Compilation failed!
-  pause
-  exit /b %ERRORLEVEL%
-)
-echo [3/3] Starting local web server...
-where python >nul 2>nul
-if %ERRORLEVEL% equ 0 (
-  python -m http.server 8080 --directory build/web
-) else (
-  npx http-server build/web -p 8080
-)
+echo [2/2] Starting Flutter Web Dev Server...
+echo Keep this window open for Hot Reload!
+echo In this window, you can:
+echo   - Press 'r' to Hot Reload (incremental rebuild in <1s)
+echo   - Press 'R' to Hot Restart (full app restart)
+echo   - Press 'q' to quit
+echo.
+call puro flutter run -d web-server --web-port=8080
 pause

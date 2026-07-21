@@ -58,7 +58,7 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 ### Actions
 1. **提供說明**：說明專案人員可以前往專案根目錄，點擊兩下執行 **`run_local_web.bat`** 檔案來一鍵啟動本地預覽。
 2. **自動背景啟動**：主動在背景啟動預覽伺服器，啟動指令為：
-   `$env:FLUTTER_ROOT="C:\Users\USER\.puro\envs\stable\flutter"; C:\Users\USER\.puro\envs\stable\flutter\bin\cache\dart-sdk\bin\dart.exe --packages="C:\Users\USER\.puro\envs\stable\flutter\packages\flutter_tools\.dart_tool\package_config.json" C:\Users\USER\.puro\shared\flutter_tools\f94f4fc76b4d74543ed9b085bbd75341ef65de22\flutter_tools.snapshot run -d web-server --web-port=8080`
+   `$env:FLUTTER_ROOT="C:\Users\USER\.puro\envs\stable\flutter"; C:\Users\USER\.puro\envs\stable\flutter\bin\cache\dart-sdk\bin\dart.exe --packages="C:\Users\USER\.puro\envs\stable\flutter\packages\flutter_tools\.dart_tool\package_config.json" C:\Users\USER\.puro\shared\flutter_tools\ee80f08bbf97172ec030b8751ceab557177a34a6\flutter_tools.snapshot run -d web-server --web-port=8080`
 3. **引導前往連結**：啟動後，請提供點擊連結 **[http://localhost:8080](http://localhost:8080)** 以便進行網頁測試版預覽。
 
 ## 「確認狀況」Automation (Status Check & Interrupt Command)
