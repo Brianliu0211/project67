@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
 import 'login_screen.dart';
 import 'customer_management_tab.dart';
 import 'settings_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isSidebarCollapsed = false;
   String _userName = '載入中...';
   String _userEmail = '';
+  String _userAvatarUrl = '';
 
   @override
   void initState() {
@@ -29,9 +33,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadUserProfile() async {
     if (isOfflineMode) {
+      final prefs = await SharedPreferences.getInstance();
       setState(() {
-        _userName = '王大同 業務代表';
+        _userName = prefs.getString('profile_name') ?? '王大同 業務代表';
         _userEmail = 'offline@insurance.helper';
+        _userAvatarUrl = prefs.getString('profile_avatar_url') ?? '';
       });
       return;
     }
@@ -43,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Query from profiles table
         final data = await supabase
             .from('profiles')
-            .select('full_name, email')
+            .select('full_name, email, avatar_url')
             .eq('id', user.id)
             .maybeSingle();
 
@@ -55,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _userName = user.userMetadata?['full_name'] ?? '新業務代表';
             }
             _userEmail = data?['email'] ?? user.email ?? '';
+            _userAvatarUrl = data?['avatar_url'] ?? '';
           });
         }
       }
@@ -64,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _userName = user?.userMetadata?['full_name'] ?? user?.email ?? '業務代表';
           _userEmail = user?.email ?? '';
+          _userAvatarUrl = '';
         });
       }
     }
@@ -155,68 +163,84 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             // Header Profile Area
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: borderColor, width: 1),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _activeMenu = '個人帳號';
+                });
+                if (MediaQuery.of(context).size.width < 768) {
+                  Navigator.of(context).pop(); // Close drawer on mobile
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: borderColor, width: 1),
+                  ),
                 ),
-              ),
-              child: _isSidebarCollapsed
-                  ? Center(
-                      child: CircleAvatar(
-                        backgroundColor: primaryColor,
-                        radius: 20,
-                        child: Text(
-                          _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Row(
-                      children: [
-                        CircleAvatar(
+                child: _isSidebarCollapsed
+                    ? Center(
+                        child: CircleAvatar(
                           backgroundColor: primaryColor,
                           radius: 20,
-                          child: Text(
-                            _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                          backgroundImage: _getAvatarProvider(_userAvatarUrl),
+                          child: _userAvatarUrl.isEmpty
+                              ? Text(
+                                  _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: primaryColor,
+                            radius: 20,
+                            backgroundImage: _getAvatarProvider(_userAvatarUrl),
+                            child: _userAvatarUrl.isEmpty
+                                ? Text(
+                                    _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _userName,
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  isOfflineMode ? '離線模式' : _userEmail,
+                                  style: TextStyle(
+                                    color: isOfflineMode ? Colors.amber : subTextColor,
+                                    fontSize: 11,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _userName,
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                isOfflineMode ? '離線模式' : _userEmail,
-                                style: TextStyle(
-                                  color: isOfflineMode ? Colors.amber : subTextColor,
-                                  fontSize: 11,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+              ),
             ),
             
             const SizedBox(height: 16),
@@ -230,6 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildSidebarItem(Icons.people_outline, '客戶管理', isDark, primaryColor),
                   _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
                   _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
+                  _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
                   _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
                 ],
               ),
@@ -320,9 +345,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? _buildScheduleTimeline()
                       : _activeMenu == '客戶管理'
                           ? const CustomerManagementTab()
-                          : _activeMenu == '系統設定'
-                              ? const SettingsScreen()
-                              : _buildFallbackScreen(),
+                          : _activeMenu == '個人帳號'
+                              ? ProfileScreen(onProfileUpdated: _loadUserProfile)
+                              : _activeMenu == '系統設定'
+                                  ? const SettingsScreen()
+                                  : _buildFallbackScreen(),
                 ),
               ],
             ),
@@ -847,3 +874,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+// Helper to parse Base64 or Network URL image provider
+ImageProvider? _getAvatarProvider(String avatarUrl) {
+  if (avatarUrl.isEmpty) return null;
+  if (avatarUrl.startsWith('data:image/') || avatarUrl.startsWith('data:application/')) {
+    try {
+      final base64String = avatarUrl.split(',').last;
+      return MemoryImage(base64Decode(base64String));
+    } catch (e) {
+      return null;
+    }
+  }
+  return NetworkImage(avatarUrl);
+}
+

@@ -14,6 +14,13 @@ CREATE TABLE public.profiles (
     id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     full_name TEXT,
+    avatar_url TEXT,
+    phone TEXT,
+    company TEXT,
+    job_title TEXT,
+    website TEXT,
+    address TEXT,
+    bio TEXT,
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
@@ -187,3 +194,71 @@ CREATE POLICY "Users can delete reminders for their own customers"
             WHERE customers.id = reminders.customer_id
         )
     );
+
+-- =============================================================
+-- Schema Upgrades for Existing Databases (Idempotent)
+-- =============================================================
+ALTER TABLE public.profiles 
+    ADD COLUMN IF NOT EXISTS avatar_url TEXT,
+    ADD COLUMN IF NOT EXISTS phone TEXT,
+    ADD COLUMN IF NOT EXISTS company TEXT,
+    ADD COLUMN IF NOT EXISTS job_title TEXT,
+    ADD COLUMN IF NOT EXISTS website TEXT,
+    ADD COLUMN IF NOT EXISTS address TEXT,
+    ADD COLUMN IF NOT EXISTS bio TEXT;
+
+-- =============================================================
+-- 4. Storage configuration (Buckets & RLS Policies)
+-- =============================================================
+
+-- 建立儲存桶 (customer-photos 與 avatars)
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('customer-photos', 'customer-photos', true),
+       ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 啟用 RLS 政策 (依安全限制隔離，使用者僅能新增/更新/刪除屬於自己 UID 資料夾底下的照片)
+-- customer-photos Policies
+CREATE POLICY "Public Read Access for Customer Photos" ON storage.objects
+    FOR SELECT USING (bucket_id = 'customer-photos');
+
+CREATE POLICY "Authenticated Insert Access for Customer Photos" ON storage.objects
+    FOR INSERT TO authenticated WITH CHECK (
+        bucket_id = 'customer-photos' AND 
+        (select auth.uid()::text) = (storage.foldername(name))[1]
+    );
+
+CREATE POLICY "Authenticated Update Access for Customer Photos" ON storage.objects
+    FOR UPDATE TO authenticated USING (
+        bucket_id = 'customer-photos' AND 
+        (select auth.uid()::text) = (storage.foldername(name))[1]
+    );
+
+CREATE POLICY "Authenticated Delete Access for Customer Photos" ON storage.objects
+    FOR DELETE TO authenticated USING (
+        bucket_id = 'customer-photos' AND 
+        (select auth.uid()::text) = (storage.foldername(name))[1]
+    );
+
+-- avatars Policies
+CREATE POLICY "Public Read Access for Avatars" ON storage.objects
+    FOR SELECT USING (bucket_id = 'avatars');
+
+CREATE POLICY "Authenticated Insert Access for Avatars" ON storage.objects
+    FOR INSERT TO authenticated WITH CHECK (
+        bucket_id = 'avatars' AND 
+        (select auth.uid()::text) = (storage.foldername(name))[1]
+    );
+
+CREATE POLICY "Authenticated Update Access for Avatars" ON storage.objects
+    FOR UPDATE TO authenticated USING (
+        bucket_id = 'avatars' AND 
+        (select auth.uid()::text) = (storage.foldername(name))[1]
+    );
+
+CREATE POLICY "Authenticated Delete Access for Avatars" ON storage.objects
+    FOR DELETE TO authenticated USING (
+        bucket_id = 'avatars' AND 
+        (select auth.uid()::text) = (storage.foldername(name))[1]
+    );
+
