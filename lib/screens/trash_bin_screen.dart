@@ -5,6 +5,7 @@ import '../main.dart';
 import '../services/app_settings.dart';
 import '../services/app_localizations.dart';
 import 'customer_management_tab.dart';
+import '../widgets/custom_toast.dart';
 
 class TrashBinScreen extends StatefulWidget {
   const TrashBinScreen({super.key});

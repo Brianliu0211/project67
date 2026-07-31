@@ -8,6 +8,7 @@ import '../main.dart';
 import '../services/app_settings.dart';
 import '../services/app_localizations.dart';
 import 'customer_management_tab.dart'; // To use CustomToast
+import '../widgets/custom_toast.dart';
 import '../widgets/animations.dart';
 
 class ProfileScreen extends StatefulWidget {

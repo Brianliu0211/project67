@@ -5,6 +5,9 @@ import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
 import '../services/app_localizations.dart';
+import '../models/schedule_event.dart';
+import '../widgets/schedule_event_dialog.dart';
+import '../widgets/custom_toast.dart';
 import 'package:intl/intl.dart';
 import 'login_screen.dart';
 import 'customer_management_tab.dart';
@@ -47,6 +50,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userEmail = '';
   String _userAvatarUrl = '';
 
+  List<ScheduleEvent> _events = [];
+  bool _isLoadingEvents = false;
+  String _calendarViewMode = 'timeline'; // 'timeline' (日時間軸) 或 'month_grid' (月網格)
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +61,95 @@ class _HomeScreenState extends State<HomeScreen> {
     AppSettings.instance.addListener(_handleSettingsChanged);
     _loadUserProfile();
     _loadSavedMenu();
+    _fetchEventsForSelectedDate();
+  }
+
+  Future<void> _fetchEventsForSelectedDate({bool silent = false}) async {
+    if (isOfflineMode) {
+      setState(() {
+        _events = [
+          ScheduleEvent(
+            id: 'demo-1',
+            profileId: 'offline',
+            title: '穿黑色衣服 (範例)',
+            startAt: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 9, 0),
+            endAt: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 10, 0),
+            eventType: 'personal',
+          ),
+          ScheduleEvent(
+            id: 'demo-2',
+            profileId: 'offline',
+            title: '服學 正式活動 (範例)',
+            startAt: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 14, 30),
+            endAt: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 17, 30),
+            location: '台大第一學生活動中心',
+            eventType: 'visit',
+          ),
+        ];
+      });
+      return;
+    }
+
+    if (!silent && _events.isEmpty) {
+      setState(() => _isLoadingEvents = true);
+    }
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        DateTime rangeStart;
+        DateTime rangeEnd;
+
+        if (_calendarViewMode == 'month_grid') {
+          // 月網格模式：查詢全月份資料 (延伸前後各 7 天以蓋過跨月週格)
+          rangeStart = DateTime(_selectedDate.year, _selectedDate.month, 1, 0, 0, 0).subtract(const Duration(days: 7)).toUtc();
+          rangeEnd = DateTime(_selectedDate.year, _selectedDate.month + 1, 0, 23, 59, 59).add(const Duration(days: 7)).toUtc();
+        } else {
+          // 日時間軸模式：查詢單日涵蓋行程
+          rangeStart = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 0, 0, 0).toUtc();
+          rangeEnd = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 23, 59, 59).toUtc();
+        }
+
+        final data = await Supabase.instance.client
+            .from('schedule_events')
+            .select()
+            .eq('profile_id', user.id)
+            .lte('start_at', rangeEnd.toIso8601String())
+            .gte('end_at', rangeStart.toIso8601String())
+            .order('start_at');
+
+        if (mounted) {
+          setState(() {
+            _events = (data as List).map((json) => ScheduleEvent.fromJson(json)).toList();
+          });
+        }
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      if (mounted) setState(() => _isLoadingEvents = false);
+    }
+  }
+
+  Future<void> _openAddEditEventDialog([ScheduleEvent? event]) async {
+    final result = await showDialog<dynamic>(
+      context: context,
+      builder: (ctx) => ScheduleEventDialog(
+        initialDate: _selectedDate,
+        eventToEdit: event,
+      ),
+    );
+
+    if (result != null && mounted) {
+      _fetchEventsForSelectedDate();
+
+      if (result == 'created') {
+        CustomToast.show(context, '行程已成功新增！', ToastType.success);
+      } else if (result == 'updated') {
+        CustomToast.show(context, '行程變更已儲存！', ToastType.success);
+      } else if (result == 'deleted') {
+        CustomToast.show(context, '行程已成功刪除！', ToastType.warning);
+      }
+    }
   }
 
   @override
@@ -74,13 +170,31 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedMenu = prefs.getString('last_active_menu');
+      final savedViewMode = prefs.getString('calendar_view_mode');
       if (savedMenu != null && mounted) {
         setState(() {
           _activeMenu = savedMenu;
         });
       }
+      if (savedViewMode != null && mounted) {
+        setState(() {
+          _calendarViewMode = savedViewMode;
+        });
+      }
     } catch (e) {
       // ignore
+    }
+  }
+
+  void _updateCalendarViewMode(String mode) {
+    if (_calendarViewMode != mode) {
+      setState(() {
+        _calendarViewMode = mode;
+      });
+      _fetchEventsForSelectedDate(silent: true);
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('calendar_view_mode', mode);
+      });
     }
   }
 
@@ -421,13 +535,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Wide Screen Header
                 if (isWideScreen) _buildWebHeader(isDark, textColor, subTextColor, borderColor),
                 
-                // Weekly Calendar Strip
-                if (_activeMenu == '今日行程') _buildWeeklyCalendarStrip(isDark, textColor, subTextColor, borderColor, primaryColor),
-                
                 // Main Working Area
-                 Expanded(
+                Expanded(
                   child: _activeMenu == '今日行程'
-                      ? _buildScheduleTimeline()
+                      ? _buildScheduleView(isWideScreen, isDark, textColor, subTextColor, borderColor, primaryColor)
                       : _activeMenu == '客戶管理'
                           ? CustomerManagementTab(
                               onMenuChanged: (menu) {
@@ -709,6 +820,562 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildScheduleView(
+    bool isWideScreen,
+    bool isDark,
+    Color textColor,
+    Color subTextColor,
+    Color borderColor,
+    Color primaryColor,
+  ) {
+    if (isWideScreen) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left Column: Calendar & Today Summary & Quick Actions
+          SizedBox(
+            width: 320,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Monthly Calendar Picker Card
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: borderColor),
+                    ),
+                    color: isDark ? const Color(0xFF161B22) : Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: CalendarDatePicker(
+                        key: ValueKey('${_selectedDate.year}-${_selectedDate.month}'),
+                        initialDate: _selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                        onDateChanged: (newDate) {
+                          final bool sameMonth = newDate.month == _selectedDate.month && newDate.year == _selectedDate.year;
+                          setState(() => _selectedDate = newDate);
+                          if (!sameMonth || _calendarViewMode == 'timeline') {
+                            _fetchEventsForSelectedDate(silent: true);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Add Event Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openAddEditEventDialog(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('新增行程', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Summary Card
+                  _buildTodaySummaryCard(isDark, borderColor, primaryColor),
+                ],
+              ),
+            ),
+          ),
+          VerticalDivider(width: 1, color: borderColor),
+          // Right Column: Timeline Header + Dynamic Timeline / Month Grid List
+          Expanded(
+            child: Column(
+              children: [
+                _buildTimelineHeader(isDark, primaryColor),
+                Expanded(
+                  child: _calendarViewMode == 'month_grid'
+                      ? _buildMonthGridView(isDark, borderColor, primaryColor)
+                      : _buildScheduleTimeline(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Column(
+        children: [
+          _buildWeeklyCalendarStrip(isDark, textColor, subTextColor, borderColor, primaryColor),
+          Expanded(child: _buildScheduleTimeline()),
+        ],
+      );
+    }
+  }
+
+  Widget _buildTimelineHeader(bool isDark, Color primaryColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade200)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.today, color: primaryColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                _calendarViewMode == 'month_grid'
+                    ? DateFormat('yyyy 年 MM 月', 'zh_TW').format(_selectedDate)
+                    : DateFormat('yyyy 年 MM 月 dd 日 (EEEE)', 'zh_TW').format(_selectedDate),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.chevron_left, size: 30),
+                onPressed: () {
+                  setState(() {
+                    if (_calendarViewMode == 'month_grid') {
+                      _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1, 1);
+                    } else {
+                      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                    }
+                  });
+                  _fetchEventsForSelectedDate(silent: true);
+                },
+                tooltip: _calendarViewMode == 'month_grid' ? '上個月' : '前一天',
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, size: 30),
+                onPressed: () {
+                  setState(() {
+                    if (_calendarViewMode == 'month_grid') {
+                      _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1, 1);
+                    } else {
+                      _selectedDate = _selectedDate.add(const Duration(days: 1));
+                    }
+                  });
+                  _fetchEventsForSelectedDate(silent: true);
+                },
+                tooltip: _calendarViewMode == 'month_grid' ? '下個月' : '後一天',
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              ),
+              const SizedBox(width: 4),
+              OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedDate = DateTime.now();
+                  });
+                  _fetchEventsForSelectedDate(silent: true);
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primaryColor,
+                  side: BorderSide(color: primaryColor.withOpacity(0.5)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                child: const Text('今天', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              // 視圖切換按鈕 (日時間軸 vs 月網格)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF161B22) : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade300),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () => _updateCalendarViewMode('timeline'),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _calendarViewMode == 'timeline' ? primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.view_day_outlined,
+                              size: 16,
+                              color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '日時間軸',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () => _updateCalendarViewMode('month_grid'),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _calendarViewMode == 'month_grid' ? primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_view_month_outlined,
+                              size: 16,
+                              color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '月網格',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              if (_isLoadingEvents)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                onPressed: _fetchEventsForSelectedDate,
+                tooltip: '重新整理行程',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTodaySummaryCard(bool isDark, Color borderColor, Color primaryColor) {
+    final totalCount = _events.length;
+    final completedCount = _events.where((e) => e.isCompleted).length;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: borderColor),
+      ),
+      color: isDark ? const Color(0xFF161B22) : Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.pie_chart_outline, size: 18, color: primaryColor),
+                const SizedBox(width: 8),
+                const Text('今日行程摘要', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildSummaryStat('總行程', '$totalCount', isDark),
+                _buildSummaryStat('已完成', '$completedCount', isDark),
+                _buildSummaryStat('未完成', '${totalCount - completedCount}', isDark),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryStat(String label, String value, bool isDark) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+      ],
+    );
+  }
+
+  Widget _buildMonthGridView(bool isDark, Color borderColor, Color primaryColor) {
+    if (_isLoadingEvents && _events.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final DateTime firstDayOfMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
+    final int leadingOffset = firstDayOfMonth.weekday % 7; // Sunday = 0
+    final DateTime gridStartDate = firstDayOfMonth.subtract(Duration(days: leadingOffset));
+
+    final List<String> weekHeaderLabels = ['日', '一', '二', '三', '四', '五', '六'];
+
+    List<List<DateTime>> weekGrid = [];
+    DateTime currDate = gridStartDate;
+
+    while (true) {
+      List<DateTime> week = [];
+      for (int i = 0; i < 7; i++) {
+        week.add(currDate);
+        currDate = currDate.add(const Duration(days: 1));
+      }
+      weekGrid.add(week);
+      if (currDate.month != _selectedDate.month && weekGrid.length >= 5) {
+        break;
+      }
+    }
+
+    return Column(
+      children: [
+        // Weekday Header Bar
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF161B22) : Colors.grey.shade100,
+            border: Border(bottom: BorderSide(color: borderColor)),
+          ),
+          child: Row(
+            children: weekHeaderLabels.map((label) {
+              final bool isWeekend = label == '日' || label == '六';
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: isWeekend ? Colors.redAccent : (isDark ? Colors.white70 : Colors.black87),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+
+        // Month Grid Weeks List
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(8),
+            itemCount: weekGrid.length,
+            itemBuilder: (context, weekIdx) {
+              final weekDays = weekGrid[weekIdx];
+              final DateTime weekStart = DateTime(weekDays.first.year, weekDays.first.month, weekDays.first.day, 0, 0, 0);
+              final DateTime weekEnd = DateTime(weekDays.last.year, weekDays.last.month, weekDays.last.day, 23, 59, 59);
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                height: 110,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double colWidth = constraints.maxWidth / 7.0;
+
+                    // Filter events overlapping this 7-day week
+                    final List<ScheduleEvent> weekEvents = _events.where((e) {
+                      final DateTime effectiveEnd = (e.endAt.hour == 0 && e.endAt.minute == 0 && e.endAt.second == 0 && e.endAt.isAfter(e.startAt))
+                          ? e.endAt.subtract(const Duration(seconds: 1))
+                          : e.endAt;
+
+                      return !e.startAt.isAfter(weekEnd) && !effectiveEnd.isBefore(weekStart);
+                    }).toList();
+
+                    return Stack(
+                      children: [
+                        // Base 7 Grid Cells (Background)
+                        Row(
+                          children: List.generate(7, (colIdx) {
+                            final DateTime cellDate = weekDays[colIdx];
+                            final bool isCurrentMonthDay = cellDate.month == _selectedDate.month;
+                            final bool isToday = cellDate.year == DateTime.now().year &&
+                                cellDate.month == DateTime.now().month &&
+                                cellDate.day == DateTime.now().day;
+                            final bool isSelected = cellDate.year == _selectedDate.year &&
+                                cellDate.month == _selectedDate.month &&
+                                cellDate.day == _selectedDate.day;
+
+                            return Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  final bool sameMonth = cellDate.month == _selectedDate.month && cellDate.year == _selectedDate.year;
+                                  setState(() => _selectedDate = cellDate);
+                                  if (!sameMonth) {
+                                    _fetchEventsForSelectedDate(silent: true);
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? primaryColor.withValues(alpha: 0.08)
+                                        : (isCurrentMonthDay
+                                            ? (isDark ? const Color(0xFF161B22) : Colors.white)
+                                            : (isDark ? const Color(0xFF0D1117).withValues(alpha: 0.3) : Colors.grey.shade50)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? primaryColor
+                                          : isToday
+                                              ? primaryColor.withValues(alpha: 0.5)
+                                              : (isCurrentMonthDay ? borderColor : borderColor.withValues(alpha: 0.3)),
+                                      width: isSelected ? 2.0 : 1.0,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: isToday
+                                                ? BoxDecoration(
+                                                    color: primaryColor,
+                                                    shape: BoxShape.circle,
+                                                  )
+                                                : null,
+                                            child: Text(
+                                              '${cellDate.day}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: isToday
+                                                    ? Colors.white
+                                                    : (isSelected
+                                                        ? primaryColor
+                                                        : (isCurrentMonthDay
+                                                            ? (isDark ? Colors.white70 : Colors.black87)
+                                                            : (isDark ? Colors.white30 : Colors.black38))),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+
+                        // Event Banners Overlay (Continuous Horizontal Banners Across Multi-Days)
+                        ...List.generate(weekEvents.length > 3 ? 3 : weekEvents.length, (evtIdx) {
+                          final event = weekEvents[evtIdx];
+                          final DateTime effectiveEnd = (event.endAt.hour == 0 && event.endAt.minute == 0 && event.endAt.second == 0 && event.endAt.isAfter(event.startAt))
+                              ? event.endAt.subtract(const Duration(seconds: 1))
+                              : event.endAt;
+
+                          final DateTime eventStartDate = DateTime(event.startAt.year, event.startAt.month, event.startAt.day);
+                          final DateTime eventEndDate = DateTime(effectiveEnd.year, effectiveEnd.month, effectiveEnd.day);
+
+                          int startCol = -1;
+                          int endCol = -1;
+
+                          for (int c = 0; c < 7; c++) {
+                            final date = DateTime(weekDays[c].year, weekDays[c].month, weekDays[c].day);
+                            final bool overlaps = !date.isBefore(eventStartDate) && !date.isAfter(eventEndDate);
+
+                            if (overlaps) {
+                              if (startCol == -1) startCol = c;
+                              endCol = c;
+                            }
+                          }
+
+                          if (startCol == -1 || endCol == -1) return const SizedBox.shrink();
+
+                          final double left = startCol * colWidth + 4.0;
+                          final double width = (endCol - startCol + 1) * colWidth - 8.0;
+                          final double top = 32.0 + evtIdx * 24.0;
+
+                          final String displayTag = (event.tag != null && event.tag!.trim().isNotEmpty)
+                              ? event.tag!.trim()
+                              : event.title;
+
+                          final Color bannerBg = _getEventTypeColor(event.eventType, primaryColor);
+
+                          return Positioned(
+                            top: top,
+                            left: left,
+                            width: width < 10.0 ? 10.0 : width,
+                            height: 22.0,
+                            child: InkWell(
+                              onTap: () => _openAddEditEventDialog(event),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: bannerBg.withValues(alpha: 0.85),
+                                  borderRadius: BorderRadius.circular(6),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: bannerBg.withValues(alpha: 0.3),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  displayTag,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  bool isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
   // Vertical Day Timeline Schedule
   Widget _buildScheduleTimeline() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -716,86 +1383,270 @@ class _HomeScreenState extends State<HomeScreen> {
     final Color gridColor = isDark ? const Color(0xFF21262D) : Colors.grey.shade300;
     final Color hourTextColor = isDark ? Colors.white30 : Colors.black45;
 
-    // We display 06:00 to 22:00
-    final List<int> hours = List.generate(17, (index) => index + 6);
+    final List<int> hours = List.generate(19, (index) => index + 6); // 06:00 to 24:00
+
+    if (_isLoadingEvents) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_events.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.event_available, size: 64, color: primaryColor.withValues(alpha: 0.3)),
+            const SizedBox(height: 16),
+            Text(
+              '本日暫無排定行程',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '點擊左側或下方按鈕新增第一個行程',
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white30 : Colors.black54),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _openAddEditEventDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('新增行程'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final double totalGridHeight = hours.length * 60.0 + 80.0;
+
+    final DateTime dayStart = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 0, 0);
+    final DateTime dayEnd = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 23, 59, 59);
+
+    final eventLayouts = _computeTimelineLayouts(_events, dayStart, dayEnd);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      child: Stack(
-        children: [
-          // Timeline Base grid lines
-          Column(
-            children: hours.map((hour) {
-              final String hourLabel = hour.toString().padLeft(2, '0') + ':00';
-              return SizedBox(
-                height: 60,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Time text
-                    SizedBox(
-                      width: 50,
-                      child: Text(
-                        hourLabel,
-                        style: TextStyle(
-                          color: hourTextColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final double availableWidth = (constraints.maxWidth - 70.0).clamp(100.0, 3000.0);
+
+          return SizedBox(
+            height: totalGridHeight,
+            child: Stack(
+              children: [
+                // Timeline Base grid lines
+                Column(
+                  children: hours.map((hour) {
+                    final String hourLabel = hour.toString().padLeft(2, '0') + ':00';
+                    return SizedBox(
+                      height: 60,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 50,
+                            child: Text(
+                              hourLabel,
+                              style: TextStyle(
+                                color: hourTextColor,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Divider(
+                                color: gridColor,
+                                thickness: 1,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    
-                    // Divider line
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Divider(
-                          color: gridColor,
-                          thickness: 1,
-                          height: 1,
-                        ),
-                      ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
-              );
-            }).toList(),
-          ),
 
-          // Card 1: 09:00 - 10:00: 「穿黑色衣服」（打卡點圓圈樣式）
-          Positioned(
-            top: 180 + 8,
-            left: 70,
-            right: 0,
-            height: 48,
-            child: _buildBulletSchedule(
-              title: '穿黑色衣服',
-              timeRange: '09:00 - 10:00',
-              bulletColor: primaryColor,
-              isDark: isDark,
-            ),
-          ),
+                // Render Dynamic Events Side-By-Side
+                ...eventLayouts.map((layout) {
+                  final event = layout.event;
+                  final DateTime effectiveStart = event.startAt.isBefore(dayStart) ? dayStart : event.startAt;
+                  final DateTime effectiveEnd = event.endAt.isAfter(dayEnd) ? dayEnd : event.endAt;
 
-          // Card 2: 14:30 - 17:30: 「服學 正式活動」（滿版背景藍色卡片樣式）
-          Positioned(
-            top: 510 + 8,
-            left: 70,
-            right: 0,
-            height: 164,
-            child: _buildCardSchedule(
-              title: '服學 正式活動',
-              timeRange: '14:30 - 17:30',
-              location: '台大第一學生活動中心',
-              tag: '服務學習',
-              cardColor: isDark ? const Color(0xFF1E3A8A).withOpacity(0.6) : const Color(0xFFDBEAFE),
-              borderColor: isDark ? const Color(0xFF2563EB) : const Color(0xFF3B82F6),
-              accentColor: isDark ? const Color(0xFF00F5FF) : const Color(0xFF1D4ED8),
-              isDark: isDark,
+                  final double startHour = effectiveStart.hour + (effectiveStart.minute / 60.0);
+                  final double endHour = effectiveEnd.hour + (effectiveEnd.minute / 60.0);
+
+                  final double topOffset = (startHour - 6.0) * 60.0 + 8.0;
+                  final double durationHours = (endHour - startHour).clamp(0.5, 18.0);
+                  final double cardHeight = durationHours * 60.0;
+
+                  final double colWidth = availableWidth / layout.totalCols;
+                  final double left = 60.0 + layout.colIndex * colWidth;
+                  final double width = colWidth - 4.0;
+
+                  final String timeRange = '${DateFormat('HH:mm').format(event.startAt)} - ${DateFormat('HH:mm').format(event.endAt)}';
+                  final bool isShort = cardHeight <= 55;
+                  final String displayTag = (event.tag != null && event.tag!.trim().isNotEmpty)
+                      ? event.tag!.trim()
+                      : _getLocalizedEventType(event.eventType);
+
+                  return Positioned(
+                    top: topOffset < 8.0 ? 8.0 : topOffset,
+                    left: left < 60.0 ? 60.0 : left,
+                    width: width < 30.0 ? 30.0 : width,
+                    height: cardHeight < 40.0 ? 40.0 : cardHeight,
+                    child: InkWell(
+                      onTap: () => _openAddEditEventDialog(event),
+                      borderRadius: BorderRadius.circular(8),
+                      child: isShort
+                          ? _buildBulletSchedule(
+                              title: event.title,
+                              timeRange: timeRange,
+                              bulletColor: _getEventTypeColor(event.eventType, primaryColor),
+                              isDark: isDark,
+                            )
+                          : _buildCardSchedule(
+                              title: event.title,
+                              timeRange: timeRange,
+                              location: event.location ?? '未指定地點',
+                              tag: displayTag,
+                              cardColor: _getEventTypeBgColor(event.eventType, isDark),
+                              borderColor: _getEventTypeColor(event.eventType, primaryColor),
+                              accentColor: _getEventTypeColor(event.eventType, primaryColor),
+                              isDark: isDark,
+                            ),
+                    ),
+                  );
+                }),
+              ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
+  }
+
+  List<_TimelineEventLayout> _computeTimelineLayouts(
+      List<ScheduleEvent> events, DateTime dayStart, DateTime dayEnd) {
+    if (events.isEmpty) return [];
+
+    final dayEvents = events.where((e) {
+      final DateTime effectiveEnd = (e.endAt.hour == 0 && e.endAt.minute == 0 && e.endAt.second == 0 && e.endAt.isAfter(e.startAt))
+          ? e.endAt.subtract(const Duration(seconds: 1))
+          : e.endAt;
+      return !e.startAt.isAfter(dayEnd) && !effectiveEnd.isBefore(dayStart);
+    }).toList();
+
+    dayEvents.sort((a, b) => a.startAt.compareTo(b.startAt));
+
+    List<List<ScheduleEvent>> clusters = [];
+    for (final event in dayEvents) {
+      bool addedToCluster = false;
+      for (final cluster in clusters) {
+        bool overlapsAny = cluster.any((e) {
+          final DateTime eEffEnd = (e.endAt.hour == 0 && e.endAt.minute == 0 && e.endAt.second == 0 && e.endAt.isAfter(e.startAt))
+              ? e.endAt.subtract(const Duration(seconds: 1))
+              : e.endAt;
+          final DateTime eventEffEnd = (event.endAt.hour == 0 && event.endAt.minute == 0 && event.endAt.second == 0 && event.endAt.isAfter(event.startAt))
+              ? event.endAt.subtract(const Duration(seconds: 1))
+              : event.endAt;
+
+          return event.startAt.isBefore(eEffEnd) && eventEffEnd.isAfter(e.startAt);
+        });
+        if (overlapsAny) {
+          cluster.add(event);
+          addedToCluster = true;
+          break;
+        }
+      }
+      if (!addedToCluster) {
+        clusters.add([event]);
+      }
+    }
+
+    List<_TimelineEventLayout> layouts = [];
+
+    for (final cluster in clusters) {
+      List<DateTime> colEndTimes = [];
+      List<int> eventCols = [];
+
+      for (final event in cluster) {
+        int assignedCol = -1;
+        for (int c = 0; c < colEndTimes.length; c++) {
+          if (!event.startAt.isBefore(colEndTimes[c])) {
+            assignedCol = c;
+            colEndTimes[c] = event.endAt;
+            break;
+          }
+        }
+        if (assignedCol == -1) {
+          assignedCol = colEndTimes.length;
+          colEndTimes.add(event.endAt);
+        }
+        eventCols.add(assignedCol);
+      }
+
+      final int numCols = colEndTimes.length;
+
+      for (int i = 0; i < cluster.length; i++) {
+        layouts.add(_TimelineEventLayout(cluster[i], eventCols[i], numCols));
+      }
+    }
+
+    return layouts;
+  }
+
+  Color _getEventTypeColor(String type, Color defaultColor) {
+    switch (type) {
+      case 'meeting':
+        return Colors.orange;
+      case 'visit':
+        return Colors.blue;
+      case 'reminder':
+        return Colors.purple;
+      case 'personal':
+      default:
+        return defaultColor;
+    }
+  }
+
+  Color _getEventTypeBgColor(String type, bool isDark) {
+    switch (type) {
+      case 'meeting':
+        return isDark ? const Color(0xFF7C2D12).withOpacity(0.5) : const Color(0xFFFFEDD5);
+      case 'visit':
+        return isDark ? const Color(0xFF1E3A8A).withOpacity(0.5) : const Color(0xFFDBEAFE);
+      case 'reminder':
+        return isDark ? const Color(0xFF581C87).withOpacity(0.5) : const Color(0xFFF3E8FF);
+      case 'personal':
+      default:
+        return isDark ? const Color(0xFF1F2937).withOpacity(0.5) : const Color(0xFFF3F4F6);
+    }
+  }
+
+  String _getLocalizedEventType(String type) {
+    switch (type) {
+      case 'meeting':
+        return '會議談判';
+      case 'visit':
+        return '客戶拜訪';
+      case 'reminder':
+        return '客戶拜訪';
+      case 'personal':
+      default:
+        return '個人行程';
+    }
   }
 
   // Bullet Schedule Item (打卡點樣式)
@@ -853,7 +1704,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Full Card Schedule Item (滿版卡片樣式)
+  // Full Card Schedule Item (滿版卡片樣式 - 具備邊界防溢與內容自適應)
   Widget _buildCardSchedule({
     required String title,
     required String timeRange,
@@ -867,75 +1718,85 @@ class _HomeScreenState extends State<HomeScreen> {
     final Color textColor = isDark ? Colors.white : Colors.black87;
     final Color subTextColor = isDark ? Colors.white70 : Colors.black54;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: borderColor.withOpacity(0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.access_time, size: 14, color: subTextColor),
-                  const SizedBox(width: 6),
-                  Text(
-                    timeRange,
-                    style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: borderColor.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.access_time, size: 13, color: subTextColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      timeRange,
+                      style: TextStyle(color: subTextColor, fontSize: 11, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: borderColor.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: borderColor.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  tag,
-                  style: TextStyle(color: accentColor, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              )
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
+                  child: Text(
+                    tag,
+                    style: TextStyle(color: accentColor, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                )
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          const Spacer(),
-          Row(
-            children: [
-              Icon(Icons.location_on_outlined, size: 14, color: subTextColor),
-              const SizedBox(width: 4),
-              Expanded(
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2.0),
                 child: Text(
-                  location,
-                  style: TextStyle(color: subTextColor, fontSize: 12),
+                  title,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3,
+                  ),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ],
-          )
-        ],
+            ),
+            if (location.isNotEmpty && location != '未指定地點')
+              Row(
+                children: [
+                  Icon(Icons.location_on_outlined, size: 12, color: subTextColor),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      location,
+                      style: TextStyle(color: subTextColor, fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -994,5 +1855,12 @@ ImageProvider? _getAvatarProvider(String avatarUrl) {
     }
   }
   return NetworkImage(avatarUrl);
+}
+
+class _TimelineEventLayout {
+  final ScheduleEvent event;
+  final int colIndex;
+  final int totalCols;
+  _TimelineEventLayout(this.event, this.colIndex, this.totalCols);
 }
 
