@@ -172,3 +172,7 @@ class AuthGateway extends StatelessWidget {
     );
   }
 }
+
+class OfflineDataStore {
+  static List<Map<String, dynamic>> customers = [];
+}

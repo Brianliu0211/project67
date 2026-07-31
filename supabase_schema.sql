@@ -263,6 +263,103 @@ CREATE POLICY "Authenticated Delete Access for Avatars" ON storage.objects
     );
 
 -- =============================================================
+-- 5. Data Trash Bin & Photo Storage Auto-Cleanup Configuration
+-- =============================================================
+
+-- Add deleted_at fields for soft deletion
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE public.reminders ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- Trigger to delete customer photo from storage on physical hard delete
+CREATE OR REPLACE FUNCTION public.delete_customer_photo_on_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+    file_path TEXT;
+BEGIN
+    IF OLD.avatar_url IS NOT NULL AND OLD.avatar_url LIKE '%/customer-photos/%' THEN
+        -- Extract the path after 'customer-photos/'
+        file_path := split_part(OLD.avatar_url, '/customer-photos/', 2);
+        IF file_path IS NOT NULL AND file_path <> '' THEN
+            DELETE FROM storage.objects 
+            WHERE bucket_id = 'customer-photos' 
+              AND name = file_path;
+        END IF;
+    END IF;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER trigger_delete_customer_photo
+    AFTER DELETE ON public.customers
+    FOR EACH ROW
+    EXECUTE FUNCTION public.delete_customer_photo_on_delete();
+
+-- Trigger to delete old customer photo when updated or cleared
+CREATE OR REPLACE FUNCTION public.delete_old_customer_photo_on_update()
+RETURNS TRIGGER AS $$
+DECLARE
+    old_file_path TEXT;
+BEGIN
+    IF OLD.avatar_url IS NOT NULL 
+       AND OLD.avatar_url LIKE '%/customer-photos/%' 
+       AND (NEW.avatar_url IS NULL OR NEW.avatar_url <> OLD.avatar_url) THEN
+        
+        old_file_path := split_part(OLD.avatar_url, '/customer-photos/', 2);
+        IF old_file_path IS NOT NULL AND old_file_path <> '' THEN
+            DELETE FROM storage.objects 
+            WHERE bucket_id = 'customer-photos' 
+              AND name = old_file_path;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER trigger_delete_old_customer_photo
+    AFTER UPDATE ON public.customers
+    FOR EACH ROW
+    EXECUTE FUNCTION public.delete_old_customer_photo_on_update();
+
+-- Trigger to delete old profile avatar when updated or cleared
+CREATE OR REPLACE FUNCTION public.delete_old_avatar_on_update()
+RETURNS TRIGGER AS $$
+DECLARE
+    old_file_path TEXT;
+BEGIN
+    IF OLD.avatar_url IS NOT NULL 
+       AND OLD.avatar_url LIKE '%/avatars/%' 
+       AND (NEW.avatar_url IS NULL OR NEW.avatar_url <> OLD.avatar_url) THEN
+        
+        old_file_path := split_part(OLD.avatar_url, '/avatars/', 2);
+        IF old_file_path IS NOT NULL AND old_file_path <> '' THEN
+            DELETE FROM storage.objects 
+            WHERE bucket_id = 'avatars' 
+              AND name = old_file_path;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER trigger_delete_old_avatar
+    AFTER UPDATE ON public.profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION public.delete_old_avatar_on_update();
+
+-- Enable pg_cron and schedule daily purge of soft-deleted data (> 30 days)
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- Schedule daily midnight purge (database local timezone or UTC depending on server setting)
+SELECT cron.schedule(
+    'purge-deleted-data-daily',
+    '0 0 * * *', -- Everyday at 00:00 (midnight)
+    $$
+    DELETE FROM public.customers WHERE deleted_at < NOW() - INTERVAL '30 days';
+    DELETE FROM public.reminders WHERE deleted_at < NOW() - INTERVAL '30 days';
+    $$
+);
+
+-- =============================================================
 -- Phase 1.5 Database Upgrades (Categorized Tags & Visit Projects)
 -- =============================================================
 

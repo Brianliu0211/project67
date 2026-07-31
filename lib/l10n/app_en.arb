@@ -82,7 +82,7 @@
   "customer_notes_label": "Notes & Remarks",
   "customer_delete_title": "Confirm Delete",
   "customer_delete_confirm_p1": "Are you sure you want to delete customer \"",
-  "customer_delete_confirm_p2": "\"? This action cannot be undone.",
+  "customer_delete_confirm_p2": "\"? This will move them to the Trash Bin for 30 days.",
   "delete": "Delete",
   "save": "Save",
   "customer_card_notes_title": "Notes",
@@ -99,5 +99,17 @@
   "customer_email_copied": "Email address copied to clipboard",
   "customer_email_empty": "Email address not set",
   "customer_phone_title": "Phone",
-  "customer_tags_classification": "Tags"
+  "customer_tags_classification": "Tags",
+  "trash_bin": "Trash Bin",
+  "trash_bin_empty": "Trash Bin is empty",
+  "trash_bin_desc": "Deleted customer profiles are kept here for 30 days before being permanently deleted.",
+  "trash_bin_restore": "Restore",
+  "trash_bin_delete_forever": "Delete Forever",
+  "trash_bin_confirm_delete_forever_title": "Confirm Delete Forever",
+  "trash_bin_confirm_delete_forever_desc": "Are you sure you want to permanently delete this customer and their photos? This action cannot be undone.",
+  "trash_bin_restore_success": "Customer profile restored successfully",
+  "trash_bin_delete_forever_success": "Customer and photos permanently deleted",
+  "trash_bin_days_left": "days left",
+  "trash_bin_soft_delete_success": "Customer moved to Trash Bin",
+  "trash_bin_goto": "Go to Trash"
 }
