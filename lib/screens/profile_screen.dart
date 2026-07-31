@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
+import '../services/app_localizations.dart';
 import 'customer_management_tab.dart'; // To use CustomToast
 import '../widgets/animations.dart';
 
@@ -131,7 +132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        CustomToast.show(context, '載入個人資料失敗: $e', ToastType.error);
+        CustomToast.show(context, '${context.l10n('profile_load_failed')}: $e', ToastType.error);
       }
     } finally {
       if (mounted) {
@@ -178,7 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           finalAvatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName);
         } catch (e) {
           if (mounted) {
-            CustomToast.show(context, '頭像上傳失敗: $e', ToastType.error);
+            CustomToast.show(context, '${context.l10n('profile_avatar_upload_failed')}: $e', ToastType.error);
           }
           setState(() {
             _isLoading = false;
@@ -209,12 +210,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _isImageCleared = false;
             _isLoading = false;
           });
-          CustomToast.show(context, '個人資料已儲存 (離線暫存)', ToastType.success);
+          CustomToast.show(context, context.l10n('profile_save_success_offline'), ToastType.success);
           widget.onProfileUpdated?.call();
         }
       } catch (e) {
         if (mounted) {
-          CustomToast.show(context, '儲存失敗: $e', ToastType.error);
+          CustomToast.show(context, '${context.l10n('profile_save_failed')}: $e', ToastType.error);
           setState(() {
             _isLoading = false;
           });
@@ -246,7 +247,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _selectedImageName = null;
           _isImageCleared = false;
         });
-        CustomToast.show(context, '個人資料已成功更新', ToastType.success);
+        CustomToast.show(context, context.l10n('profile_save_success'), ToastType.success);
         widget.onProfileUpdated?.call();
       }
     } catch (e) {
@@ -399,7 +400,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 8),
               TextButton.icon(
                 icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 16),
-                label: const Text('清除頭像', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                label: Text(context.l10n('profile_clear_avatar'), style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
                 onPressed: () {
                   setState(() {
                     _selectedImageBytes = null;
@@ -413,14 +414,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
 
             Text(
-              _nameController.text.isNotEmpty ? _nameController.text : '您的姓名',
+              _nameController.text.isNotEmpty ? _nameController.text : context.l10n('profile_your_name'),
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
             ),
             const SizedBox(height: 4),
             Text(
               _jobTitleController.text.isNotEmpty 
                   ? '${_jobTitleController.text} • ${_companyController.text.isNotEmpty ? _companyController.text : "保險經紀人"}'
-                  : '尚未設定職稱',
+                  : context.l10n('profile_no_title'),
               style: TextStyle(fontSize: 12, color: subTextColor),
             ),
             const SizedBox(height: 12),
@@ -456,7 +457,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Icon(Icons.person_outline_rounded, color: primaryColor, size: 20),
                 const SizedBox(width: 8),
-                Text('基本資料設定', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+                Text(context.l10n('profile_basic_info'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
               ],
             ),
             const SizedBox(height: 12),
@@ -466,10 +467,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(color: textColor),
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_phoneFocus),
-              decoration: buildInputDecoration('個人姓名', Icons.badge_outlined),
+              decoration: buildInputDecoration(context.l10n('profile_name'), Icons.badge_outlined),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return '請輸入您的姓名';
+                  return context.l10n('profile_name_required');
                 }
                 return null;
               },
@@ -482,7 +483,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               keyboardType: TextInputType.phone,
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_companyFocus),
-              decoration: buildInputDecoration('聯絡電話', Icons.phone_android_rounded),
+              decoration: buildInputDecoration(context.l10n('profile_phone'), Icons.phone_android_rounded),
             ),
             
             const SizedBox(height: 24),
@@ -492,7 +493,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Icon(Icons.business_center_outlined, color: primaryColor, size: 20),
                 const SizedBox(width: 8),
-                Text('商務與名片資訊', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+                Text(context.l10n('profile_business_info'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
               ],
             ),
             const SizedBox(height: 12),
@@ -505,7 +506,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(color: textColor),
                     textInputAction: TextInputAction.next,
                     onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_jobTitleFocus),
-                    decoration: buildInputDecoration('所屬公司', Icons.corporate_fare_outlined),
+                    decoration: buildInputDecoration(context.l10n('profile_company'), Icons.corporate_fare_outlined),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -516,7 +517,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(color: textColor),
                     textInputAction: TextInputAction.next,
                     onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_websiteFocus),
-                    decoration: buildInputDecoration('專業職稱', Icons.work_outline_rounded),
+                    decoration: buildInputDecoration(context.l10n('profile_job_title'), Icons.work_outline_rounded),
                   ),
                 ),
               ],
@@ -528,7 +529,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(color: textColor),
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_addressFocus),
-              decoration: buildInputDecoration('公司 / 個人網站', Icons.web_rounded, hintText: '例如: www.mywebsite.com'),
+              decoration: buildInputDecoration(context.l10n('profile_website'), Icons.web_rounded, hintText: context.l10n('profile_website_eg')),
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -538,7 +539,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(color: textColor),
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_bioFocus),
-              decoration: buildInputDecoration('服務地址', Icons.location_on_outlined),
+              decoration: buildInputDecoration(context.l10n('profile_address'), Icons.location_on_outlined),
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -546,7 +547,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               focusNode: _bioFocus,
               maxLines: 3,
               style: TextStyle(color: textColor),
-              decoration: buildInputDecoration('個人簡介 (會顯示在名片背面或詳細資訊中)', Icons.info_outline_rounded),
+              decoration: buildInputDecoration(context.l10n('profile_bio_hint'), Icons.info_outline_rounded),
             ),
             
             const SizedBox(height: 32),
@@ -557,7 +558,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: _isLoading 
                   ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : const Icon(Icons.save_rounded, size: 18),
-              label: Text(_isLoading ? '正在儲存...' : '儲存變更', style: const TextStyle(fontWeight: FontWeight.bold)),
+              label: Text(_isLoading ? context.l10n('profile_saving') : context.l10n('profile_save_changes'), style: const TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,

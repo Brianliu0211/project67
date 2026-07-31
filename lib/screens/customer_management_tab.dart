@@ -7,6 +7,7 @@ import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
 import '../services/tag_categorizer.dart';
+import '../services/app_localizations.dart';
 import '../widgets/animations.dart';
 
 class CustomerManagementTab extends StatefulWidget {
@@ -735,7 +736,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
             return AlertDialog(
               backgroundColor: dialogBg,
               title: Text(
-                isEdit ? '編輯客戶檔案' : '新增客戶檔案',
+                isEdit ? context.l10n('customer_edit_title') : context.l10n('customer_add_title'),
                 style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
               ),
               content: SingleChildScrollView(
@@ -796,7 +797,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                         Center(
                           child: TextButton.icon(
                             icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 16),
-                            label: const Text('清除照片', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                            label: Text(context.l10n('customer_clear_photo'), style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
                             onPressed: () {
                               setDialogState(() {
                                 selectedImageFile = null;
@@ -807,13 +808,12 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 16),
                       TextField(
                         controller: nameController,
                         style: TextStyle(color: textColor),
                         textInputAction: TextInputAction.next,
                         onSubmitted: (_) => submitForm(),
-                        decoration: buildInputDecoration('客戶姓名 (必填)', Icons.person_outline),
+                        decoration: buildInputDecoration(context.l10n('customer_name_label'), Icons.person_outline),
                       ),
                       const SizedBox(height: 16),
                       TextField(
@@ -821,7 +821,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                         style: TextStyle(color: textColor),
                         textInputAction: TextInputAction.next,
                         onSubmitted: (_) => submitForm(),
-                        decoration: buildInputDecoration('客戶綽號', Icons.person_pin_outlined),
+                        decoration: buildInputDecoration(context.l10n('customer_nickname_label'), Icons.person_pin_outlined),
                       ),
                       const SizedBox(height: 16),
                       TextField(
@@ -830,7 +830,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                         keyboardType: TextInputType.phone,
                         textInputAction: TextInputAction.next,
                         onSubmitted: (_) => submitForm(),
-                        decoration: buildInputDecoration('電話號碼', Icons.phone_outlined),
+                        decoration: buildInputDecoration(context.l10n('customer_phone_label'), Icons.phone_outlined),
                       ),
                       const SizedBox(height: 16),
                       TextField(
@@ -839,7 +839,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
                         onSubmitted: (_) => submitForm(),
-                        decoration: buildInputDecoration('Email 信箱', Icons.email_outlined),
+                        decoration: buildInputDecoration(context.l10n('customer_email_label'), Icons.email_outlined),
                       ),
                       const SizedBox(height: 16),
                       TextField(
@@ -847,14 +847,14 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                         style: TextStyle(color: textColor),
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => submitForm(),
-                        decoration: buildInputDecoration('標籤 (逗號區隔)', Icons.local_offer_outlined, hintText: '例如: 高意願, 醫療險, 車險'),
+                        decoration: buildInputDecoration(context.l10n('customer_tags_label'), Icons.local_offer_outlined, hintText: context.l10n('customer_tags_eg')),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: notesController,
                         style: TextStyle(color: textColor),
                         maxLines: 3,
-                        decoration: buildInputDecoration('備註紀錄', Icons.note_alt_outlined),
+                        decoration: buildInputDecoration(context.l10n('customer_notes_label'), Icons.note_alt_outlined),
                       ),
                     ],
                   ),
@@ -863,7 +863,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('取消', style: TextStyle(color: subTextColor)),
+                  child: Text(context.l10n('cancel'), style: TextStyle(color: subTextColor)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -871,7 +871,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: submitForm,
-                  child: const Text('儲存'),
+                  child: Text(context.l10n('save')),
                 ),
               ],
             );
@@ -893,12 +893,12 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: dialogBg,
-          title: Text('確認刪除', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-          content: Text('確定要刪除客戶「$name」的完整檔案嗎？此操作無法還原。', style: TextStyle(color: textColor)),
+          title: Text(context.l10n('customer_delete_title'), style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+          content: Text(context.l10n('customer_delete_confirm_p1') + name + context.l10n('customer_delete_confirm_p2'), style: TextStyle(color: textColor)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('取消', style: TextStyle(color: subTextColor)),
+              child: Text(context.l10n('cancel'), style: TextStyle(color: subTextColor)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
@@ -906,7 +906,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                 _deleteCustomer(id);
                 Navigator.pop(context);
               },
-              child: const Text('刪除'),
+              child: Text(context.l10n('delete')),
             ),
           ],
         );
@@ -941,7 +941,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                     controller: _searchController,
                     style: TextStyle(color: textColor),
                     decoration: InputDecoration(
-                      hintText: '搜尋客戶姓名或標籤...',
+                      hintText: context.l10n('customer_search_hint'),
                       hintStyle: TextStyle(color: iconColor),
                       prefixIcon: Icon(Icons.search, color: iconColor),
                       fillColor: searchBg,
@@ -986,7 +986,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   elevation: 2,
                 ),
                 icon: const Icon(Icons.add, size: 20),
-                label: const Text('新增客戶', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: Text(context.l10n('customer_add_btn'), style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -1093,7 +1093,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           ),
           const SizedBox(height: 16),
           Text(
-            '尚未建立客戶或查無此人',
+            context.l10n('customer_empty_title'),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -1102,7 +1102,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           ),
           const SizedBox(height: 8),
           Text(
-            '點選右上角的「新增客戶」按鈕開始建立客戶資料。\n您也可以輸入其他關鍵字搜尋。',
+            context.l10n('customer_empty_desc'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
@@ -1167,8 +1167,8 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
   void _showZoomDetails(BuildContext context) {
     final String name = widget.customer['name'] ?? '';
     final String nickname = widget.customer['nickname'] ?? '';
-    final String phone = widget.customer['phone'] ?? '未填寫';
-    final String email = widget.customer['email'] ?? '未填寫';
+    final String phone = widget.customer['phone'] ?? context.l10n('customer_card_not_filled');
+    final String email = widget.customer['email'] ?? context.l10n('customer_card_not_filled');
     final List tags = widget.customer['tags'] ?? [];
     final String notes = widget.customer['notes'] ?? '';
     final String avatarUrl = widget.customer['avatar_url'] ?? '';
@@ -1230,7 +1230,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                     if (nickname.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        '本名：$name',
+                      '${context.l10n('customer_real_name')}：$name',
                         style: TextStyle(color: subTextColor, fontSize: 12),
                       ),
                     ],
@@ -1241,28 +1241,28 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                       children: [
                         _buildActionButton(
                           icon: Icons.phone,
-                          label: '撥打',
+                          label: context.l10n('customer_action_call'),
                           color: primaryColor,
                           onPressed: () {
-                            if (phone != '未填寫') {
+                            if (phone != context.l10n('customer_card_not_filled')) {
                               Clipboard.setData(ClipboardData(text: phone));
-                              CustomToast.show(context, '已複製電話號碼至剪貼簿: $phone', ToastType.success);
+                              CustomToast.show(context, '${context.l10n('customer_phone_copied')}: $phone', ToastType.success);
                             } else {
-                              CustomToast.show(context, '電話未填寫', ToastType.warning);
+                              CustomToast.show(context, context.l10n('customer_phone_empty'), ToastType.warning);
                             }
                           },
                         ),
                         const SizedBox(width: 12),
                         _buildActionButton(
                           icon: Icons.email,
-                          label: '郵件',
+                          label: context.l10n('customer_action_email'),
                           color: primaryColor,
                           onPressed: () {
-                            if (email != '未填寫') {
+                            if (email != context.l10n('customer_card_not_filled')) {
                               Clipboard.setData(ClipboardData(text: email));
-                              CustomToast.show(context, '已複製電子信信箱至剪貼簿: $email', ToastType.success);
+                              CustomToast.show(context, '${context.l10n('customer_email_copied')}: $email', ToastType.success);
                             } else {
-                              CustomToast.show(context, '信箱未填寫', ToastType.warning);
+                              CustomToast.show(context, context.l10n('customer_email_empty'), ToastType.warning);
                             }
                           },
                         ),
@@ -1275,12 +1275,12 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildInfoRow(Icons.phone_iphone_rounded, '電話', phone, context),
+                    _buildInfoRow(Icons.phone_iphone_rounded, context.l10n('customer_phone_title'), phone, context),
                     const SizedBox(height: 12),
                     _buildInfoRow(Icons.mail_outline_rounded, 'Email', email, context),
                     const SizedBox(height: 16),
                     Text(
-                      '標籤分類',
+                      context.l10n('customer_tags_classification'),
                       style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
@@ -1308,10 +1308,10 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                         }).toList(),
                       )
                     else
-                      Text('暫無標籤', style: TextStyle(color: subTextColor, fontSize: 12)),
+                      Text(context.l10n('customer_card_no_tags'), style: TextStyle(color: subTextColor, fontSize: 12)),
                     const SizedBox(height: 16),
                     Text(
-                      '備註說明',
+                      context.l10n('customer_card_notes_detail_title'),
                       style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
@@ -1326,7 +1326,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                         ),
                         child: SingleChildScrollView(
                           child: Text(
-                            notes.isNotEmpty ? notes : '無備註資訊。',
+                            notes.isNotEmpty ? notes : context.l10n('customer_card_no_notes'),
                             style: TextStyle(
                               color: textColor,
                               fontSize: 12,
@@ -1616,7 +1616,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                     children: [
                       IconButton(
                         icon: Icon(Icons.fullscreen_rounded, color: iconColor, size: 20),
-                        tooltip: '放大詳情',
+                        tooltip: context.l10n('customer_card_zoom_tooltip'),
                         onPressed: () => _showZoomDetails(context),
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.all(4),
@@ -1692,7 +1692,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                 children: [
                   Expanded(
                     child: Text(
-                      '備註 ($name)',
+                      '${context.l10n('customer_card_notes_title')} ($name)',
                       style: TextStyle(
                         color: primaryColor,
                         fontSize: 13,
@@ -1706,7 +1706,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                     children: [
                       IconButton(
                         icon: Icon(Icons.fullscreen_rounded, color: primaryColor, size: 16),
-                        tooltip: '放大詳情',
+                        tooltip: context.l10n('customer_card_zoom_tooltip'),
                         onPressed: () => _showZoomDetails(context),
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -1737,7 +1737,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
               Expanded(
                 child: SingleChildScrollView(
                   child: Text(
-                    notes.isNotEmpty ? notes : '無備註資訊。',
+                    notes.isNotEmpty ? notes : context.l10n('customer_card_no_notes'),
                     style: TextStyle(
                       color: notes.isNotEmpty 
                           ? (isDark ? Colors.white : Colors.black87) 
