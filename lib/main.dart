@@ -25,32 +25,36 @@ void main() async {
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
-    isOfflineMode = true;
-    offlineReason = '找不到 .env 檔案';
+    // If dotenv.load fails, it might still have environment defines
   }
 
-  if (!isOfflineMode) {
-    final supabaseUrl = dotenv.maybeGet('SUPABASE_URL');
-    final supabaseKey = dotenv.maybeGet('SUPABASE_ANON_KEY');
+  // Dual-track fallback: check dotenv first, then const String.fromEnvironment
+  String? supabaseUrl = dotenv.maybeGet('SUPABASE_URL');
+  if (supabaseUrl == null || supabaseUrl.isEmpty) {
+    supabaseUrl = const String.fromEnvironment('SUPABASE_URL');
+  }
 
-    // If placeholders or empty values are detected, fall back to offline preview
-    if (supabaseUrl == null || 
-        supabaseKey == null || 
-        supabaseUrl.isEmpty ||
-        supabaseKey.isEmpty ||
-        supabaseUrl.contains('your-project-id')) {
+  String? supabaseKey = dotenv.maybeGet('SUPABASE_ANON_KEY');
+  if (supabaseKey == null || supabaseKey.isEmpty) {
+    supabaseKey = const String.fromEnvironment('SUPABASE_ANON_KEY');
+  }
+
+  // If placeholders or empty values are detected, fall back to offline preview
+  if (supabaseUrl.isEmpty || 
+      supabaseKey.isEmpty || 
+      supabaseUrl.contains('your-project-id')) {
+    isOfflineMode = true;
+    offlineReason = '未檢測到有效的 Supabase URL 或 ANON KEY';
+  } else {
+    try {
+      await Supabase.initialize(
+        url: supabaseUrl,
+        anonKey: supabaseKey,
+      );
+      isOfflineMode = false;
+    } catch (e) {
       isOfflineMode = true;
-      offlineReason = '檢測到預設金鑰占位字串';
-    } else {
-      try {
-        await Supabase.initialize(
-          url: supabaseUrl,
-          anonKey: supabaseKey,
-        );
-      } catch (e) {
-        isOfflineMode = true;
-        offlineReason = 'Supabase 初始化連線失敗';
-      }
+      offlineReason = 'Supabase 初始化連線失敗: $e';
     }
   }
 

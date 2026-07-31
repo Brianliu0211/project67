@@ -47,6 +47,9 @@ dependencies:
   # Image picking package
   image_picker: ^1.1.2
 
+  # Voice recording for voice memos (cross-platform including Web)
+  record: ^5.2.0
+
   # Internationalization support
   flutter_localizations:
     sdk: flutter
