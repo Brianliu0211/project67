@@ -5,6 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/app_settings.dart';
+import 'services/app_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 // Global flag to track if we are in offline preview mode
 bool isOfflineMode = false;
@@ -12,6 +15,8 @@ String offlineReason = '';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('zh_TW', null);
+  await initializeDateFormatting('en_US', null);
   
   // Load AppSettings
   await AppSettings.instance.loadSettings();
@@ -114,6 +119,19 @@ class MyApp extends StatelessWidget {
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: AppSettings.instance.themeMode,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('zh', 'TW'),
+            Locale('en', 'US'),
+          ],
+          locale: AppSettings.instance.language == 'zh_TW'
+              ? const Locale('zh', 'TW')
+              : const Locale('en', 'US'),
           home: const AuthGateway(),
         );
       },

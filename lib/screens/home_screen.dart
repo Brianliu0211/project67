@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
+import '../services/app_localizations.dart';
+import 'package:intl/intl.dart';
 import 'login_screen.dart';
 import 'customer_management_tab.dart';
 import 'settings_screen.dart';
@@ -19,6 +21,16 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   DateTime _selectedDate = DateTime.now(); // Default to dynamic current time
   String _activeMenu = '今日行程';
+
+  String _getLocalizedMenuTitle(String menu) {
+    if (menu == '今日行程') return context.l10n('today_schedule');
+    if (menu == '客戶管理') return context.l10n('customer_mgmt');
+    if (menu == '人脈拓撲') return context.l10n('relationship_topology');
+    if (menu == '數據戰情') return context.l10n('data_dashboard');
+    if (menu == '個人帳號') return context.l10n('personal_account');
+    if (menu == '系統設定') return context.l10n('system_settings');
+    return menu;
+  }
   bool _isSidebarCollapsed = false;
   String _userName = '載入中...';
   String _userEmail = '';
@@ -300,7 +312,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-            // Sign out button
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -317,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.transparent,
                       child: ListTile(
                         leading: const Icon(Icons.logout, color: Colors.redAccent),
-                        title: const Text('登出系統', style: TextStyle(color: Colors.redAccent)),
+                        title: Text(context.l10n('logout_system'), style: const TextStyle(color: Colors.redAccent)),
                         onTap: _handleSignOut,
                         contentPadding: EdgeInsets.zero,
                         dense: true,
@@ -334,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: isWideScreen
           ? null
           : AppBar(
-              title: Text(_activeMenu),
+              title: Text(_getLocalizedMenuTitle(_activeMenu)),
               backgroundColor: sidebarBg,
               actions: [
                 if (isOfflineMode)
@@ -345,9 +356,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.amber.shade900,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
-                      '離線預覽',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    child: Text(
+                      context.l10n('offline_preview'),
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ),
               ],
@@ -391,6 +402,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final Color activeBg = primaryColor.withOpacity(0.15);
     final Color inactiveText = isDark ? Colors.white70 : Colors.black87;
 
+    final String displayTitle = _getLocalizedMenuTitle(title);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
@@ -418,7 +431,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (!_isSidebarCollapsed) ...[
                 const SizedBox(width: 16),
                 Text(
-                  title,
+                  displayTitle,
                   style: TextStyle(
                     color: isActive ? primaryColor : inactiveText,
                     fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
@@ -445,7 +458,7 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            _activeMenu,
+            _getLocalizedMenuTitle(_activeMenu),
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -463,19 +476,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     border: Border.all(color: Colors.amber.shade700, width: 1),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.offline_bolt_outlined, size: 14, color: Colors.amber),
-                      SizedBox(width: 6),
+                      const Icon(Icons.offline_bolt_outlined, size: 14, color: Colors.amber),
+                      const SizedBox(width: 6),
                       Text(
-                        '離線預覽模式',
-                        style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold),
+                        context.l10n('offline_preview_mode'),
+                        style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                 ),
               Text(
-                '保險客戶管理助手 v1.0.0',
+                context.l10n('client_helper_v'),
                 style: TextStyle(color: subTextColor, fontSize: 12),
               ),
             ],
@@ -488,9 +501,21 @@ class _HomeScreenState extends State<HomeScreen> {
   // Horizontal Weekly Calendar Strip
   Widget _buildWeeklyCalendarStrip(bool isDark, Color textColor, Color subTextColor, Color borderColor, Color primaryColor) {
     final List<DateTime> weekDates = _getWeekDates(_selectedDate);
-    final List<String> weekdaysZh = ['一', '二', '三', '四', '五', '六', '日'];
-    
-    final String monthString = '${_selectedDate.year}年${_selectedDate.month}月';
+    final String localeStr = AppSettings.instance.language;
+    final String monthString = DateFormat.yMMMM(localeStr).format(_selectedDate);
+
+    // Get narrow weekdays from date symbols (Sun, Mon, Tue...)
+    final List<String> narrowWeekdays = DateFormat.E(localeStr).dateSymbols.NARROWWEEKDAYS;
+    // Map to Mon-Sun
+    final List<String> weekdays = [
+      narrowWeekdays[1], // Mon
+      narrowWeekdays[2], // Tue
+      narrowWeekdays[3], // Wed
+      narrowWeekdays[4], // Thu
+      narrowWeekdays[5], // Fri
+      narrowWeekdays[6], // Sat
+      narrowWeekdays[0], // Sun
+    ];
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
@@ -586,7 +611,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Column(
                             children: [
                               Text(
-                                weekdaysZh[index],
+                                weekdays[index],
                                 style: TextStyle(
                                   color: isSelected ? Colors.white : subTextColor,
                                   fontSize: 12,
