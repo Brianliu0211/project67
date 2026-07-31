@@ -29,6 +29,7 @@ class AppSettings extends ChangeNotifier {
   Color _primaryColor = AppThemeColors.tealCyan;
   String _defaultCustomerViewMode = 'card'; // 'card' or 'list'
   bool _isSidebarCollapsedByDefault = false;
+  bool _isSidebarHoverExpandEnabled = false;
   String _language = 'zh_TW';
 
   // Getters
@@ -36,6 +37,7 @@ class AppSettings extends ChangeNotifier {
   Color get primaryColor => _primaryColor;
   String get defaultCustomerViewMode => _defaultCustomerViewMode;
   bool get isSidebarCollapsedByDefault => _isSidebarCollapsedByDefault;
+  bool get isSidebarHoverExpandEnabled => _isSidebarHoverExpandEnabled;
   String get language => _language;
 
   bool _isInitialized = false;
@@ -67,6 +69,9 @@ class AppSettings extends ChangeNotifier {
 
       // Load Sidebar Preference
       _isSidebarCollapsedByDefault = prefs.getBool('prefs_sidebar_collapsed') ?? false;
+
+      // Load Sidebar Hover Expand Preference
+      _isSidebarHoverExpandEnabled = prefs.getBool('prefs_sidebar_hover_expand') ?? false;
 
       // Load Language
       _language = prefs.getString('prefs_language') ?? 'zh_TW';
@@ -131,6 +136,14 @@ class AppSettings extends ChangeNotifier {
           }
         }
 
+        if (cloudData.containsKey('sidebar_hover_expand')) {
+          final hoverExpand = cloudData['sidebar_hover_expand'] as bool;
+          if (_isSidebarHoverExpandEnabled != hoverExpand) {
+            _isSidebarHoverExpandEnabled = hoverExpand;
+            hasChanges = true;
+          }
+        }
+
         if (cloudData.containsKey('language')) {
           final lang = cloudData['language'] as String;
           if (_language != lang) {
@@ -181,6 +194,14 @@ class AppSettings extends ChangeNotifier {
     await _saveAndSync();
   }
 
+  /// Update Sidebar Hover Expand Preference
+  Future<void> setSidebarHoverExpandEnabled(bool enabled) async {
+    if (_isSidebarHoverExpandEnabled == enabled) return;
+    _isSidebarHoverExpandEnabled = enabled;
+    notifyListeners();
+    await _saveAndSync();
+  }
+
   /// Update Language
   Future<void> setLanguage(String lang) async {
     if (_language == lang) return;
@@ -195,6 +216,7 @@ class AppSettings extends ChangeNotifier {
     _primaryColor = AppThemeColors.tealCyan;
     _defaultCustomerViewMode = 'card';
     _isSidebarCollapsedByDefault = false;
+    _isSidebarHoverExpandEnabled = false;
     _language = 'zh_TW';
     notifyListeners();
     await _saveAndSync();
@@ -208,6 +230,7 @@ class AppSettings extends ChangeNotifier {
       await prefs.setInt('prefs_primary_color', _primaryColor.value);
       await prefs.setString('prefs_customer_view_mode', _defaultCustomerViewMode);
       await prefs.setBool('prefs_sidebar_collapsed', _isSidebarCollapsedByDefault);
+      await prefs.setBool('prefs_sidebar_hover_expand', _isSidebarHoverExpandEnabled);
       await prefs.setString('prefs_language', _language);
     } catch (e) {
       debugPrint('Error saving settings to SharedPreferences: $e');
@@ -229,6 +252,7 @@ class AppSettings extends ChangeNotifier {
           'primary_color_value': _primaryColor.value,
           'customer_view_mode': _defaultCustomerViewMode,
           'sidebar_collapsed': _isSidebarCollapsedByDefault,
+          'sidebar_hover_expand': _isSidebarHoverExpandEnabled,
           'language': _language,
           'updated_at': DateTime.now().toIso8601String(),
         };

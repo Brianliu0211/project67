@@ -27,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _getLocalizedMenuTitle(String menu) {
     if (menu == '今日行程') return context.l10n('today_schedule');
     if (menu == '客戶管理') return context.l10n('customer_mgmt');
+    if (menu == '專案拜訪') return context.l10n('project_visits');
     if (menu == '人脈拓撲') return context.l10n('relationship_topology');
     if (menu == '數據戰情') return context.l10n('data_dashboard');
     if (menu == '個人帳號') return context.l10n('personal_account');
@@ -35,6 +36,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return menu;
   }
   bool _isSidebarCollapsed = false;
+  bool _isSidebarHovered = false;
+
+  bool get _effectiveSidebarCollapsed {
+    final bool isHoverExpandActive = AppSettings.instance.isSidebarHoverExpandEnabled;
+    return _isSidebarCollapsed && !(isHoverExpandActive && _isSidebarHovered);
+  }
+
   String _userName = '載入中...';
   String _userEmail = '';
   String _userAvatarUrl = '';
@@ -43,8 +51,23 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _isSidebarCollapsed = AppSettings.instance.isSidebarCollapsedByDefault;
+    AppSettings.instance.addListener(_handleSettingsChanged);
     _loadUserProfile();
     _loadSavedMenu();
+  }
+
+  @override
+  void dispose() {
+    AppSettings.instance.removeListener(_handleSettingsChanged);
+    super.dispose();
+  }
+
+  void _handleSettingsChanged() {
+    if (mounted) {
+      setState(() {
+        _isSidebarCollapsed = AppSettings.instance.isSidebarCollapsedByDefault;
+      });
+    }
   }
 
   Future<void> _loadSavedMenu() async {
@@ -200,46 +223,47 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Sidebar navigation content
     Widget sidebarContent() {
-      return Container(
-        color: sidebarBg,
-        width: _isSidebarCollapsed ? 80 : 260,
-        child: Column(
-          children: [
-            // Header Profile Area
-            InkWell(
-              onTap: () {
-                _changeActiveMenu('個人帳號');
-                if (MediaQuery.of(context).size.width < 768) {
-                  Navigator.of(context).pop(); // Close drawer on mobile
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: borderColor, width: 1),
+      final isHoverExpandActive = AppSettings.instance.isSidebarHoverExpandEnabled;
+      return MouseRegion(
+        onEnter: (_) {
+          if (isHoverExpandActive && _isSidebarCollapsed && !_isSidebarHovered) {
+            setState(() {
+              _isSidebarHovered = true;
+            });
+          }
+        },
+        onExit: (_) {
+          if (isHoverExpandActive && _isSidebarHovered) {
+            setState(() {
+              _isSidebarHovered = false;
+            });
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          color: sidebarBg,
+          width: _effectiveSidebarCollapsed ? 80 : 260,
+          child: Column(
+            children: [
+              // Header Profile Area
+              InkWell(
+                onTap: () {
+                  _changeActiveMenu('個人帳號');
+                  if (MediaQuery.of(context).size.width < 768) {
+                    Navigator.of(context).pop(); // Close drawer on mobile
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: borderColor, width: 1),
+                    ),
                   ),
-                ),
-                child: _isSidebarCollapsed
-                    ? Center(
-                        child: CircleAvatar(
-                          backgroundColor: primaryColor,
-                          radius: 20,
-                          backgroundImage: _getAvatarProvider(_userAvatarUrl),
-                          child: _userAvatarUrl.isEmpty
-                              ? Text(
-                                  _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        ),
-                      )
-                    : Row(
-                        children: [
-                          CircleAvatar(
+                  child: _effectiveSidebarCollapsed
+                      ? Center(
+                          child: CircleAvatar(
                             backgroundColor: primaryColor,
                             radius: 20,
                             backgroundImage: _getAvatarProvider(_userAvatarUrl),
@@ -253,94 +277,113 @@ class _HomeScreenState extends State<HomeScreen> {
                                   )
                                 : null,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _userName,
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  isOfflineMode ? '離線模式' : _userEmail,
-                                  style: TextStyle(
-                                    color: isOfflineMode ? Colors.amber : subTextColor,
-                                    fontSize: 11,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                        )
+                      : Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: primaryColor,
+                              radius: 20,
+                              backgroundImage: _getAvatarProvider(_userAvatarUrl),
+                              child: _userAvatarUrl.isEmpty
+                                  ? Text(
+                                      _userName.isNotEmpty ? _userName.substring(0, 1) : '?',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : null,
                             ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _userName,
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isOfflineMode ? '離線模式' : _userEmail,
+                                    style: TextStyle(
+                                      color: isOfflineMode ? Colors.amber : subTextColor,
+                                      fontSize: 11,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
               ),
-            ),
-            
-            const SizedBox(height: 16),
+              
+              const SizedBox(height: 16),
 
-            // Navigation Items
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                children: [
-                  _buildSidebarItem(Icons.calendar_today_outlined, '今日行程', isDark, primaryColor),
-                  _buildSidebarItem(Icons.people_outline, '客戶管理', isDark, primaryColor),
-                  _buildSidebarItem(Icons.assignment_outlined, '專案拜訪', isDark, primaryColor),
-                  _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
-                  _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
-                  _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
-                  _buildSidebarItem(Icons.delete_outline, '垃圾桶', isDark, primaryColor),
-                  _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
-                ],
-              ),
-            ),
-
-            // Collapse button (Desktop only)
-            if (isWideScreen)
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    _isSidebarCollapsed = !_isSidebarCollapsed;
-                  });
-                },
-                icon: Icon(
-                  _isSidebarCollapsed ? Icons.chevron_right : Icons.chevron_left,
-                  color: subTextColor,
+              // Navigation Items
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  children: [
+                    _buildSidebarItem(Icons.calendar_today_outlined, '今日行程', isDark, primaryColor),
+                    _buildSidebarItem(Icons.people_outline, '客戶管理', isDark, primaryColor),
+                    _buildSidebarItem(Icons.assignment_outlined, '專案拜訪', isDark, primaryColor),
+                    _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
+                    _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
+                    _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
+                    _buildSidebarItem(Icons.delete_outline, '垃圾桶', isDark, primaryColor),
+                    _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
+                  ],
                 ),
               ),
 
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: borderColor, width: 1),
+              // Collapse button (Desktop only)
+              if (isWideScreen)
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _isSidebarCollapsed = !_isSidebarCollapsed;
+                      _isSidebarHovered = false; // Reset hover if manually toggled
+                    });
+                  },
+                  icon: Icon(
+                    _effectiveSidebarCollapsed ? Icons.chevron_right : Icons.chevron_left,
+                    color: subTextColor,
+                  ),
                 ),
-              ),
-              child: _isSidebarCollapsed
-                  ? IconButton(
-                      icon: const Icon(Icons.logout, color: Colors.redAccent),
-                      onPressed: _handleSignOut,
-                    )
-                  : Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        leading: const Icon(Icons.logout, color: Colors.redAccent),
-                        title: Text(context.l10n('logout_system'), style: const TextStyle(color: Colors.redAccent)),
-                        onTap: _handleSignOut,
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
+
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: borderColor, width: 1),
+                  ),
+                ),
+                child: _effectiveSidebarCollapsed
+                    ? IconButton(
+                        icon: const Icon(Icons.logout, color: Colors.redAccent),
+                        onPressed: _handleSignOut,
+                      )
+                    : Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          leading: const Icon(Icons.logout, color: Colors.redAccent),
+                          title: Text(context.l10n('logout_system'), style: const TextStyle(color: Colors.redAccent)),
+                          onTap: _handleSignOut,
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
                       ),
-                    ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -436,14 +479,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           child: Row(
-            mainAxisAlignment: _isSidebarCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+            mainAxisAlignment: _effectiveSidebarCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
             children: [
               Icon(
                 icon,
                 color: isActive ? primaryColor : inactiveText,
                 size: 20,
               ),
-              if (!_isSidebarCollapsed) ...[
+              if (!_effectiveSidebarCollapsed) ...[
                 const SizedBox(width: 16),
                 Text(
                   displayTitle,
