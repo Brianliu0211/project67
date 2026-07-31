@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/app_settings.dart';
+import '../services/app_localizations.dart';
 import '../main.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -28,9 +29,9 @@ class SettingsScreen extends StatelessWidget {
                     children: [
                       Icon(Icons.tune_rounded, color: primaryColor, size: 28),
                       const SizedBox(width: 12),
-                      const Text(
-                        '系統個性化與偏好設定',
-                        style: TextStyle(
+                      Text(
+                        context.l10n('system_settings_title'),
+                        style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
@@ -39,7 +40,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '自訂專屬您的工作介面風格、視圖習慣與跨裝置備份機制',
+                    context.l10n('system_settings_subtitle'),
                     style: TextStyle(
                       fontSize: 13,
                       color: isDark ? Colors.white54 : Colors.black54,
@@ -52,7 +53,7 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Section 1: Appearance & Theme
-                  _buildSectionHeader(context, Icons.palette_outlined, '外觀與風格主題', primaryColor),
+                  _buildSectionHeader(context, Icons.palette_outlined, context.l10n('appearance_theme'), primaryColor),
                   const SizedBox(height: 12),
                   _buildCardContainer(
                     context,
@@ -61,9 +62,9 @@ class SettingsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Theme Mode Selector
-                        const Text(
-                          '色彩模式 (Theme Mode)',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        Text(
+                          context.l10n('theme_mode'),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -72,7 +73,7 @@ class SettingsScreen extends StatelessWidget {
                               child: _buildThemeModeCard(
                                 context,
                                 mode: ThemeMode.dark,
-                                title: '深色模式',
+                                title: context.l10n('theme_dark'),
                                 icon: Icons.dark_mode_outlined,
                                 isSelected: settings.themeMode == ThemeMode.dark,
                                 isDark: isDark,
@@ -84,7 +85,7 @@ class SettingsScreen extends StatelessWidget {
                               child: _buildThemeModeCard(
                                 context,
                                 mode: ThemeMode.light,
-                                title: '淺色模式',
+                                title: context.l10n('theme_light'),
                                 icon: Icons.light_mode_outlined,
                                 isSelected: settings.themeMode == ThemeMode.light,
                                 isDark: isDark,
@@ -96,7 +97,7 @@ class SettingsScreen extends StatelessWidget {
                               child: _buildThemeModeCard(
                                 context,
                                 mode: ThemeMode.system,
-                                title: '跟隨系統',
+                                title: context.l10n('theme_system'),
                                 icon: Icons.brightness_auto_outlined,
                                 isSelected: settings.themeMode == ThemeMode.system,
                                 isDark: isDark,
@@ -110,9 +111,9 @@ class SettingsScreen extends StatelessWidget {
                         const SizedBox(height: 24),
 
                         // Accent Color Selector
-                        const Text(
-                          '系統強調色 (Accent Color)',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        Text(
+                          context.l10n('accent_color'),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                         const SizedBox(height: 12),
                         Wrap(
@@ -122,6 +123,19 @@ class SettingsScreen extends StatelessWidget {
                             final String name = item['name'];
                             final Color color = item['color'];
                             final bool isSelected = settings.primaryColor.value == color.value;
+
+                            String displayName = name;
+                            if (name == '商務青藍') {
+                              displayName = context.l10n('accent_teal');
+                            } else if (name == '皇家寶藍') {
+                              displayName = context.l10n('accent_blue');
+                            } else if (name == '翡翠鮮綠') {
+                              displayName = context.l10n('accent_green');
+                            } else if (name == '高雅奢紫') {
+                              displayName = context.l10n('accent_purple');
+                            } else if (name == '暖陽琥珀') {
+                              displayName = context.l10n('accent_amber');
+                            }
 
                             return InkWell(
                               onTap: () => settings.setPrimaryColor(color),
@@ -161,7 +175,7 @@ class SettingsScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      name,
+                                      displayName,
                                       style: TextStyle(
                                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                         fontSize: 13,
@@ -179,7 +193,7 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Section 2: View Preferences
-                  _buildSectionHeader(context, Icons.dashboard_customize_outlined, '操作與檢視偏好', primaryColor),
+                  _buildSectionHeader(context, Icons.dashboard_customize_outlined, context.l10n('operation_preferences'), primaryColor),
                   const SizedBox(height: 12),
                   _buildCardContainer(
                     context,
@@ -197,26 +211,26 @@ class SettingsScreen extends StatelessWidget {
                             ),
                             child: Icon(Icons.style_outlined, color: primaryColor, size: 20),
                           ),
-                          title: const Text('客戶卡片預設檢視模式', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          subtitle: const Text('設定進入客戶管理頁面時的預設展現方式', style: TextStyle(fontSize: 12)),
+                          title: Text(context.l10n('customer_view_mode'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                          subtitle: Text(context.l10n('customer_view_mode_desc'), style: const TextStyle(fontSize: 12)),
                           trailing: SegmentedButton<String>(
-                            segments: const [
+                            segments: [
                               ButtonSegment(
                                 value: 'card',
-                                label: Text('3D名片'),
-                                icon: Icon(Icons.view_carousel_outlined, size: 16),
+                                label: Text(context.l10n('view_3d_card')),
+                                icon: const Icon(Icons.view_carousel_outlined, size: 16),
                               ),
                               ButtonSegment(
                                 value: 'list',
-                                label: Text('條列清單'),
-                                icon: Icon(Icons.table_rows_outlined, size: 16),
+                                label: Text(context.l10n('view_list_view')),
+                                icon: const Icon(Icons.table_rows_outlined, size: 16),
                               ),
                             ],
                             selected: {settings.defaultCustomerViewMode},
                             onSelectionChanged: (Set<String> newSelection) {
                               settings.setDefaultCustomerViewMode(newSelection.first);
                             },
-                            style: ButtonStyle(
+                            style: const ButtonStyle(
                               visualDensity: VisualDensity.compact,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
@@ -235,8 +249,8 @@ class SettingsScreen extends StatelessWidget {
                             ),
                             child: Icon(Icons.view_sidebar_outlined, color: primaryColor, size: 20),
                           ),
-                          title: const Text('預設自動折疊側邊欄', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          subtitle: const Text('啟動或載入系統時，自動保持側邊導覽列為精簡圖示模式', style: TextStyle(fontSize: 12)),
+                          title: Text(context.l10n('auto_collapse_sidebar'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                          subtitle: Text(context.l10n('auto_collapse_sidebar_desc'), style: const TextStyle(fontSize: 12)),
                           value: settings.isSidebarCollapsedByDefault,
                           activeColor: primaryColor,
                           onChanged: (bool value) {
@@ -249,7 +263,7 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Section 3: Language & Localization (Phase 6 i18n Prep)
-                  _buildSectionHeader(context, Icons.language_outlined, '多國語系 (Language)', primaryColor),
+                  _buildSectionHeader(context, Icons.language_outlined, context.l10n('language_title'), primaryColor),
                   const SizedBox(height: 12),
                   _buildCardContainer(
                     context,
@@ -264,8 +278,8 @@ class SettingsScreen extends StatelessWidget {
                         ),
                         child: Icon(Icons.translate_outlined, color: primaryColor, size: 20),
                       ),
-                      title: const Text('顯示語言 Preference Language', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('切換專案介面顯示之語言語系 (對齊 Phase 6 i18n)', style: TextStyle(fontSize: 12)),
+                      title: Text(context.l10n('pref_language'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      subtitle: Text(context.l10n('pref_language_desc'), style: const TextStyle(fontSize: 12)),
                       trailing: DropdownButton<String>(
                         value: settings.language,
                         underline: const SizedBox(),
@@ -302,7 +316,7 @@ class SettingsScreen extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () => _confirmResetDialog(context, settings, primaryColor),
                       icon: const Icon(Icons.restart_alt_outlined, color: Colors.redAccent, size: 18),
-                      label: const Text('恢復系統預設值', style: TextStyle(color: Colors.redAccent)),
+                      label: Text(context.l10n('reset_defaults'), style: const TextStyle(color: Colors.redAccent)),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.redAccent),
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -348,7 +362,7 @@ class SettingsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isOffline ? '離線偏好儲存模式 (Local Storage)' : 'Supabase 雲端偏好對齊 (Cloud Synced)',
+                  isOffline ? context.l10n('cloud_sync_offline') : context.l10n('cloud_sync_synced'),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -358,8 +372,8 @@ class SettingsScreen extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   isOffline
-                      ? '您的偏好設定目前安全儲存於本機 SharedPreferences 中。'
-                      : '設定將同時更新至 SharedPreferences 與 Supabase 雲端 User Metadata，實現跨裝置自動同步。',
+                      ? context.l10n('cloud_sync_offline_desc')
+                      : context.l10n('cloud_sync_synced_desc'),
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.white70 : Colors.black54,
@@ -467,18 +481,18 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.amber),
-              SizedBox(width: 8),
-              Text('恢復預設設定'),
+              const Icon(Icons.warning_amber_rounded, color: Colors.amber),
+              const SizedBox(width: 8),
+              Text(context.l10n('reset_dialog_title')),
             ],
           ),
-          content: const Text('確定要將主題顏色、色彩模式與檢視偏好恢復為系統預設值嗎？'),
+          content: Text(context.l10n('reset_dialog_content')),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
+              child: Text(context.l10n('cancel')),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -490,11 +504,11 @@ class SettingsScreen extends StatelessWidget {
                 await settings.resetToDefaults();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已恢復系統預設設定')),
+                    SnackBar(content: Text(context.l10n('reset_success'))),
                   );
                 }
               },
-              child: const Text('確認重置'),
+              child: Text(context.l10n('confirm')),
             ),
           ],
         );
