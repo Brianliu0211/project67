@@ -74,3 +74,20 @@
 ## 🔒 安全與金鑰管理規範
 - 所有 API 金鑰、Supabase 憑證（`SUPABASE_URL`、`SUPABASE_ANON_KEY`、`GEMINI_API_KEY`）**絕對禁止**以明文形式寫在程式碼中或提交至 Git 倉庫。
 - 必須使用 `flutter_dotenv` 或 `--dart-define` 技術在建置階段動態載入環境變數。
+
+---
+
+## 🎨 全局 UI Toast 提示規範 (CustomToast)
+
+專案內所有模組（客戶管理、行事曆、拜訪紀錄、設定等）的操作回饋與狀態提示，**必須統一調用 [lib/widgets/custom_toast.dart](file:///c:/GitHub/project67/lib/widgets/custom_toast.dart) 的 `CustomToast.show()` 靜態方法**，禁止直接建立風格不一致的原生 SnackBar。
+
+### 1. 設計視覺標準
+- **視覺外觀**: 深色半透明膠囊造型背景 (`0xFF161B22`)，配備 1.5px 細發光邊框與輕微陰影。
+- **左側圖示**: 帶圓圈狀狀態指示圖標，顏色與邊框同色系發光。
+- **右側開關**: 內建關閉 `X` 按鈕與可選的快捷 Action 操作按鈕。
+
+### 2. 狀態顏色分類
+- 🟢 **`ToastType.success` (成功)**: 邊框與圖標為霓虹青/藍色 (`0xFF00ADB5` / `0xFF00F5FF`)。適用於：新增/編輯/儲存成功。
+- 🟡 **`ToastType.warning` (警告)**: 邊框與圖標為琥珀黃色 (`Colors.amber`)。適用於：時間防呆警示、刪除項目、欄位缺漏。
+- 🔴 **`ToastType.error` (錯誤)**: 邊框與圖標為亮紅/深紅色 (`Colors.redAccent`)。適用於：網路斷線、資料庫寫入失敗、權限不足。
+

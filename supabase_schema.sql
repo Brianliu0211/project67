@@ -586,3 +586,47 @@ CREATE POLICY "Users can delete visit_project_customers for their projects" ON p
         auth.uid() = (SELECT profile_id FROM public.visit_projects WHERE id = visit_project_id)
     );
 
+-- =============================================================
+-- 7. Schedule Events Table (Calendar Revamp - Phase 5)
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.schedule_events (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE, -- NULLable for personal events
+    title TEXT NOT NULL,
+    start_at TIMESTAMPTZ NOT NULL,
+    end_at TIMESTAMPTZ NOT NULL,
+    location TEXT,
+    tag TEXT, -- 自訂標籤名稱
+    event_type TEXT DEFAULT 'personal', -- e.g., 'personal', 'meeting', 'visit', 'reminder'
+    is_completed BOOLEAN DEFAULT FALSE NOT NULL,
+    google_event_id TEXT,
+    google_calendar_id TEXT,
+    last_synced_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_events_profile_id ON public.schedule_events(profile_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_events_customer_id ON public.schedule_events(customer_id);
+
+-- Bind updated_at trigger to schedule_events
+DROP TRIGGER IF EXISTS trigger_update_schedule_events_timestamp ON public.schedule_events;
+CREATE TRIGGER trigger_update_schedule_events_timestamp
+    BEFORE UPDATE ON public.schedule_events
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Enable RLS for schedule_events
+ALTER TABLE public.schedule_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own schedule_events" ON public.schedule_events
+    FOR SELECT USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can insert their own schedule_events" ON public.schedule_events
+    FOR INSERT TO authenticated WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Users can update their own schedule_events" ON public.schedule_events
+    FOR UPDATE TO authenticated USING (auth.uid() = profile_id) WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Users can delete their own schedule_events" ON public.schedule_events
+    FOR DELETE TO authenticated USING (auth.uid() = profile_id);
