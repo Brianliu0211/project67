@@ -10,6 +10,7 @@ import '../services/tag_categorizer.dart';
 import '../services/app_localizations.dart';
 import '../widgets/animations.dart';
 import '../widgets/custom_toast.dart';
+import '../widgets/voice_recorder_widget.dart';
 
 class CustomerManagementTab extends StatefulWidget {
   final ValueChanged<String>? onMenuChanged;
@@ -885,10 +886,21 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                         decoration: buildInputDecoration(context.l10n('customer_tags_label'), Icons.local_offer_outlined, hintText: context.l10n('customer_tags_eg')),
                       ),
                       const SizedBox(height: 16),
+                      // 語音備註輸入列
+                      VoiceRecorderWidget(
+                        primaryColor: primaryColor,
+                        isDark: isDark,
+                        onTranscribed: (text) {
+                          final current = notesController.text.trim();
+                          notesController.text =
+                              current.isEmpty ? text : '$current\n\n$text';
+                        },
+                      ),
+                      const SizedBox(height: 8),
                       TextField(
                         controller: notesController,
                         style: TextStyle(color: textColor),
-                        maxLines: 3,
+                        maxLines: 4,
                         decoration: buildInputDecoration(context.l10n('customer_notes_label'), Icons.note_alt_outlined),
                       ),
                     ],
