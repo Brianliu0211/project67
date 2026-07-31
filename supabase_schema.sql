@@ -359,4 +359,230 @@ SELECT cron.schedule(
     $$
 );
 
+-- =============================================================
+-- Phase 1.5 Database Upgrades (Categorized Tags & Visit Projects)
+-- =============================================================
+
+-- 1. Tag Categories Table
+CREATE TABLE IF NOT EXISTS public.tag_categories (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    color_code TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS and add Policies for tag_categories
+ALTER TABLE public.tag_categories ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to tag_categories" ON public.tag_categories 
+    FOR SELECT USING (true);
+
+CREATE POLICY "Allow authenticated insert to tag_categories" ON public.tag_categories 
+    FOR INSERT TO authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated update to tag_categories" ON public.tag_categories 
+    FOR UPDATE TO authenticated USING (true);
+
+-- Seed pre-defined Tag Categories
+INSERT INTO public.tag_categories (name, color_code)
+VALUES 
+    ('客戶身分', 'blue'),
+    ('已購險種', 'green'),
+    ('生活興趣', 'orange'),
+    ('健康與體況', 'pink'),
+    ('跟進狀態', 'purple')
+ON CONFLICT (name) DO NOTHING;
+
+-- 2. Tags Table
+CREATE TABLE IF NOT EXISTS public.tags (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    category_id UUID REFERENCES public.tag_categories(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS and add Policies for tags
+ALTER TABLE public.tags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to tags" ON public.tags 
+    FOR SELECT USING (true);
+
+CREATE POLICY "Allow authenticated insert to tags" ON public.tags 
+    FOR INSERT TO authenticated WITH CHECK (true);
+
+-- 3. Customer Tags Junction Table
+CREATE TABLE IF NOT EXISTS public.customer_tags (
+    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    tag_id UUID REFERENCES public.tags(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    PRIMARY KEY (customer_id, tag_id)
+);
+
+-- Enable RLS and add Policies for customer_tags
+ALTER TABLE public.customer_tags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view customer_tags for their customers" ON public.customer_tags 
+    FOR SELECT USING (
+        auth.uid() = (SELECT profile_id FROM public.customers WHERE id = customer_id)
+    );
+    
+CREATE POLICY "Users can insert customer_tags for their customers" ON public.customer_tags 
+    FOR INSERT TO authenticated WITH CHECK (
+        auth.uid() = (SELECT profile_id FROM public.customers WHERE id = customer_id)
+    );
+    
+CREATE POLICY "Users can delete customer_tags for their customers" ON public.customer_tags 
+    FOR DELETE TO authenticated USING (
+        auth.uid() = (SELECT profile_id FROM public.customers WHERE id = customer_id)
+    );
+
+-- 4. Trigger to sync customer tags array column to tags and customer_tags tables
+CREATE OR REPLACE FUNCTION public.sync_customer_tags()
+RETURNS TRIGGER AS $$
+DECLARE
+    tag_name TEXT;
+    cat_id UUID;
+    t_id UUID;
+BEGIN
+    -- Delete relation links not present in the new tag array
+    DELETE FROM public.customer_tags
+    WHERE customer_id = NEW.id
+      AND tag_id NOT IN (
+          SELECT id FROM public.tags WHERE name = ANY(NEW.tags)
+      );
+
+    -- Insert/link each tag in the new array
+    FOREACH tag_name IN ARRAY NEW.tags LOOP
+        tag_name := trim(tag_name);
+        IF tag_name = '' THEN
+            CONTINUE;
+        END IF;
+
+        -- Find existing tag
+        SELECT id INTO t_id FROM public.tags WHERE name = tag_name;
+        
+        -- Create tag if not exists
+        IF t_id IS NULL THEN
+            -- Category auto-mapping rules
+            IF tag_name LIKE '%險' OR tag_name LIKE '%保單' OR tag_name LIKE '%規劃' OR tag_name LIKE '%儲蓄' THEN
+                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '已購險種';
+            ELSIF tag_name LIKE '%意願' OR tag_name LIKE '%簽單' OR tag_name LIKE '%跟進' OR tag_name = '已簽單' OR tag_name = '待跟進' THEN
+                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '跟進狀態';
+            ELSIF tag_name LIKE '%體況' OR tag_name LIKE '%病%' OR tag_name LIKE '%血壓' OR tag_name LIKE '%手術' OR tag_name LIKE '%健康' OR tag_name LIKE '%史' THEN
+                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '健康與體況';
+            ELSIF tag_name LIKE '%愛%' OR tag_name LIKE '%運動%' OR tag_name LIKE '%茶%' OR tag_name LIKE '%玩%' OR tag_name LIKE '%露營%' OR tag_name LIKE '%爬山%' OR tag_name LIKE '%旅遊%' THEN
+                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '生活興趣';
+            ELSE
+                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '客戶身分';
+            END IF;
+
+            -- Category fallback
+            IF cat_id IS NULL THEN
+                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '客戶身分';
+            END IF;
+
+            -- Insert the tag
+            INSERT INTO public.tags (category_id, name)
+            VALUES (cat_id, tag_name)
+            ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+            RETURNING id INTO t_id;
+        END IF;
+
+        -- Insert junction relation
+        INSERT INTO public.customer_tags (customer_id, tag_id)
+        VALUES (NEW.id, t_id)
+        ON CONFLICT DO NOTHING;
+    END LOOP;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Bind trigger to customers table
+DROP TRIGGER IF EXISTS trigger_sync_customer_tags ON public.customers;
+CREATE TRIGGER trigger_sync_customer_tags
+    AFTER INSERT OR UPDATE OF tags ON public.customers
+    FOR EACH ROW EXECUTE FUNCTION public.sync_customer_tags();
+
+-- Migrate existing customers' tags to populate the new tables
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN SELECT id, tags FROM public.customers LOOP
+        UPDATE public.customers SET tags = r.tags WHERE id = r.id;
+    END LOOP;
+END;
+$$;
+
+-- 5. Visit Projects Table (Project-based Visit Todo List)
+CREATE TABLE IF NOT EXISTS public.visit_projects (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    is_completed BOOLEAN DEFAULT FALSE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_visit_projects_profile_id ON public.visit_projects(profile_id);
+
+-- Bind updated_at trigger to visit_projects
+DROP TRIGGER IF EXISTS trigger_update_visit_projects_timestamp ON public.visit_projects;
+CREATE TRIGGER trigger_update_visit_projects_timestamp
+    BEFORE UPDATE ON public.visit_projects
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Enable RLS for visit_projects
+ALTER TABLE public.visit_projects ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own visit_projects" ON public.visit_projects
+    FOR SELECT USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can insert their own visit_projects" ON public.visit_projects
+    FOR INSERT TO authenticated WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Users can update their own visit_projects" ON public.visit_projects
+    FOR UPDATE TO authenticated USING (auth.uid() = profile_id) WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Users can delete their own visit_projects" ON public.visit_projects
+    FOR DELETE TO authenticated USING (auth.uid() = profile_id);
+
+-- 6. Visit Project Customers Table ( Checklist Checklist Relation )
+CREATE TABLE IF NOT EXISTS public.visit_project_customers (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    visit_project_id UUID REFERENCES public.visit_projects(id) ON DELETE CASCADE NOT NULL,
+    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE NOT NULL,
+    is_visited BOOLEAN DEFAULT FALSE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_vpc_project_id ON public.visit_project_customers(visit_project_id);
+CREATE INDEX IF NOT EXISTS idx_vpc_customer_id ON public.visit_project_customers(customer_id);
+
+-- Enable RLS for visit_project_customers
+ALTER TABLE public.visit_project_customers ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view visit_project_customers for their projects" ON public.visit_project_customers
+    FOR SELECT USING (
+        auth.uid() = (SELECT profile_id FROM public.visit_projects WHERE id = visit_project_id)
+    );
+
+CREATE POLICY "Users can insert visit_project_customers for their projects" ON public.visit_project_customers
+    FOR INSERT TO authenticated WITH CHECK (
+        auth.uid() = (SELECT profile_id FROM public.visit_projects WHERE id = visit_project_id)
+    );
+
+CREATE POLICY "Users can update visit_project_customers for their projects" ON public.visit_project_customers
+    FOR UPDATE TO authenticated USING (
+        auth.uid() = (SELECT profile_id FROM public.visit_projects WHERE id = visit_project_id)
+    ) WITH CHECK (
+        auth.uid() = (SELECT profile_id FROM public.visit_projects WHERE id = visit_project_id)
+    );
+
+CREATE POLICY "Users can delete visit_project_customers for their projects" ON public.visit_project_customers
+    FOR DELETE TO authenticated USING (
+        auth.uid() = (SELECT profile_id FROM public.visit_projects WHERE id = visit_project_id)
+    );
 
