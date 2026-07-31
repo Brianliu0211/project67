@@ -201,40 +201,62 @@ class SettingsScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         // Default Customer View Mode
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: primaryColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.style_outlined, color: primaryColor, size: 20),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(context.l10n('customer_view_mode'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 2),
+                                      Text(context.l10n('customer_view_mode_desc'), style: const TextStyle(fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            child: Icon(Icons.style_outlined, color: primaryColor, size: 20),
-                          ),
-                          title: Text(context.l10n('customer_view_mode'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          subtitle: Text(context.l10n('customer_view_mode_desc'), style: const TextStyle(fontSize: 12)),
-                          trailing: SegmentedButton<String>(
-                            segments: [
-                              ButtonSegment(
-                                value: 'card',
-                                label: Text(context.l10n('view_3d_card')),
-                                icon: const Icon(Icons.view_carousel_outlined, size: 16),
-                              ),
-                              ButtonSegment(
-                                value: 'list',
-                                label: Text(context.l10n('view_list_view')),
-                                icon: const Icon(Icons.table_rows_outlined, size: 16),
-                              ),
-                            ],
-                            selected: {settings.defaultCustomerViewMode},
-                            onSelectionChanged: (Set<String> newSelection) {
-                              settings.setDefaultCustomerViewMode(newSelection.first);
-                            },
-                            style: const ButtonStyle(
-                              visualDensity: VisualDensity.compact,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SegmentedButton<String>(
+                                    segments: [
+                                      ButtonSegment(
+                                        value: 'card',
+                                        label: Text(context.l10n('view_3d_card')),
+                                        icon: const Icon(Icons.view_carousel_outlined, size: 16),
+                                      ),
+                                      ButtonSegment(
+                                        value: 'list',
+                                        label: Text(context.l10n('view_list_view')),
+                                        icon: const Icon(Icons.table_rows_outlined, size: 16),
+                                      ),
+                                    ],
+                                    selected: {settings.defaultCustomerViewMode},
+                                    onSelectionChanged: (Set<String> newSelection) {
+                                      settings.setDefaultCustomerViewMode(newSelection.first);
+                                    },
+                                    style: const ButtonStyle(
+                                      visualDensity: VisualDensity.compact,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
+                          ],
                         ),
                         const Divider(height: 24),
 
@@ -255,6 +277,27 @@ class SettingsScreen extends StatelessWidget {
                           activeColor: primaryColor,
                           onChanged: (bool value) {
                             settings.setSidebarCollapsedByDefault(value);
+                          },
+                        ),
+                        const Divider(height: 24),
+
+                        // Sidebar Hover Expand Preference
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          secondary: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.mouse_outlined, color: primaryColor, size: 20),
+                          ),
+                          title: Text(context.l10n('sidebar_hover_expand'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                          subtitle: Text(context.l10n('sidebar_hover_expand_desc'), style: const TextStyle(fontSize: 12)),
+                          value: settings.isSidebarHoverExpandEnabled,
+                          activeColor: primaryColor,
+                          onChanged: (bool value) {
+                            settings.setSidebarHoverExpandEnabled(value);
                           },
                         ),
                       ],

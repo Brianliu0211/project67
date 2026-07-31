@@ -998,6 +998,36 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                 ),
               ),
               const SizedBox(width: 12),
+              // View Mode Toggle Button
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: searchBg,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: searchBorder),
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      final newMode = AppSettings.instance.defaultCustomerViewMode == 'list' ? 'card' : 'list';
+                      AppSettings.instance.setDefaultCustomerViewMode(newMode);
+                    },
+                    icon: Icon(
+                      AppSettings.instance.defaultCustomerViewMode == 'list'
+                          ? Icons.grid_view_outlined
+                          : Icons.view_list_outlined,
+                      color: primaryColor,
+                      size: 20,
+                    ),
+                    tooltip: AppSettings.instance.defaultCustomerViewMode == 'list'
+                        ? context.l10n('view_3d_card')
+                        : context.l10n('view_list_view'),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               OutlinedButton.icon(
                 onPressed: _showCreateProjectDialog,
                 style: OutlinedButton.styleFrom(
@@ -1030,10 +1060,14 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           // Customer Grid/List Area
           Expanded(
             child: _isLoading
-                ? _buildShimmerGrid(isWideScreen, screenWidth)
+                ? (AppSettings.instance.defaultCustomerViewMode == 'list'
+                    ? _buildShimmerList(isWideScreen, screenWidth)
+                    : _buildShimmerGrid(isWideScreen, screenWidth))
                 : _filteredCustomers.isEmpty
                     ? _buildEmptyState(isDark, primaryColor)
-                    : _buildCustomerGrid(isWideScreen, screenWidth),
+                    : (AppSettings.instance.defaultCustomerViewMode == 'list'
+                        ? _buildCustomerList(isWideScreen, screenWidth)
+                        : _buildCustomerGrid(isWideScreen, screenWidth)),
           ),
         ],
       ),
@@ -1075,6 +1109,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
               customer: customer,
               onEdit: () => _showCustomerForm(customer: customer),
               onDelete: () => _showDeleteConfirm(customer['id'], customer['name'] ?? ''),
+              onZoom: () => _showCustomerZoomDetails(customer),
             ),
           ),
         );
@@ -1147,65 +1182,345 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       ),
     );
   }
-}
 
-// ==========================================
-// 3D Flipping Customer Card Widget
-// ==========================================
-class FlippingCustomerCard extends StatefulWidget {
-  final Map<String, dynamic> customer;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const FlippingCustomerCard({
-    super.key,
-    required this.customer,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  @override
-  State<FlippingCustomerCard> createState() => _FlippingCustomerCardState();
-}
-
-class _FlippingCustomerCardState extends State<FlippingCustomerCard> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  bool _isFront = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
+  // List Layout
+  Widget _buildCustomerList(bool isWideScreen, double screenWidth) {
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 12, bottom: 24, left: 8, right: 8),
+      itemCount: _filteredCustomers.length,
+      itemBuilder: (context, index) {
+        final customer = _filteredCustomers[index];
+        return StaggeredFadeIn(
+          index: index,
+          child: _buildCustomerListRow(customer, isWideScreen, screenWidth),
+        );
+      },
     );
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  // Shimmer Skeleton Loader List Layout
+  Widget _buildShimmerList(bool isWideScreen, double screenWidth) {
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 12, bottom: 24, left: 8, right: 8),
+      itemCount: 8,
+      itemBuilder: (context, index) {
+        return const CustomerListShimmer();
+      },
+    );
   }
 
-  void _flip() {
-    if (_isFront) {
-      _controller.forward();
+  // List Row UI
+  Widget _buildCustomerListRow(Map<String, dynamic> customer, bool isWideScreen, double screenWidth) {
+    final String name = customer['name'] ?? '';
+    final String nickname = customer['nickname'] ?? '';
+    final String phone = customer['phone'] ?? '未填寫';
+    final String email = customer['email'] ?? '未填寫';
+    final List tags = customer['tags'] ?? [];
+    final String notes = customer['notes'] ?? '';
+    final String avatarUrl = customer['avatar_url'] ?? '';
+
+    final String displayName = nickname.isNotEmpty ? '$name ($nickname)' : name;
+    final String nameInitial = name.isNotEmpty ? name.substring(0, 1) : '?';
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+    final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color cardBorder = isDark ? const Color(0xFF21262D) : Colors.grey.shade300;
+    final Color nameColor = isDark ? Colors.white : Colors.black87;
+    final Color infoColor = isDark ? Colors.white54 : Colors.black54;
+    final Color iconColor = isDark ? Colors.white30 : Colors.black38;
+
+    Widget child;
+
+    if (isWideScreen) {
+      // Wide layout (Desktop/Tablet)
+      child = Row(
+        children: [
+          // 1. Avatar & Display Name
+          SizedBox(
+            width: 180,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: primaryColor.withOpacity(0.12),
+                  radius: 20,
+                  backgroundImage: _getAvatarProvider(avatarUrl),
+                  child: avatarUrl.isEmpty
+                      ? Text(
+                          nameInitial,
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    displayName,
+                    style: TextStyle(
+                      color: nameColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // 2. Contact Info (Phone & Email)
+          SizedBox(
+            width: 180,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.phone, size: 12, color: iconColor),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        phone,
+                        style: TextStyle(color: infoColor, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.email, size: 12, color: iconColor),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        email,
+                        style: TextStyle(color: infoColor, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // 3. Tags Column (Wrap with dynamic flex)
+          Expanded(
+            flex: 2,
+            child: tags.isNotEmpty
+                ? Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: tags.take(4).map((tag) {
+                      final style = TagCategorizer.getStyle(tag.toString(), isDark);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: style.backgroundColor,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          tag.toString(),
+                          style: TextStyle(
+                            color: style.textColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  )
+                : Text(
+                    '無標籤',
+                    style: TextStyle(color: infoColor, fontSize: 11, fontStyle: FontStyle.italic),
+                  ),
+          ),
+          const SizedBox(width: 12),
+
+          // 4. Notes preview
+          Expanded(
+            flex: 3,
+            child: Text(
+              notes.isNotEmpty ? notes : '無備註資料',
+              style: TextStyle(
+                color: notes.isNotEmpty ? infoColor : (isDark ? Colors.white24 : Colors.black38),
+                fontSize: 11,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // 5. Actions row
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.fullscreen_rounded, color: primaryColor, size: 20),
+                tooltip: context.l10n('customer_card_zoom_tooltip'),
+                onPressed: () => _showCustomerZoomDetails(customer),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(6),
+              ),
+              IconButton(
+                icon: Icon(Icons.edit_outlined, color: infoColor, size: 18),
+                onPressed: () => _showCustomerForm(customer: customer),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(6),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                onPressed: () => _showDeleteConfirm(customer['id'], customer['name'] ?? ''),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(6),
+              ),
+            ],
+          ),
+        ],
+      );
     } else {
-      _controller.reverse();
+      // Narrow layout (Mobile/Compact)
+      child = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: primaryColor.withOpacity(0.12),
+                radius: 18,
+                backgroundImage: _getAvatarProvider(avatarUrl),
+                child: avatarUrl.isEmpty
+                    ? Text(
+                        nameInitial,
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: TextStyle(
+                        color: nameColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      phone,
+                      style: TextStyle(color: infoColor, fontSize: 10),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.fullscreen_rounded, color: primaryColor, size: 18),
+                onPressed: () => _showCustomerZoomDetails(customer),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(4),
+              ),
+              IconButton(
+                icon: Icon(Icons.edit_outlined, color: infoColor, size: 16),
+                onPressed: () => _showCustomerForm(customer: customer),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(4),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 16),
+                onPressed: () => _showDeleteConfirm(customer['id'], customer['name'] ?? ''),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(4),
+              ),
+            ],
+          ),
+          if (tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: tags.take(3).map((tag) {
+                final style = TagCategorizer.getStyle(tag.toString(), isDark);
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: style.backgroundColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    tag.toString(),
+                    style: TextStyle(
+                      color: style.textColor,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              notes,
+              style: TextStyle(
+                color: isDark ? Colors.white38 : Colors.black45,
+                fontSize: 10,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      );
     }
-    setState(() {
-      _isFront = !_isFront;
-    });
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: HoverAnimatedCard(
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: cardBorder, width: 1),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: child,
+          ),
+        ),
+      ),
+    );
   }
 
-  void _showZoomDetails(BuildContext context) {
-    final String name = widget.customer['name'] ?? '';
-    final String nickname = widget.customer['nickname'] ?? '';
-    final String phone = widget.customer['phone'] ?? context.l10n('customer_card_not_filled');
-    final String email = widget.customer['email'] ?? context.l10n('customer_card_not_filled');
-    final List tags = widget.customer['tags'] ?? [];
-    final String notes = widget.customer['notes'] ?? '';
-    final String avatarUrl = widget.customer['avatar_url'] ?? '';
+  // Zoom Dialog
+  void _showCustomerZoomDetails(Map<String, dynamic> customer) {
+    final String name = customer['name'] ?? '';
+    final String nickname = customer['nickname'] ?? '';
+    final String phone = customer['phone'] ?? context.l10n('customer_card_not_filled');
+    final String email = customer['email'] ?? context.l10n('customer_card_not_filled');
+    final List tags = customer['tags'] ?? [];
+    final String notes = customer['notes'] ?? '';
+    final String avatarUrl = customer['avatar_url'] ?? '';
 
     final String displayName = nickname.isNotEmpty ? '$name ($nickname)' : name;
     final String nameInitial = name.isNotEmpty ? name.substring(0, 1) : '?';
@@ -1264,7 +1579,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                     if (nickname.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                      '${context.l10n('customer_real_name')}：$name',
+                        '${context.l10n('customer_real_name')}：$name',
                         style: TextStyle(color: subTextColor, fontSize: 12),
                       ),
                     ],
@@ -1309,9 +1624,9 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildInfoRow(Icons.phone_iphone_rounded, context.l10n('customer_phone_title'), phone, context),
+                    _buildInfoRow(Icons.phone_iphone_rounded, context.l10n('customer_phone_title'), phone),
                     const SizedBox(height: 12),
-                    _buildInfoRow(Icons.mail_outline_rounded, 'Email', email, context),
+                    _buildInfoRow(Icons.mail_outline_rounded, 'Email', email),
                     const SizedBox(height: 16),
                     Text(
                       context.l10n('customer_tags_classification'),
@@ -1461,7 +1776,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String title, String value, BuildContext context) {
+  Widget _buildInfoRow(IconData icon, String title, String value) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = AppSettings.instance.primaryColor;
     final Color iconColor = isDark ? Colors.white30 : Colors.black45;
@@ -1505,6 +1820,61 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
       ],
     );
   }
+}
+
+// ==========================================
+// 3D Flipping Customer Card Widget
+// ==========================================
+class FlippingCustomerCard extends StatefulWidget {
+  final Map<String, dynamic> customer;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onZoom;
+
+  const FlippingCustomerCard({
+    super.key,
+    required this.customer,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onZoom,
+  });
+
+  @override
+  State<FlippingCustomerCard> createState() => _FlippingCustomerCardState();
+}
+
+class _FlippingCustomerCardState extends State<FlippingCustomerCard> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  bool _isFront = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _flip() {
+    if (_isFront) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+    setState(() {
+      _isFront = !_isFront;
+    });
+  }
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -1651,7 +2021,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                       IconButton(
                         icon: Icon(Icons.fullscreen_rounded, color: iconColor, size: 20),
                         tooltip: context.l10n('customer_card_zoom_tooltip'),
-                        onPressed: () => _showZoomDetails(context),
+                        onPressed: widget.onZoom,
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.all(4),
                       ),
@@ -1741,7 +2111,7 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                       IconButton(
                         icon: Icon(Icons.fullscreen_rounded, color: primaryColor, size: 16),
                         tooltip: context.l10n('customer_card_zoom_tooltip'),
-                        onPressed: () => _showZoomDetails(context),
+                        onPressed: widget.onZoom,
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                       ),
@@ -2043,6 +2413,69 @@ class CustomerCardShimmer extends StatelessWidget {
                 ShimmerLoader(width: 60, height: 18, borderRadius: 4),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Shimmer list card widget for list loading states
+class CustomerListShimmer extends StatelessWidget {
+  const CustomerListShimmer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color cardBorder = isDark ? const Color(0xFF21262D) : Colors.grey.shade300;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: cardBg,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: cardBorder, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        child: Row(
+          children: [
+            // Avatar
+            const ShimmerLoader(width: 40, height: 40, borderRadius: 20),
+            const SizedBox(width: 16),
+            // Name
+            const ShimmerLoader(width: 100, height: 16, borderRadius: 4),
+            const SizedBox(width: 24),
+            // Contact info (Wide screen simulation or general spacing)
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  ShimmerLoader(width: 120, height: 10, borderRadius: 4),
+                  SizedBox(height: 6),
+                  ShimmerLoader(width: 140, height: 10, borderRadius: 4),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Tags shimmer
+            Expanded(
+              flex: 2,
+              child: Row(
+                children: const [
+                  ShimmerLoader(width: 60, height: 18, borderRadius: 4),
+                  SizedBox(width: 8),
+                  ShimmerLoader(width: 50, height: 18, borderRadius: 4),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Actions
+            const ShimmerLoader(width: 80, height: 24, borderRadius: 12),
           ],
         ),
       ),

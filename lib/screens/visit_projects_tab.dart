@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
+import '../services/app_localizations.dart';
 import '../services/tag_categorizer.dart';
 
 class VisitProjectsTab extends StatefulWidget {
@@ -69,7 +70,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
         }
       } catch (e) {
         if (mounted) {
-          _showToast('載入專案失敗: $e', isError: true);
+          _showToast('${context.l10n('pv_load_fail')}: $e', isError: true);
           setState(() {
             _isLoading = false;
           });
@@ -82,7 +83,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
-      if (user == null) throw Exception('使用者未登入');
+      if (user == null) throw Exception(context.l10n('pv_user_not_logged_in'));
 
       final response = await supabase
           .from('visit_projects')
@@ -98,7 +99,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
       }
     } catch (e) {
       if (mounted) {
-        _showToast('載入專案失敗: $e', isError: true);
+        _showToast('${context.l10n('pv_load_fail')}: $e', isError: true);
         setState(() {
           _isLoading = false;
         });
@@ -148,9 +149,9 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
 
         // Refresh UI state directly
         _fetchProjects();
-        _showToast(isVisitedValue ? '已完成拜訪客戶' : '已取消標記拜訪');
+        _showToast(isVisitedValue ? context.l10n('pv_visit_marked') : context.l10n('pv_visit_unmarked'));
       } catch (e) {
-        _showToast('操作失敗: $e', isError: true);
+        _showToast('${context.l10n('pv_update_fail')}: $e', isError: true);
       }
       return;
     }
@@ -182,9 +183,9 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
           .eq('id', projectId);
 
       _fetchProjects();
-      _showToast(isVisitedValue ? '已完成拜訪客戶' : '已取消標記拜訪');
+      _showToast(isVisitedValue ? context.l10n('pv_visit_marked') : context.l10n('pv_visit_unmarked'));
     } catch (e) {
-      _showToast('更新失敗: $e', isError: true);
+      _showToast('${context.l10n('pv_update_fail')}: $e', isError: true);
     }
   }
 
@@ -199,17 +200,17 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: dialogBg,
-        title: Text('確認刪除專案', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-        content: Text('確定要刪除此拜訪專案嗎？此操作將同時清除該專案的拜訪 Checklist，但不會影響客戶的基本資料。', style: TextStyle(color: textColor)),
+        title: Text(context.l10n('pv_confirm_delete_title'), style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+        content: Text(context.l10n('pv_confirm_delete_body'), style: TextStyle(color: textColor)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('取消', style: TextStyle(color: subTextColor)),
+            child: Text(context.l10n('pv_cancel'), style: TextStyle(color: subTextColor)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('刪除'),
+            child: Text(context.l10n('pv_delete')),
           ),
         ],
       ),
@@ -238,9 +239,9 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
         }
 
         _fetchProjects();
-        _showToast('專案已刪除');
+        _showToast(context.l10n('pv_delete_success'));
       } catch (e) {
-        _showToast('刪除失敗: $e', isError: true);
+        _showToast('${context.l10n('pv_delete_fail')}: $e', isError: true);
       }
       return;
     }
@@ -250,9 +251,9 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
       final supabase = Supabase.instance.client;
       await supabase.from('visit_projects').delete().eq('id', projectId);
       _fetchProjects();
-      _showToast('專案已刪除');
+      _showToast(context.l10n('pv_delete_success'));
     } catch (e) {
-      _showToast('刪除失敗: $e', isError: true);
+      _showToast('${context.l10n('pv_delete_fail')}: $e', isError: true);
     }
   }
 
@@ -303,7 +304,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
           children: [
             // Header Description
             Text(
-              '建立專案來追蹤特定議題（如法規修訂、防災關懷）的批次客戶拜訪進度。',
+              context.l10n('pv_description'),
               style: TextStyle(
                 color: isDark ? Colors.white54 : Colors.black54,
                 fontSize: 14,
@@ -410,7 +411,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '名單數: $total',
+                          '${context.l10n('pv_list_count')}: $total',
                           style: TextStyle(color: primaryColor, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -431,7 +432,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
                       IconButton(
                         icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
                         onPressed: () => _deleteProject(projId),
-                        tooltip: '刪除專案',
+                        tooltip: context.l10n('pv_delete_tooltip'),
                       ),
                       
                       // Expand Icon
@@ -445,7 +446,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
                   
                   // Project Purpose (Why)
                   Text(
-                    '專案目的：${project['purpose'] ?? ''}',
+                    '${context.l10n('pv_purpose')}：${project['purpose'] ?? ''}',
                     style: TextStyle(
                       color: subTextColor,
                       fontSize: 13,
@@ -468,7 +469,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       child: Center(
                         child: Text(
-                          '無客戶名單',
+                          context.l10n('pv_no_customers'),
                           style: TextStyle(color: subTextColor, fontSize: 13),
                         ),
                       ),
@@ -648,8 +649,8 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
   void _showZoomDetails(BuildContext context, Map<String, dynamic> customer) {
     final String name = customer['name'] ?? '';
     final String nickname = customer['nickname'] ?? '';
-    final String phone = customer['phone'] ?? '未填寫';
-    final String email = customer['email'] ?? '未填寫';
+    final String phone = customer['phone'] ?? '--';
+    final String email = customer['email'] ?? '--';
     final String notes = customer['notes'] ?? '';
     final String avatarUrl = customer['avatar_url'] ?? '';
     final List tags = customer['tags'] is List ? customer['tags'] : [];
@@ -705,7 +706,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '客戶基本資訊',
+                              context.l10n('pv_customer_info'),
                               style: TextStyle(color: subTextColor, fontSize: 12),
                             ),
                           ],
@@ -739,7 +740,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
 
                   // Tags
                   Text(
-                    '標籤分類',
+                    context.l10n('pv_tags'),
                     style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
@@ -767,17 +768,17 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
                       }).toList(),
                     )
                   else
-                    Text('暫無標籤', style: TextStyle(color: subTextColor, fontSize: 12)),
+                    Text(context.l10n('pv_no_tags'), style: TextStyle(color: subTextColor, fontSize: 12)),
                   const SizedBox(height: 20),
 
                   // Notes
                   Text(
-                    '備註說明',
+                    context.l10n('pv_notes'),
                     style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    notes.isNotEmpty ? notes : '暫無備註記錄',
+                    notes.isNotEmpty ? notes : context.l10n('pv_no_notes'),
                     style: TextStyle(color: textColor, fontSize: 13, height: 1.4),
                   ),
                 ],
@@ -833,7 +834,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
           ),
           const SizedBox(height: 16),
           Text(
-            '尚未建立任何拜訪專案',
+            context.l10n('pv_empty_title'),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -842,7 +843,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
           ),
           const SizedBox(height: 8),
           Text(
-            '您可以前往「客戶管理」分頁，使用搜尋欄或篩選器篩選出目標名單，\n並點選「建立專案」以追蹤特定拜訪議題！',
+            context.l10n('pv_empty_body'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
