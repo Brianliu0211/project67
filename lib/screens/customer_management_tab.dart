@@ -9,7 +9,8 @@ import '../services/app_localizations.dart';
 import '../widgets/animations.dart';
 
 class CustomerManagementTab extends StatefulWidget {
-  const CustomerManagementTab({super.key});
+  final ValueChanged<String>? onMenuChanged;
+  const CustomerManagementTab({super.key, this.onMenuChanged});
 
   @override
   State<CustomerManagementTab> createState() => _CustomerManagementTabState();
@@ -81,10 +82,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     await Future.delayed(const Duration(milliseconds: 500));
 
     if (isOfflineMode) {
-      // Offline fallback: load from state or initial mock list
-      if (_allCustomers.isEmpty) {
-        _allCustomers = List.from(_mockCustomers);
+      // Offline fallback: load from shared OfflineDataStore or initial mock list
+      if (OfflineDataStore.customers.isEmpty) {
+        OfflineDataStore.customers = List<Map<String, dynamic>>.from(_mockCustomers);
       }
+      _allCustomers = OfflineDataStore.customers;
       _filterCustomers();
       setState(() {
         _isLoading = false;
@@ -97,6 +99,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       final response = await supabase
           .from('customers')
           .select()
+          .isFilter('deleted_at', null)
           .order('created_at', ascending: false);
 
       setState(() {
@@ -112,6 +115,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
             'tags': List<String>.from(data['tags'] ?? []),
             'notes': data['notes'],
             'created_at': data['created_at'],
+            'deleted_at': data['deleted_at'],
           };
         }));
       });
@@ -140,10 +144,12 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   void _filterCustomers() {
     final query = _searchController.text.trim().toLowerCase();
     setState(() {
+      final activeCustomers = _allCustomers.where((c) => c['deleted_at'] == null).toList();
+      
       if (query.isEmpty) {
-        _filteredCustomers = List.from(_allCustomers);
+        _filteredCustomers = List.from(activeCustomers);
       } else {
-        _filteredCustomers = _allCustomers.where((customer) {
+        _filteredCustomers = activeCustomers.where((customer) {
           final name = (customer['name'] ?? '').toString().toLowerCase();
           final notes = (customer['notes'] ?? '').toString().toLowerCase();
           final List tags = customer['tags'] ?? [];
@@ -369,7 +375,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     }
   }
 
-  // Delete Customer logic
+  // Delete Customer logic (Soft Delete)
   Future<void> _deleteCustomer(String id) async {
     setState(() {
       _isLoading = true;
@@ -377,22 +383,50 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
 
     if (isOfflineMode) {
       setState(() {
-        _allCustomers.removeWhere((c) => c['id'] == id);
+        final index = _allCustomers.indexWhere((c) => c['id'] == id);
+        if (index != -1) {
+          _allCustomers[index] = {
+            ..._allCustomers[index],
+            'deleted_at': DateTime.now().toUtc().toIso8601String(),
+          };
+        }
         _isLoading = false;
       });
       _filterCustomers();
       if (mounted) {
-        CustomToast.show(context, '成功刪除客戶檔案 (離線暫存)', ToastType.success);
+        CustomToast.show(
+          context,
+          '${context.l10n('trash_bin_soft_delete_success')} (離線暫存)',
+          ToastType.success,
+          actionLabel: context.l10n('trash_bin_goto'),
+          onActionPressed: () {
+            if (widget.onMenuChanged != null) {
+              widget.onMenuChanged!('垃圾桶');
+            }
+          },
+        );
       }
       return;
     }
 
     try {
       final supabase = Supabase.instance.client;
-      await supabase.from('customers').delete().eq('id', id);
+      await supabase.from('customers').update({
+        'deleted_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', id);
       await _fetchCustomers();
       if (mounted) {
-        CustomToast.show(context, '成功刪除客戶檔案', ToastType.success);
+        CustomToast.show(
+          context,
+          context.l10n('trash_bin_soft_delete_success'),
+          ToastType.success,
+          actionLabel: context.l10n('trash_bin_goto'),
+          onActionPressed: () {
+            if (widget.onMenuChanged != null) {
+              widget.onMenuChanged!('垃圾桶');
+            }
+          },
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -1506,25 +1540,37 @@ class CustomToast extends StatefulWidget {
   final String message;
   final ToastType type;
   final VoidCallback onDismiss;
+  final String? actionLabel;
+  final VoidCallback? onActionPressed;
 
   const CustomToast({
     key,
     required this.message,
     required this.type,
     required this.onDismiss,
+    this.actionLabel,
+    this.onActionPressed,
   }) : super(key: key);
 
-  static void show(BuildContext context, String message, ToastType type) {
+  static void show(
+    BuildContext context, 
+    String message, 
+    ToastType type, {
+    String? actionLabel,
+    VoidCallback? onActionPressed,
+  }) {
     late OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
         bottom: 24,
         right: MediaQuery.of(context).size.width >= 768 ? 24 : null,
         left: MediaQuery.of(context).size.width >= 768 ? null : 24,
-        width: MediaQuery.of(context).size.width >= 768 ? 320 : MediaQuery.of(context).size.width - 48,
+        width: MediaQuery.of(context).size.width >= 768 ? 360 : MediaQuery.of(context).size.width - 48,
         child: CustomToast(
           message: message,
           type: type,
+          actionLabel: actionLabel,
+          onActionPressed: onActionPressed,
           onDismiss: () {
             overlayEntry.remove();
           },
@@ -1633,6 +1679,28 @@ class _CustomToastState extends State<CustomToast> with SingleTickerProviderStat
                     style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ),
+                if (widget.actionLabel != null && widget.onActionPressed != null) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      widget.onActionPressed!();
+                      _controller.reverse().then((_) {
+                        widget.onDismiss();
+                      });
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF00F5FF),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      widget.actionLabel!,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white30, size: 16),
                   onPressed: () {

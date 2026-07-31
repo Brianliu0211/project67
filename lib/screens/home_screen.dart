@@ -10,6 +10,7 @@ import 'login_screen.dart';
 import 'customer_management_tab.dart';
 import 'settings_screen.dart';
 import 'profile_screen.dart';
+import 'trash_bin_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (menu == '數據戰情') return context.l10n('data_dashboard');
     if (menu == '個人帳號') return context.l10n('personal_account');
     if (menu == '系統設定') return context.l10n('system_settings');
+    if (menu == '垃圾桶') return context.l10n('trash_bin');
     return menu;
   }
   bool _isSidebarCollapsed = false;
@@ -293,6 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
                   _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
                   _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
+                  _buildSidebarItem(Icons.delete_outline, '垃圾桶', isDark, primaryColor),
                   _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
                 ],
               ),
@@ -377,16 +380,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (_activeMenu == '今日行程') _buildWeeklyCalendarStrip(isDark, textColor, subTextColor, borderColor, primaryColor),
                 
                 // Main Working Area
-                Expanded(
+                 Expanded(
                   child: _activeMenu == '今日行程'
                       ? _buildScheduleTimeline()
                       : _activeMenu == '客戶管理'
-                          ? const CustomerManagementTab()
+                          ? CustomerManagementTab(
+                              onMenuChanged: (menu) {
+                                setState(() {
+                                  _activeMenu = menu;
+                                });
+                              },
+                            )
                           : _activeMenu == '個人帳號'
                               ? ProfileScreen(onProfileUpdated: _loadUserProfile)
-                              : _activeMenu == '系統設定'
-                                  ? const SettingsScreen()
-                                  : _buildFallbackScreen(),
+                              : _activeMenu == '垃圾桶'
+                                  ? const TrashBinScreen()
+                                  : _activeMenu == '系統設定'
+                                      ? const SettingsScreen()
+                                      : _buildFallbackScreen(),
                 ),
               ],
             ),

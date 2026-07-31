@@ -13,12 +13,18 @@ if %ERRORLEVEL% neq 0 (
   timeout /t 5
 )
 echo.
-echo [2/2] Starting Flutter Web Dev Server...
-echo Keep this window open for Hot Reload!
-echo In this window, you can:
-echo   - Press 'r' to Hot Reload (incremental rebuild in <1s)
-echo   - Press 'R' to Hot Restart (full app restart)
-echo   - Press 'q' to quit
+echo [2/3] Compiling Web release build (to bypass Puro path conflicts)...
+call puro flutter build web --release
+if %ERRORLEVEL% neq 0 (
+  echo.
+  echo [ERROR] Compilation failed!
+  pause
+  exit /b %ERRORLEVEL%
+)
 echo.
-call puro flutter run -d web-server --web-port=8080
+echo [3/3] Starting HTTP Server on Port 8080...
+echo You can preview the web app at http://localhost:8080
+echo Keep this window open. Press Ctrl+C to stop.
+echo.
+npx -y http-server build/web -p 8080
 pause
