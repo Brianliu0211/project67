@@ -20,5 +20,5 @@ echo   - Press 'r' to Hot Reload (incremental rebuild in <1s)
 echo   - Press 'R' to Hot Restart (full app restart)
 echo   - Press 'q' to quit
 echo.
-call puro flutter run -d web-server --web-port=8080
+call puro flutter run -d web-server --web-port=8080 --release
 pause
