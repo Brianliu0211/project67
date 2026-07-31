@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../main.dart';
 import '../services/app_settings.dart';
+import '../services/tag_categorizer.dart';
 import '../widgets/animations.dart';
 
 class CustomerManagementTab extends StatefulWidget {
@@ -403,6 +405,247 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     }
   }
 
+  // Show Project Creation Dialog
+  void _showCreateProjectDialog() {
+    if (_filteredCustomers.isEmpty) {
+      CustomToast.show(context, '目前無篩選客戶，請先搜尋或篩選出目標客群', ToastType.warning);
+      return;
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = AppSettings.instance.primaryColor;
+    final Color dialogBg = isDark ? const Color(0xFF161B22) : Colors.white;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color subTextColor = isDark ? Colors.white70 : Colors.black54;
+
+    final titleController = TextEditingController();
+    final purposeController = TextEditingController();
+
+    InputDecoration buildInputDecoration(String labelText, IconData iconData, {String? hintText}) {
+      return InputDecoration(
+        labelText: labelText,
+        labelStyle: TextStyle(color: subTextColor),
+        hintText: hintText,
+        hintStyle: TextStyle(color: subTextColor),
+        prefixIcon: Icon(iconData, color: subTextColor),
+        border: const OutlineInputBorder(),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: isDark ? Colors.white30 : Colors.grey.shade400),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: primaryColor, width: 2),
+        ),
+      );
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isSubmitting = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> submitProject() async {
+              final title = titleController.text.trim();
+              final purpose = purposeController.text.trim();
+
+              if (title.isEmpty || purpose.isEmpty) {
+                CustomToast.show(context, '專案標題與建立目的為必填欄位', ToastType.warning);
+                return;
+              }
+
+              setDialogState(() {
+                isSubmitting = true;
+              });
+
+              if (isOfflineMode) {
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  final String projectId = 'mock-proj-${DateTime.now().millisecondsSinceEpoch}';
+
+                  // 1. Save new project metadata
+                  final projectJson = {
+                    'id': projectId,
+                    'title': title,
+                    'purpose': purpose,
+                    'is_completed': false,
+                    'created_at': DateTime.now().toIso8601String(),
+                  };
+
+                  List<dynamic> localProjects = [];
+                  final storedProjects = prefs.getString('offline_visit_projects');
+                  if (storedProjects != null) {
+                    localProjects = jsonDecode(storedProjects);
+                  }
+                  localProjects.insert(0, projectJson);
+                  await prefs.setString('offline_visit_projects', jsonEncode(localProjects));
+
+                  // 2. Save project checklist customers
+                  final List<Map<String, dynamic>> projectCustomers = [];
+                  for (var i = 0; i < _filteredCustomers.length; i++) {
+                    final customer = _filteredCustomers[i];
+                    projectCustomers.add({
+                      'id': 'mock-vpc-${projectId}-$i',
+                      'visit_project_id': projectId,
+                      'customer_id': customer['id'],
+                      'is_visited': false,
+                      'created_at': DateTime.now().toIso8601String(),
+                      'customer': {
+                        'id': customer['id'],
+                        'name': customer['name'],
+                        'nickname': customer['nickname'],
+                        'phone': customer['phone'],
+                        'email': customer['email'],
+                        'tags': customer['tags'],
+                        'avatar_url': customer['avatar_url'],
+                        'notes': customer['notes'],
+                      }
+                    });
+                  }
+
+                  List<dynamic> localProjCustomers = [];
+                  final storedProjCustomers = prefs.getString('offline_visit_project_customers');
+                  if (storedProjCustomers != null) {
+                    localProjCustomers = jsonDecode(storedProjCustomers);
+                  }
+                  localProjCustomers.addAll(projectCustomers);
+                  await prefs.setString('offline_visit_project_customers', jsonEncode(localProjCustomers));
+
+                  if (mounted) {
+                    CustomToast.show(context, '已成功建立「$title」拜訪專案 (離線暫存)', ToastType.success);
+                    Navigator.pop(context);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    CustomToast.show(context, '建立失敗: $e', ToastType.error);
+                  }
+                } finally {
+                  setDialogState(() {
+                    isSubmitting = false;
+                  });
+                }
+                return;
+              }
+
+              // Online Supabase Mode
+              try {
+                final supabase = Supabase.instance.client;
+                final user = supabase.auth.currentUser;
+                if (user == null) throw Exception('使用者未登入');
+
+                // 1. Insert into visit_projects
+                final projectResult = await supabase.from('visit_projects').insert({
+                  'profile_id': user.id,
+                  'title': title,
+                  'purpose': purpose,
+                }).select().single();
+
+                final String projectId = projectResult['id'];
+
+                // 2. Insert into visit_project_customers
+                final List<Map<String, dynamic>> projectCustomers = _filteredCustomers.map((customer) {
+                  return {
+                    'visit_project_id': projectId,
+                    'customer_id': customer['id'],
+                    'is_visited': false,
+                  };
+                }).toList();
+
+                await supabase.from('visit_project_customers').insert(projectCustomers);
+
+                if (mounted) {
+                  CustomToast.show(context, '已成功建立「$title」拜訪專案', ToastType.success);
+                  Navigator.pop(context);
+                }
+              } catch (e) {
+                if (mounted) {
+                  CustomToast.show(context, '建立專案失敗: $e', ToastType.error);
+                }
+              } finally {
+                setDialogState(() {
+                  isSubmitting = false;
+                });
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: dialogBg,
+              title: Text(
+                '建立拜訪專案',
+                style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+              ),
+              content: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: primaryColor.withOpacity(0.2), width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.people_outline, color: primaryColor, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '已篩選客戶數：${_filteredCustomers.length} 位\n(專案將以此名單作為拜訪 Checklist)',
+                                style: TextStyle(color: textColor, fontSize: 13, height: 1.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: titleController,
+                        style: TextStyle(color: textColor),
+                        textInputAction: TextInputAction.next,
+                        decoration: buildInputDecoration('專案名稱 (必填)', Icons.assignment_outlined, hintText: '如: 2026長照政策關懷專案'),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: purposeController,
+                        style: TextStyle(color: textColor),
+                        maxLines: 3,
+                        decoration: buildInputDecoration('建立目的 / 拜訪 Why (必填)', Icons.ads_click_outlined, hintText: '如: 說明最新長照法規影響並關照防護缺口'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: Text('取消', style: TextStyle(color: subTextColor)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: isSubmitting ? null : submitProject,
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('確認建立'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   // Display Add/Edit Dialog Form
   void _showCustomerForm({Map<String, dynamic>? customer}) {
     final isEdit = customer != null;
@@ -720,7 +963,19 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _showCreateProjectDialog,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primaryColor,
+                  side: BorderSide(color: primaryColor, width: 1.5),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                ),
+                icon: const Icon(Icons.assignment_outlined, size: 20),
+                label: const Text('建立專案', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: () => _showCustomerForm(),
                 style: ElevatedButton.styleFrom(
@@ -1033,21 +1288,24 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
-                        children: tags.map((tag) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            tag.toString(),
-                            style: TextStyle(
-                              color: primaryColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                        children: tags.map((tag) {
+                          final style = TagCategorizer.getStyle(tag.toString(), isDark);
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: style.backgroundColor,
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                          ),
-                        )).toList(),
+                            child: Text(
+                              tag.toString(),
+                              style: TextStyle(
+                                color: style.textColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       )
                     else
                       Text('暫無標籤', style: TextStyle(color: subTextColor, fontSize: 12)),
@@ -1382,16 +1640,17 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                   spacing: 6,
                   runSpacing: 4,
                   children: tags.take(3).map((tag) {
+                    final style = TagCategorizer.getStyle(tag.toString(), isDark);
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.12),
+                        color: style.backgroundColor,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         tag.toString(),
                         style: TextStyle(
-                          color: primaryColor,
+                          color: style.textColor,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),

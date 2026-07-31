@@ -6,6 +6,7 @@ import '../main.dart';
 import '../services/app_settings.dart';
 import 'login_screen.dart';
 import 'customer_management_tab.dart';
+import 'visit_projects_tab.dart';
 import 'settings_screen.dart';
 import 'profile_screen.dart';
 
@@ -278,6 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _buildSidebarItem(Icons.calendar_today_outlined, '今日行程', isDark, primaryColor),
                   _buildSidebarItem(Icons.people_outline, '客戶管理', isDark, primaryColor),
+                  _buildSidebarItem(Icons.assignment_outlined, '專案拜訪', isDark, primaryColor),
                   _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
                   _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
                   _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
@@ -371,11 +373,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? _buildScheduleTimeline()
                       : _activeMenu == '客戶管理'
                           ? const CustomerManagementTab()
-                          : _activeMenu == '個人帳號'
-                              ? ProfileScreen(onProfileUpdated: _loadUserProfile)
-                              : _activeMenu == '系統設定'
-                                  ? const SettingsScreen()
-                                  : _buildFallbackScreen(),
+                          : _activeMenu == '專案拜訪'
+                              ? const VisitProjectsTab()
+                              : _activeMenu == '個人帳號'
+                                  ? ProfileScreen(onProfileUpdated: _loadUserProfile)
+                                  : _activeMenu == '系統設定'
+                                      ? const SettingsScreen()
+                                      : _buildFallbackScreen(),
                 ),
               ],
             ),
