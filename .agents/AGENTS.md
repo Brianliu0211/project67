@@ -83,6 +83,33 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 
 ---
 
+## 「對齊」Automation (Align Master System Specification Command)
+
+### Trigger
+- **Rule**: When the user says **「對齊」**, or requests to align/synchronize the main system specification, you **MUST** automatically perform the following actions:
+
+### Actions
+1. **全面巡檢現有程式碼與資料庫結構**：對比 `lib/` 原始碼、`docs/進度.md` 與 Supabase Schema。
+2. **對齊補全主系統規格書**：更新 [docs/00_公共規格/main_spec.md](docs/00_公共規格/main_spec.md)，補充最新落地的資料庫資料表結構 (如 `schedule_events`, `visit_projects`, `tag_categories` 與垃圾桶 `deleted_at`)、UI Toast 視覺標準與第三方授權邏輯，確保主規格書反映最新的最高指導狀態。
+3. **報告對齊結果**：向專案人員摘要說明本次 `main_spec.md` 補全了哪些欄位與核心架構。
+
+---
+
+## 「book」Automation (System Document Relationship Map Command)
+
+### Trigger
+- **Rule**: When the user says **「book」** (or `Book`), you **MUST** automatically perform the following actions:
+
+### Actions
+1. **渲染全專案文檔關係地圖 (Mermaid Diagram)**：輸出專案核心文件 (AGENTS, 快捷指令, 主規格書, 進度表, 個人工作區, 專題報告) 的完整架構圖。
+2. **說明 4 種連動型態對照表**：
+   - **Type A (雙向自動對齊)**：`AGENTS.md` $\Leftrightarrow$ `開發人員快捷指令.md` / `手冊.md`
+   - **Type B (單向唯讀巡檢 - 人類領地)**：`個人工作區` $\rightarrow$ `進度.md` (AI 僅讀取，不改動人類筆記)
+   - **Type C (按需實體對齊)**：`lib/` + `*.sql` + `開發日誌` $\rightarrow$ `main_spec.md` (輸入 `對齊` 時觸發)
+   - **Type D (里程碑自動備份)**：`lib/` $\rightarrow$ `04_專題報告/` (有改 Code 時收工自動備份 Mermaid/ERD)
+
+---
+
 ## Obsidian Linking Specification
 
 ### Rule
