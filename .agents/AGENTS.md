@@ -12,7 +12,7 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 - **Timing**: Perform this update immediately after modifying configuration files (like `pubspec.yaml`) or running install commands.
 
 ### Developer Log Update (`docs/03_開發日誌/`)
-- **Rule**: Whenever the user requests you to write a development log, you **MUST** create a new file in [docs/03_開發日誌/](docs/03_開發日誌/) named in the format `YYYYMMDD_Title.md` (e.g., `20260713_登入介面更新.md`), using short, concise titles.
+- **Rule**: Whenever the user requests you to write a development log, you **MUST** create a new file in [docs/03_開發日誌/YYYY-MM/](docs/03_開發日誌/) (e.g. `docs/03_開發日誌/2026-08/`) named in the format `YYYYMMDD_Title.md` (e.g., `20260802_進度表大模組重構.md`), using short, concise titles.
 - **Specification Compliance**: You **MUST** strictly follow all rules and templates defined in [開發日誌規範.md](docs/03_開發日誌/開發日誌規範.md).
 - **Multiple Logs Per Day**: If multiple dev logs are written on the same day, each log should use a distinct functional title (e.g., `20260714_客戶卡片UI刻劃.md` and `20260714_Supabase串接與RLS測試.md`). Do NOT use sequential numbering.
 
