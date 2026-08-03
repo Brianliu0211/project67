@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/app_settings.dart';
 import '../services/app_localizations.dart';
 import '../main.dart';
+import 'tag_manager_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -268,6 +269,43 @@ class SettingsScreen extends StatelessWidget {
                           },
                         ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Section 2.5: Tag & Folder Management
+                  _buildSectionHeader(context, Icons.local_offer_outlined, '🏷️ 標籤字典與資料夾管理', primaryColor),
+                  const SizedBox(height: 12),
+                  _buildCardContainer(
+                    context,
+                    isDark,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.folder_special_outlined, color: primaryColor, size: 20),
+                      ),
+                      title: const Text('標籤與資料夾管理器', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      subtitle: const Text('管理 5 大資料夾分類、標籤手動新增/編輯與一鍵合併功能', style: TextStyle(fontSize: 12)),
+                      trailing: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const TagManagerScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.tune, size: 16),
+                        label: const Text('開啟管理'),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
