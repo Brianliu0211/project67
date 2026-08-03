@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/app_settings.dart';
+import '../services/app_localizations.dart';
 import '../services/voice_transcription_service.dart';
 
 enum RecordingState {
@@ -308,7 +309,7 @@ class _VoiceSchedulerOverlayState extends State<VoiceSchedulerOverlay> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
-                '請說出您的行程，例如：\n「明天下午三點與林經理開會一個小時」',
+                context.l10n('voice_overlay_listening'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 18,
@@ -320,7 +321,7 @@ class _VoiceSchedulerOverlayState extends State<VoiceSchedulerOverlay> {
             ),
             const SizedBox(height: 12),
             Text(
-              '正在聆聽中...',
+              context.l10n('voice_overlay_listening'),
               style: TextStyle(
                 fontSize: 14,
                 color: subTextColor,
@@ -342,7 +343,7 @@ class _VoiceSchedulerOverlayState extends State<VoiceSchedulerOverlay> {
             ),
             const SizedBox(height: 48),
             Text(
-              'AI 正在解析並建立行程...',
+              context.l10n('voice_overlay_analyzing'),
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -353,7 +354,7 @@ class _VoiceSchedulerOverlayState extends State<VoiceSchedulerOverlay> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32.0),
               child: Text(
-                '正在為您匹配聯絡客戶並建立行事曆事件，請稍候片刻',
+                context.l10n('voice_overlay_analyzing'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -395,7 +396,7 @@ class _VoiceSchedulerOverlayState extends State<VoiceSchedulerOverlay> {
             ),
             const SizedBox(height: 48),
             Text(
-              '自動排程成功',
+              context.l10n('voice_overlay_success'),
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -554,10 +555,10 @@ class _VoiceSchedulerOverlayState extends State<VoiceSchedulerOverlay> {
           ),
           child: Text(
             isError
-                ? '關閉'
+                ? context.l10n('close')
                 : isWarning
-                    ? '捨棄行程'
-                    : '取消',
+                    ? context.l10n('discard_event')
+                    : context.l10n('cancel'),
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         ),
@@ -576,10 +577,10 @@ class _VoiceSchedulerOverlayState extends State<VoiceSchedulerOverlay> {
           ),
           child: Text(
             isError
-                ? '重新錄音'
+                ? context.l10n('re_record')
                 : isWarning
-                    ? '手動調整'
-                    : '完成',
+                    ? context.l10n('manual_adjust')
+                    : context.l10n('done'),
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         ),

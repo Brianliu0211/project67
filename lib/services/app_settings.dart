@@ -187,9 +187,11 @@ class AppSettings extends ChangeNotifier {
   }
 
   /// Update Sidebar Collapsed Preference
+  /// Also syncs hover-expand: enabled when collapsed, disabled when not collapsed.
   Future<void> setSidebarCollapsedByDefault(bool collapsed) async {
     if (_isSidebarCollapsedByDefault == collapsed) return;
     _isSidebarCollapsedByDefault = collapsed;
+    _isSidebarHoverExpandEnabled = collapsed; // 懸停展開與折疊偏好連動
     notifyListeners();
     await _saveAndSync();
   }
