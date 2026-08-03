@@ -8,6 +8,7 @@ import '../services/app_localizations.dart';
 import '../models/schedule_event.dart';
 import '../widgets/schedule_event_dialog.dart';
 import '../widgets/custom_toast.dart';
+import '../widgets/voice_scheduler_overlay.dart';
 import 'package:intl/intl.dart';
 import 'login_screen.dart';
 import 'customer_management_tab.dart';
@@ -148,6 +149,40 @@ class _HomeScreenState extends State<HomeScreen> {
         CustomToast.show(context, '行程變更已儲存！', ToastType.success);
       } else if (result == 'deleted') {
         CustomToast.show(context, '行程已成功刪除！', ToastType.warning);
+      }
+    }
+  }
+
+  Future<void> _openVoiceSchedulerDialog() async {
+    final result = await showGeneralDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      barrierLabel: 'VoiceScheduler',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return const VoiceSchedulerOverlay();
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: child,
+        );
+      },
+    );
+
+    if (result != null && mounted) {
+      final status = result['status'] as String? ?? 'green';
+      final eventMap = result['event'] as Map<String, dynamic>?;
+
+      if (eventMap != null) {
+        final event = ScheduleEvent.fromJson(eventMap);
+        if (status == 'yellow') {
+          CustomToast.show(context, '行程資訊有所遺漏，請手動補完！', ToastType.warning);
+          await _openAddEditEventDialog(event);
+        } else {
+          CustomToast.show(context, '已成功自動建立行程：「${event.title}」', ToastType.success);
+          _fetchEventsForSelectedDate();
+        }
       }
     }
   }
@@ -562,6 +597,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      floatingActionButton: _activeMenu == '今日行程'
+          ? _VoiceSchedulerFAB(
+              onPressed: _openVoiceSchedulerDialog,
+              isDark: isDark,
+              primaryColor: primaryColor,
+            )
+          : null,
     );
   }
 
@@ -1862,5 +1904,97 @@ class _TimelineEventLayout {
   final int colIndex;
   final int totalCols;
   _TimelineEventLayout(this.event, this.colIndex, this.totalCols);
+}
+
+class _VoiceSchedulerFAB extends StatefulWidget {
+  final VoidCallback onPressed;
+  final bool isDark;
+  final Color primaryColor;
+
+  const _VoiceSchedulerFAB({
+    Key? key,
+    required this.onPressed,
+    required this.isDark,
+    required this.primaryColor,
+  }) : super(key: key);
+
+  @override
+  State<_VoiceSchedulerFAB> createState() => _VoiceSchedulerFABState();
+}
+
+class _VoiceSchedulerFABState extends State<_VoiceSchedulerFAB>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+
+    _glowAnimation = Tween<double>(begin: 4.0, end: 16.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isDark) {
+      return FloatingActionButton(
+        onPressed: widget.onPressed,
+        backgroundColor: widget.primaryColor.withOpacity(0.12),
+        elevation: 0,
+        highlightElevation: 2,
+        hoverElevation: 1,
+        shape: const CircleBorder(),
+        child: Icon(
+          Icons.mic,
+          color: widget.primaryColor,
+          size: 28,
+        ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        return Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: widget.primaryColor.withOpacity(0.35),
+                blurRadius: _glowAnimation.value,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: child,
+        );
+      },
+      child: FloatingActionButton(
+        onPressed: widget.onPressed,
+        backgroundColor: const Color(0xFF161B22),
+        elevation: 4,
+        shape: CircleBorder(
+          side: BorderSide(color: widget.primaryColor.withOpacity(0.3), width: 1),
+        ),
+        child: Icon(
+          Icons.mic,
+          color: widget.primaryColor,
+          size: 28,
+        ),
+      ),
+    );
+  }
 }
 
