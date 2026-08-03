@@ -914,7 +914,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () => _openAddEditEventDialog(),
                       icon: const Icon(Icons.add),
-                      label: const Text('新增行程', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(context.l10n('event_add_title'), style: const TextStyle(fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
@@ -970,8 +970,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 8),
               Text(
                 _calendarViewMode == 'month_grid'
-                    ? DateFormat('yyyy 年 MM 月', 'zh_TW').format(_selectedDate)
-                    : DateFormat('yyyy 年 MM 月 dd 日 (EEEE)', 'zh_TW').format(_selectedDate),
+                    ? DateFormat('yyyy/MM', AppSettings.instance.language).format(_selectedDate)
+                    : DateFormat('yyyy/MM/dd (EEE)', AppSettings.instance.language).format(_selectedDate),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(width: 8),
@@ -987,7 +987,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                   _fetchEventsForSelectedDate(silent: true);
                 },
-                tooltip: _calendarViewMode == 'month_grid' ? '上個月' : '前一天',
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               ),
@@ -1003,7 +1002,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                   _fetchEventsForSelectedDate(silent: true);
                 },
-                tooltip: _calendarViewMode == 'month_grid' ? '下個月' : '後一天',
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               ),
@@ -1023,7 +1021,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                 ),
-                child: const Text('今天', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                child: Text(context.l10n('calendar_back_to_today'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ],
           ),
@@ -1058,7 +1056,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              '日時間軸',
+                              context.l10n('calendar_view_timeline'),
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -1082,13 +1080,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Row(
                           children: [
                             Icon(
-                              Icons.calendar_view_month_outlined,
+                              Icons.grid_on_outlined,
                               size: 16,
                               color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              '月網格',
+                              context.l10n('calendar_view_month'),
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -1142,16 +1140,16 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Icon(Icons.pie_chart_outline, size: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                const Text('今日行程摘要', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(context.l10n('today_summary'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildSummaryStat('總行程', '$totalCount', isDark),
-                _buildSummaryStat('已完成', '$completedCount', isDark),
-                _buildSummaryStat('未完成', '${totalCount - completedCount}', isDark),
+                _buildSummaryStat(context.l10n('stat_total'), '$totalCount', isDark),
+                _buildSummaryStat(context.l10n('stat_completed'), '$completedCount', isDark),
+                _buildSummaryStat(context.l10n('stat_pending'), '${totalCount - completedCount}', isDark),
               ],
             ),
           ],
@@ -1179,7 +1177,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final int leadingOffset = firstDayOfMonth.weekday % 7; // Sunday = 0
     final DateTime gridStartDate = firstDayOfMonth.subtract(Duration(days: leadingOffset));
 
-    final List<String> weekHeaderLabels = ['日', '一', '二', '三', '四', '五', '六'];
+    final bool isEn = AppSettings.instance.language == 'en_US';
+    final List<String> weekHeaderLabels = isEn
+        ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        : ['日', '一', '二', '三', '四', '五', '六'];
 
     List<List<DateTime>> weekGrid = [];
     DateTime currDate = gridStartDate;
@@ -1207,7 +1208,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           child: Row(
             children: weekHeaderLabels.map((label) {
-              final bool isWeekend = label == '日' || label == '六';
+              final bool isWeekend = label == '日' || label == '六' || label == 'Sun' || label == 'Sat';
               return Expanded(
                 child: Center(
                   child: Text(
@@ -1460,7 +1461,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ElevatedButton.icon(
               onPressed: () => _openAddEditEventDialog(),
               icon: const Icon(Icons.add),
-              label: const Text('新增行程'),
+              label: Text(context.l10n('event_add_title')),
             ),
           ],
         ),
