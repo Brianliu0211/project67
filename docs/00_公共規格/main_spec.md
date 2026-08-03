@@ -83,6 +83,40 @@
 
 ---
 
+## 📐 全局 UI/UX 視覺與對話框組件設計規範 (UI Design System)
+
+為避免隨開發時間推移導致全站 UI 視覺割裂，所有模組（客戶管理、行事曆排程、拜訪專案、標籤管理器等）的對話框 (Dialog)、輸入框 (TextField) 與按鈕，**必須嚴格遵循以下新版 UI 視覺標準**：
+
+### 1. 彈窗與卡片容器 (Modal & Card Container)
+- **彈窗圓角 (Modal Radius)**: 統一使用 `BorderRadius.circular(20)`。
+- **內嵌卡片圓角 (Card Radius)**: 統一使用 `BorderRadius.circular(16)` 或 `BorderRadius.circular(12)`。
+- **彈窗頂欄 (Modal Header)**:
+  - 左側：`Icon` 圖示 + `fontSize: 18, fontWeight: FontWeight.bold` 主標題。
+  - 右側：置入 `IconButton(icon: Icon(Icons.close))` 顯性關閉按鈕。
+- **主題顏色適配 (Theme Adaptation)**:
+  - 淺色模式：卡片背景 `Color(0xFFF8FAFC)`，邊框 `Color(0xFFE2E8F0)`。
+  - 深色模式：卡片背景 `Color(0xFF1E293B)`，邊框 `Color(0xFF334155)`。
+
+### 2. 表單輸入框 (Input Field Design)
+- **統一外觀 (Border & Icon)**:
+  - 全站放棄傳統 Material 外突刻痕舊框線，統一使用 **現代圓角外框 (`BorderRadius.circular(12)`)**。
+  - 每個輸入框皆需配置前綴 Icon 引導（如：`Icons.person_outline`、`Icons.calendar_today`）。
+  - Focus 時高亮為品牌主色 (`0xFF10B981` / `0xFF0369A1`)，邊框加寬至 `1.5 - 2.0`。
+
+### 3. 按鈕視覺階層 (Action Button Hierarchy)
+- **主要動作按鈕 (Primary Action Button - 儲存/新增/確定)**:
+  - 使用填色膠囊/圓角按鈕 (`ElevatedButton` / `Container`)。
+  - 背景：`0xFF10B981` (綠色系) 或 `0xFF0369A1` (天藍色系)。
+  - 文字：純白粗體 (`Colors.white, fontWeight: FontWeight.bold`)。
+- **次要動作按鈕 (Secondary Action Button - 取消/返回)**:
+  - 使用灰色/無邊框純文字按鈕 (`TextButton`)，呈現清晰的主次視覺對比。
+
+### 4. 標籤選擇器 (Categorized Tag Selector)
+- **全站統一組件**: 任何需要標籤維護與點選的模組，**必須 100% 調用 [`CategorizedTagAccordionSelector`](../../lib/widgets/categorized_tag_accordion_selector.dart)**。
+- 嚴禁使用傳統單行純文字輸入框或自訂逗號分隔字串。
+
+---
+
 ## 🔒 安全與金鑰管理規範
 - 所有 API 金鑰（`SUPABASE_URL`、`SUPABASE_ANON_KEY`、`GEMINI_API_KEY`）**絕對禁止**明文寫入程式碼。
 - 本地開發使用 `.env`（被 `.gitignore` 排除），並由團隊於 Line 記事本安全範本集中維護；正式部署由 GitHub Secrets 動態注入。

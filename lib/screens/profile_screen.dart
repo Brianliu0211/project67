@@ -300,16 +300,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         labelStyle: TextStyle(color: subTextColor, fontSize: 13),
         hintText: hintText,
         hintStyle: TextStyle(color: subTextColor, fontSize: 13),
-        prefixIcon: Icon(iconData, color: primaryColor.withOpacity(0.7), size: 18),
-        border: const OutlineInputBorder(),
+        prefixIcon: Icon(iconData, color: primaryColor, size: 18),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
         filled: true,
-        fillColor: isDark ? const Color(0xFF0D1117).withOpacity(0.5) : Colors.grey.shade50,
+        fillColor: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
       );
     }
 
@@ -564,7 +566,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 2,
               ),
             ),

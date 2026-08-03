@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../services/tag_manager_service.dart';
-import '../services/app_settings.dart';
+import '../widgets/color_palette_picker.dart';
 
 class TagManagerScreen extends StatefulWidget {
   final bool isDialogMode;
   const TagManagerScreen({super.key, this.isDialogMode = false});
 
-  static void showAsDialog(BuildContext context) {
-    showDialog(
+  static Future<void> showAsDialog(BuildContext context) async {
+    return showDialog(
       context: context,
       builder: (ctx) {
         return Dialog(
@@ -35,6 +35,9 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
   String _selectedCategoryId = 'cat_identity';
   final Set<String> _selectedTagIdsForMerge = {};
   bool _isMergeMode = false;
+
+  String? _bannerMessage;
+  String _bannerType = 'green';
 
   @override
   void initState() {
@@ -77,68 +80,219 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
   }
 
   void _showToast(String message, {String type = 'green'}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    Color bg = const Color(0xFF10B981);
-    Color text = Colors.white;
-    IconData icon = Icons.check_circle_outline;
+    if (!mounted) return;
+    setState(() {
+      _bannerMessage = message;
+      _bannerType = type;
+    });
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          if (_bannerMessage == message) {
+            _bannerMessage = null;
+          }
+        });
+      }
+    });
+  }
 
-    if (type == 'yellow') {
-      bg = const Color(0xFFF59E0B);
-      text = Colors.black87;
-      icon = Icons.warning_amber_rounded;
-    } else if (type == 'red') {
-      bg = const Color(0xFFEF4444);
-      text = Colors.white;
-      icon = Icons.error_outline_rounded;
-    }
+  void _openAddCategoryDialog() {
+    final nameController = TextEditingController();
+    String selectedColorHex = '#0369A1';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(icon, color: text, size: 20),
-            const SizedBox(width: 10),
-            Expanded(child: Text(message, style: TextStyle(color: text, fontWeight: FontWeight.bold))),
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('➕ 新增大分類資料夾', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: '大分類名稱 (如：理財規劃、售後服務)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ColorPalettePicker(
+                  initialColorHex: selectedColorHex,
+                  onColorSelected: (hex) => selectedColorHex = hex,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+
+                final cat = await TagManagerService.addCategory(name, colorHex: selectedColorHex);
+                if (!mounted) return;
+                Navigator.pop(ctx);
+
+                if (cat == null) {
+                  _showToast('大分類「$name」已存在，不可重複建立！', type: 'yellow');
+                } else {
+                  _showToast('成功建立大分類「$name」！', type: 'green');
+                  setState(() {
+                    _selectedCategoryId = cat.id;
+                  });
+                  _loadData();
+                }
+              },
+              child: const Text('確定建立大分類'),
+            ),
           ],
-        ),
-        backgroundColor: bg,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+        );
+      },
+    );
+  }
+
+  void _openEditCategoryDialog(TagCategoryModel cat) {
+    final nameController = TextEditingController(text: cat.name);
+    String selectedColorHex = cat.colorHex ?? '#0369A1';
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('✏️ 編輯大分類【${cat.name}】', style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: '大分類名稱',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ColorPalettePicker(
+                  initialColorHex: selectedColorHex,
+                  onColorSelected: (hex) => selectedColorHex = hex,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => _confirmDeleteCategory(cat),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('刪除此資料夾'),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+
+                final ok = await TagManagerService.editCategory(
+                  cat.id,
+                  newName: name,
+                  colorHex: selectedColorHex,
+                );
+                if (!mounted) return;
+                Navigator.pop(ctx);
+
+                if (ok) {
+                  _showToast('成功更新大分類「$name」！', type: 'green');
+                  _loadData();
+                } else {
+                  _showToast('更新失敗。', type: 'yellow');
+                }
+              },
+              child: const Text('儲存修改'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteCategory(TagCategoryModel cat) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red),
+              SizedBox(width: 8),
+              Text('確認刪除大分類？'),
+            ],
+          ),
+          content: Text('您確定要刪除大分類「${cat.name}」嗎？該分類下的所有子標籤亦將一併移除。'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              onPressed: () async {
+                Navigator.pop(ctx); // Close confirmation
+                Navigator.pop(context); // Close edit dialog
+                await TagManagerService.deleteCategory(cat.id);
+                _showToast('大分類「${cat.name}」已刪除！', type: 'red');
+                _loadData();
+              },
+              child: const Text('確認刪除'),
+            ),
+          ],
+        );
+      },
     );
   }
 
   void _openAddTagDialog() {
     final nameController = TextEditingController();
-    String? selectedCustomColor;
+    String? selectedCustomColor = _categories.firstWhere((c) => c.id == _selectedCategoryId, orElse: () => TagCategoryModel(id: '', name: '')).colorHex;
 
     showDialog(
       context: context,
       builder: (ctx) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('新增子標籤', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: '標籤名稱 (例：社團、吃素)',
-                  hintText: '請輸入標籤名稱',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          title: const Text('🏷️ 新增子標籤', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: '標籤名稱 (例：社團、吃素)',
+                    hintText: '請輸入標籤名稱',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Text('預設顏色：繼承該資料夾主題色', style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54)),
-                ],
-              ),
-            ],
+                const SizedBox(height: 16),
+                ColorPalettePicker(
+                  initialColorHex: selectedCustomColor,
+                  onColorSelected: (hex) => selectedCustomColor = hex,
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -164,7 +318,7 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
                 if (!mounted) return;
                 Navigator.pop(ctx);
                 if (result == null) {
-                  _showToast('標籤「$name」已存在於資料庫中，不可重複建立！', type: 'yellow');
+                  _showToast('標籤「$name」已存在，不可重複建立！', type: 'yellow');
                 } else {
                   _showToast('成功建立標籤「$name」！', type: 'green');
                   _loadData();
@@ -181,6 +335,7 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
   void _openEditTagDialog(TagItemModel tag) {
     final nameController = TextEditingController(text: tag.name);
     String selectedCatId = tag.categoryId;
+    String? selectedCustomColor = tag.colorHex;
 
     showDialog(
       context: context,
@@ -190,34 +345,41 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
           title: const Text('編輯標籤', style: TextStyle(fontWeight: FontWeight.bold)),
           content: StatefulBuilder(
             builder: (context, setStateModal) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: '標籤名稱',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: '標籤名稱',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: selectedCatId,
-                    decoration: InputDecoration(
-                      labelText: '隸屬資料夾 (大分類)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedCatId,
+                      decoration: InputDecoration(
+                        labelText: '隸屬資料夾 (大分類)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: _categories.map((c) {
+                        return DropdownMenuItem(
+                          value: c.id,
+                          child: Text(c.name),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setStateModal(() => selectedCatId = val);
+                      },
                     ),
-                    items: _categories.map((c) {
-                      return DropdownMenuItem(
-                        value: c.id,
-                        child: Text(c.name),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) setStateModal(() => selectedCatId = val);
-                    },
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    ColorPalettePicker(
+                      initialColorHex: selectedCustomColor,
+                      onColorSelected: (hex) => selectedCustomColor = hex,
+                    ),
+                  ],
+                ),
               );
             },
           ),
@@ -232,6 +394,7 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
                 final ok = await TagManagerService.editTag(
                   tag.id,
                   newName: newName,
+                  colorHex: selectedCustomColor,
                   newCategoryId: selectedCatId,
                 );
                 if (!mounted) return;
@@ -409,34 +572,50 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: _categories.map((cat) {
-                        final isSelected = cat.id == _selectedCategoryId;
-                        final color = _parseColor(cat.colorHex, const Color(0xFF0369A1));
+                      children: [
+                        ..._categories.map((cat) {
+                          final isSelected = cat.id == _selectedCategoryId;
+                          final color = _parseColor(cat.colorHex, const Color(0xFF0369A1));
 
-                        return Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Row(
-                              children: [
-                                Icon(Icons.folder_outlined, size: 16, color: isSelected ? Colors.white : color),
-                                const SizedBox(width: 6),
-                                Text(cat.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                              ],
+                          return Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Row(
+                                children: [
+                                  Icon(Icons.folder_outlined, size: 16, color: isSelected ? Colors.white : color),
+                                  const SizedBox(width: 6),
+                                  Text(cat.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                                  if (isSelected) ...[
+                                    const SizedBox(width: 4),
+                                    InkWell(
+                                      onTap: () => _openEditCategoryDialog(cat),
+                                      child: const Icon(Icons.edit_outlined, size: 14, color: Colors.white),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              selected: isSelected,
+                              selectedColor: color,
+                              backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+                              labelStyle: TextStyle(color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87)),
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _selectedCategoryId = cat.id;
+                                  });
+                                }
+                              },
                             ),
-                            selected: isSelected,
-                            selectedColor: color,
-                            backgroundColor: isDark ? Colors.grey[800] : Colors.white,
-                            labelStyle: TextStyle(color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87)),
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() {
-                                  _selectedCategoryId = cat.id;
-                                });
-                              }
-                            },
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }),
+                        ActionChip(
+                          avatar: const Icon(Icons.add, size: 16, color: Color(0xFF10B981)),
+                          label: const Text('新增大分類', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                          backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
+                          side: const BorderSide(color: Color(0xFF10B981)),
+                          onPressed: _openAddCategoryDialog,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -548,6 +727,44 @@ class _TagManagerScreenState extends State<TagManagerScreen> {
                           ),
                         ),
                 ),
+                if (_bannerMessage != null) ...[
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _bannerType == 'yellow'
+                          ? const Color(0xFFF59E0B)
+                          : (_bannerType == 'red' ? const Color(0xFFEF4444) : const Color(0xFF10B981)),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, 2))
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _bannerType == 'yellow'
+                              ? Icons.warning_amber_rounded
+                              : (_bannerType == 'red' ? Icons.error_outline_rounded : Icons.check_circle_outline),
+                          color: _bannerType == 'yellow' ? Colors.black87 : Colors.white,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _bannerMessage!,
+                            style: TextStyle(
+                              color: _bannerType == 'yellow' ? Colors.black87 : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/schedule_event.dart';
 import 'custom_toast.dart';
 import '../main.dart';
+import 'categorized_tag_accordion_selector.dart';
 
 class ScheduleEventDialog extends StatefulWidget {
   final DateTime initialDate;
@@ -261,7 +262,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                     decoration: const InputDecoration(
                       labelText: '行程名稱 *',
                       prefixIcon: Icon(Icons.event_note),
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                     ),
                     validator: (val) => (val == null || val.trim().isEmpty) ? '請輸入行程名稱' : null,
                   ),
@@ -273,7 +274,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                     decoration: const InputDecoration(
                       labelText: '行程類型',
                       prefixIcon: Icon(Icons.category_outlined),
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                     ),
                     items: const [
                       DropdownMenuItem(value: 'personal', child: Text('個人行程 👤')),
@@ -309,7 +310,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           child: InputDecorator(
                             decoration: const InputDecoration(
                               labelText: '開始日期',
-                              border: OutlineInputBorder(),
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               prefixIcon: Icon(Icons.calendar_today, size: 18),
                             ),
                             child: Text(DateFormat('yyyy/MM/dd').format(_startDate)),
@@ -331,7 +332,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           child: InputDecorator(
                             decoration: const InputDecoration(
                               labelText: '開始時間',
-                              border: OutlineInputBorder(),
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               prefixIcon: Icon(Icons.access_time, size: 18),
                             ),
                             child: Text(_startTime.format(context)),
@@ -361,7 +362,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           child: InputDecorator(
                             decoration: const InputDecoration(
                               labelText: '結束日期',
-                              border: OutlineInputBorder(),
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               prefixIcon: Icon(Icons.calendar_today, size: 18),
                             ),
                             child: Text(DateFormat('yyyy/MM/dd').format(_endDate)),
@@ -383,7 +384,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           child: InputDecorator(
                             decoration: const InputDecoration(
                               labelText: '結束時間',
-                              border: OutlineInputBorder(),
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               prefixIcon: Icon(Icons.access_time, size: 18),
                             ),
                             child: Text(_endTime.format(context)),
@@ -402,21 +403,16 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                     decoration: const InputDecoration(
                       labelText: '地點 (選填)',
                       prefixIcon: Icon(Icons.location_on_outlined),
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Custom Tag Input
-                  TextFormField(
-                    controller: _tagController,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _saveEvent(),
-                    decoration: const InputDecoration(
-                      labelText: '自訂標籤/服務項目 (選填，如：服務學習、理賠復核)',
-                      prefixIcon: Icon(Icons.label_outlined),
-                      border: OutlineInputBorder(),
-                    ),
+                  // Dynamic Categorized Tag Selector (Unified with Customer Tag System)
+                  CategorizedTagAccordionSelector(
+                    tagsController: _tagController,
+                    isDark: Theme.of(context).brightness == Brightness.dark,
+                    primaryColor: const Color(0xFF0369A1),
                   ),
                   const SizedBox(height: 16),
 
@@ -426,7 +422,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                     decoration: InputDecoration(
                       labelText: '關聯客戶 (選填)',
                       prefixIcon: const Icon(Icons.person_outline),
-                      border: const OutlineInputBorder(),
+                      border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                       suffixIcon: _isLoadingCustomers
                           ? const SizedBox(
                               width: 16,
@@ -460,15 +456,18 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           label: const Text('刪除', style: TextStyle(color: Colors.red)),
                         ),
                       const Spacer(),
-                      OutlinedButton(
+                      TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('取消'),
+                        child: const Text('取消', style: TextStyle(color: Colors.grey)),
                       ),
                       const SizedBox(width: 12),
                       ElevatedButton(
                         onPressed: _isSaving ? null : _saveEvent,
                         style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         child: _isSaving
                             ? const SizedBox(
@@ -476,7 +475,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                                 height: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
-                            : Text(isEdit ? '儲存變更' : '新增行程'),
+                            : Text(isEdit ? '儲存變更' : '新增行程', style: const TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),

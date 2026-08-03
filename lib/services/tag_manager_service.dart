@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -113,20 +112,56 @@ class TagManagerService {
     TagItemModel(id: 't_17', categoryId: 'cat_followup', name: '觀望中'),
   ];
 
-  /// Fetches all active categories (local cache + default)
+  /// Fetches all active categories (local cache + default + Supabase sync)
   static Future<List<TagCategoryModel>> getCategories() async {
     final prefs = await SharedPreferences.getInstance();
+    List<TagCategoryModel> result = [];
+
     final String? cached = prefs.getString(_prefCategoriesKey);
-    if (cached == null || cached.isEmpty) {
-      await saveCategories(defaultCategories);
-      return defaultCategories;
+    if (cached != null && cached.isNotEmpty) {
+      try {
+        final List<dynamic> list = jsonDecode(cached);
+        result = list.map((e) => TagCategoryModel.fromJson(e)).toList();
+      } catch (_) {}
     }
+
+    if (result.isEmpty) {
+      result = List.from(defaultCategories);
+    }
+
+    // Attempt Supabase sync if connected
     try {
-      final List<dynamic> list = jsonDecode(cached);
-      return list.map((e) => TagCategoryModel.fromJson(e)).toList();
+      final response = await Supabase.instance.client
+          .from('tag_categories')
+          .select('id, name, color_code')
+          .order('name');
+      
+      if ((response as List).isNotEmpty) {
+        final dbCategories = (response as List).map((row) {
+          return TagCategoryModel(
+            id: row['id'].toString(),
+            name: row['name'] as String,
+            colorHex: row['color_code'] as String?,
+          );
+        }).toList();
+
+        // Merge DB categories with default categories to avoid losing initial defaults
+        final Map<String, TagCategoryModel> mergedMap = {};
+        for (var c in result) {
+          mergedMap[c.name] = c;
+        }
+        for (var c in dbCategories) {
+          mergedMap[c.name] = c;
+        }
+
+        result = mergedMap.values.toList();
+        await saveCategories(result);
+      }
     } catch (_) {
-      return defaultCategories;
+      // Offline fallback or missing table
     }
+
+    return result;
   }
 
   /// Saves categories to SharedPreferences
@@ -136,20 +171,24 @@ class TagManagerService {
     await prefs.setString(_prefCategoriesKey, encoded);
   }
 
-  /// Fetches all tags
+  /// Fetches all tags (local cache + default + Supabase sync)
   static Future<List<TagItemModel>> getTags() async {
     final prefs = await SharedPreferences.getInstance();
+    List<TagItemModel> result = [];
+
     final String? cached = prefs.getString(_prefTagsKey);
-    if (cached == null || cached.isEmpty) {
-      await saveTags(defaultTags);
-      return defaultTags;
+    if (cached != null && cached.isNotEmpty) {
+      try {
+        final List<dynamic> list = jsonDecode(cached);
+        result = list.map((e) => TagItemModel.fromJson(e)).toList();
+      } catch (_) {}
     }
-    try {
-      final List<dynamic> list = jsonDecode(cached);
-      return list.map((e) => TagItemModel.fromJson(e)).toList();
-    } catch (_) {
-      return defaultTags;
+
+    if (result.isEmpty) {
+      result = List.from(defaultTags);
     }
+
+    return result;
   }
 
   /// Saves tags to SharedPreferences
@@ -168,16 +207,84 @@ class TagManagerService {
 
   /// Adds a new category
   static Future<TagCategoryModel?> addCategory(String name, {String? colorHex}) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) return null;
+
     final categories = await getCategories();
+    if (categories.any((c) => c.name.toLowerCase() == trimmedName.toLowerCase())) {
+      return null; // Duplicate category name
+    }
+
     final newCat = TagCategoryModel(
       id: 'cat_${DateTime.now().millisecondsSinceEpoch}',
-      name: name.trim(),
-      colorHex: colorHex,
+      name: trimmedName,
+      colorHex: colorHex ?? '#0369A1',
       sortOrder: categories.length + 1,
     );
     categories.add(newCat);
     await saveCategories(categories);
+
+    // Sync to Supabase tag_categories table if available
+    try {
+      await Supabase.instance.client.from('tag_categories').insert({
+        'name': trimmedName,
+        'color_code': colorHex ?? '#0369A1',
+      });
+    } catch (_) {}
+
     return newCat;
+  }
+
+  /// Edits an existing category
+  static Future<bool> editCategory(String categoryId, {required String newName, String? colorHex}) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return false;
+
+    final categories = await getCategories();
+    final index = categories.indexWhere((c) => c.id == categoryId);
+    if (index == -1) return false;
+
+    final oldCat = categories[index];
+    categories[index] = TagCategoryModel(
+      id: oldCat.id,
+      name: trimmed,
+      colorHex: colorHex ?? oldCat.colorHex,
+      sortOrder: oldCat.sortOrder,
+    );
+    await saveCategories(categories);
+
+    // Sync to Supabase
+    try {
+      await Supabase.instance.client
+          .from('tag_categories')
+          .update({'name': trimmed, 'color_code': colorHex ?? oldCat.colorHex})
+          .eq('name', oldCat.name);
+    } catch (_) {}
+
+    return true;
+  }
+
+  /// Deletes a category and its sub-tags
+  static Future<bool> deleteCategory(String categoryId) async {
+    final categories = await getCategories();
+    final catIndex = categories.indexWhere((c) => c.id == categoryId);
+    if (catIndex == -1) return false;
+
+    final cat = categories[catIndex];
+    categories.removeAt(catIndex);
+    await saveCategories(categories);
+
+    // Remove sub-tags belonging to this category
+    final tags = await getTags();
+    tags.removeWhere((t) => t.categoryId == categoryId);
+    await saveTags(tags);
+
+    // Sync deletion to Supabase
+    try {
+      await Supabase.instance.client.from('tag_categories').delete().eq('name', cat.name);
+    } catch (_) {}
+
+    return true;
   }
 
   /// Adds a new tag
