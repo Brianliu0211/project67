@@ -13,6 +13,8 @@ import '../services/app_localizations.dart';
 import '../widgets/animations.dart';
 import '../widgets/custom_toast.dart';
 import '../widgets/voice_recorder_widget.dart';
+import '../widgets/color_palette_picker.dart';
+import '../widgets/categorized_tag_accordion_selector.dart';
 
 class CustomerManagementTab extends StatefulWidget {
   final ValueChanged<String>? onMenuChanged;
@@ -463,17 +465,21 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     InputDecoration buildInputDecoration(String labelText, IconData iconData, {String? hintText}) {
       return InputDecoration(
         labelText: labelText,
-        labelStyle: TextStyle(color: subTextColor),
+        labelStyle: TextStyle(color: subTextColor, fontSize: 13),
         hintText: hintText,
-        hintStyle: TextStyle(color: subTextColor),
-        prefixIcon: Icon(iconData, color: subTextColor),
-        border: const OutlineInputBorder(),
-        enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: isDark ? Colors.white30 : Colors.grey.shade400),
+        hintStyle: TextStyle(color: subTextColor, fontSize: 13),
+        prefixIcon: Icon(iconData, color: primaryColor, size: 18),
+        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+        enabledBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
+        filled: true,
+        fillColor: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
       );
     }
 
@@ -707,17 +713,21 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     InputDecoration buildInputDecoration(String labelText, IconData iconData, {String? hintText}) {
       return InputDecoration(
         labelText: labelText,
-        labelStyle: TextStyle(color: subTextColor),
+        labelStyle: TextStyle(color: subTextColor, fontSize: 13),
         hintText: hintText,
-        hintStyle: TextStyle(color: subTextColor),
-        prefixIcon: Icon(iconData, color: subTextColor),
-        border: const OutlineInputBorder(),
+        hintStyle: TextStyle(color: subTextColor, fontSize: 13),
+        prefixIcon: Icon(iconData, color: primaryColor, size: 18),
+        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: isDark ? Colors.white30 : Colors.grey.shade400),
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
+        filled: true,
+        fillColor: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : const Color(0xFFF8FAFC),
       );
     }
     showDialog(
@@ -882,21 +892,13 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                         decoration: buildInputDecoration(context.l10n('customer_email_label'), Icons.email_outlined),
                       ),
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: tagsController,
-                        style: TextStyle(color: textColor, fontSize: 16),
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => submitForm(),
-                        decoration: buildInputDecoration(context.l10n('customer_tags_label'), Icons.local_offer_outlined, hintText: context.l10n('customer_tags_eg')),
-                      ),
-                      const SizedBox(height: 12),
                       // Sleek Collapsible Accordion Tag Selector (1-Tap Expand by Category)
                       CategorizedTagAccordionSelector(
                         tagsController: tagsController,
                         isDark: isDark,
                         primaryColor: primaryColor,
-                        onOpenQuickAdd: () => _openQuickAddTagDialog(context, tagsController),
-                        onOpenTagManager: () => TagManagerScreen.showAsDialog(context),
+                        onOpenQuickAdd: () async => _openQuickAddTagDialog(context, tagsController),
+                        onOpenTagManager: () async => TagManagerScreen.showAsDialog(context),
                       ),
                       const SizedBox(height: 16),
                       // 語音備註輸入列
@@ -975,101 +977,65 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   }
 
   // Helper: Open Quick Add Tag Dialog with custom color palette
-  void _openQuickAddTagDialog(BuildContext dialogContext, TextEditingController tagsController) {
+  Future<void> _openQuickAddTagDialog(BuildContext dialogContext, TextEditingController tagsController) async {
     final nameController = TextEditingController();
-    String selectedCatId = 'cat_identity';
-    Color? selectedColor;
+    final categories = await TagManagerService.getCategories();
+    String selectedCatId = categories.isNotEmpty ? categories.first.id : 'cat_identity';
+    String? selectedColorHex;
 
-    final List<Map<String, dynamic>> colorPalette = [
-      {'name': '繼承資料夾色', 'color': null},
-      {'name': '翡翠綠', 'color': const Color(0xFF15803D)},
-      {'name': '皇家藍', 'color': const Color(0xFF0369A1)},
-      {'name': '活力橘', 'color': const Color(0xFFB45309)},
-      {'name': '羅蘭紫', 'color': const Color(0xFF6B21A8)},
-      {'name': '玫瑰紅', 'color': const Color(0xFFBE123C)},
-      {'name': '琥珀黃', 'color': const Color(0xFFD97706)},
-    ];
+    if (!dialogContext.mounted) return;
 
-    showDialog(
+    return showDialog(
       context: dialogContext,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: const [
+              title: const Row(
+                children: [
                   Icon(Icons.local_offer, color: Color(0xFF10B981)),
                   SizedBox(width: 8),
                   Text('➕ 新增標籤與自訂顏色', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 ],
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: '標籤名稱 (例: 企業戶, 高意願)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: '標籤名稱 (例: 企業戶, 高意願)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: selectedCatId,
-                    decoration: InputDecoration(
-                      labelText: '歸屬大分類資料夾',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedCatId,
+                      decoration: InputDecoration(
+                        labelText: '歸屬大分類資料夾',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: categories.map((c) {
+                        return DropdownMenuItem(
+                          value: c.id,
+                          child: Text('📁 ${c.name}'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setModalState(() => selectedCatId = val);
+                      },
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'cat_identity', child: Text('👤 客戶身分 (藍色系)')),
-                      DropdownMenuItem(value: 'cat_insurance', child: Text('🛡️ 已購險種 (綠色系)')),
-                      DropdownMenuItem(value: 'cat_interests', child: Text('🎨 生活興趣 (橘色系)')),
-                      DropdownMenuItem(value: 'cat_health', child: Text('🏥 健康體況 (紅色系)')),
-                      DropdownMenuItem(value: 'cat_followup', child: Text('💜 跟進狀態 (紫色系)')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) setModalState(() => selectedCatId = val);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('自訂色盤 (若未選取則自動繼承資料夾色)：', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: colorPalette.map((cp) {
-                      final Color? c = cp['color'];
-                      final bool isSelected = selectedColor == c;
-                      return InkWell(
-                        onTap: () => setModalState(() => selectedColor = c),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: c != null ? c.withOpacity(0.15) : Colors.grey.withOpacity(0.2),
-                            border: Border.all(color: isSelected ? (c ?? Colors.blue) : Colors.transparent, width: 2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(color: c ?? Colors.grey, shape: BoxShape.circle),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(cp['name'], style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    ColorPalettePicker(
+                      initialColorHex: selectedColorHex,
+                      onColorSelected: (hex) => selectedColorHex = hex,
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
@@ -1083,14 +1049,10 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                     final name = nameController.text.trim();
                     if (name.isEmpty) return;
 
-                    final String? colorHex = selectedColor != null
-                        ? '#${selectedColor!.value.toRadixString(16).substring(2)}'
-                        : null;
-
                     final res = await TagManagerService.addTag(
                       categoryId: selectedCatId,
                       name: name,
-                      colorHex: colorHex,
+                      colorHex: selectedColorHex,
                     );
 
                     Navigator.pop(ctx);
@@ -2616,277 +2578,6 @@ class CustomerListShimmer extends StatelessWidget {
             const ShimmerLoader(width: 80, height: 24, borderRadius: 12),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// Stateful Accordion Category Tag Selector Widget (Collapsible & Compact)
-class CategorizedTagAccordionSelector extends StatefulWidget {
-  final TextEditingController tagsController;
-  final bool isDark;
-  final Color primaryColor;
-  final VoidCallback onOpenQuickAdd;
-  final VoidCallback onOpenTagManager;
-
-  const CategorizedTagAccordionSelector({
-    super.key,
-    required this.tagsController,
-    required this.isDark,
-    required this.primaryColor,
-    required this.onOpenQuickAdd,
-    required this.onOpenTagManager,
-  });
-
-  @override
-  State<CategorizedTagAccordionSelector> createState() => _CategorizedTagAccordionSelectorState();
-}
-
-class _CategorizedTagAccordionSelectorState extends State<CategorizedTagAccordionSelector> {
-  String? _expandedCategoryId; // Nullable: only expanded category ID
-
-  final List<Map<String, dynamic>> _categorySections = [
-    {
-      'id': 'cat_followup',
-      'title': '跟進狀態',
-      'icon': Icons.favorite_border,
-      'color': const Color(0xFF6B21A8),
-      'tags': ['高意願', '定期聯繫', '觀望中'],
-    },
-    {
-      'id': 'cat_insurance',
-      'title': '已購險種',
-      'icon': Icons.shield_outlined,
-      'color': const Color(0xFF15803D),
-      'tags': ['醫療險', '意外險', '車險', '防癌險', '儲蓄險'],
-    },
-    {
-      'id': 'cat_identity',
-      'title': '客戶身分',
-      'icon': Icons.person_outline,
-      'color': const Color(0xFF0369A1),
-      'tags': ['高資產', '青年(18-35)', '中年(36-60)'],
-    },
-    {
-      'id': 'cat_interests',
-      'title': '生活興趣',
-      'icon': Icons.palette_outlined,
-      'color': const Color(0xFFB45309),
-      'tags': ['露營', '高爾夫', '爬山'],
-    },
-    {
-      'id': 'cat_health',
-      'title': '健康體況',
-      'icon': Icons.health_and_safety_outlined,
-      'color': const Color(0xFFBE123C),
-      'tags': ['健康', '高血壓'],
-    },
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: widget.isDark ? const Color(0xFF21262D) : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: widget.isDark ? const Color(0xFF30363D) : Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Bar with Action Shortcuts
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.local_fire_department, size: 18, color: widget.primaryColor),
-                  const SizedBox(width: 6),
-                  Text(
-                    '常用標籤 (點擊大分類展開)',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: widget.isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  InkWell(
-                    onTap: widget.onOpenQuickAdd,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF10B981)),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.add, size: 12, color: Color(0xFF10B981)),
-                          SizedBox(width: 2),
-                          Text('自訂色', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  InkWell(
-                    onTap: widget.onOpenTagManager,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: widget.primaryColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: widget.primaryColor),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.settings, size: 12, color: widget.primaryColor),
-                          const SizedBox(width: 2),
-                          Text('管理大分類', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: widget.primaryColor)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Divider(height: 1),
-          const SizedBox(height: 10),
-
-          // Compact Category Pills Row (1-Tap to Expand)
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _categorySections.map((sec) {
-              final String catId = sec['id'];
-              final String title = sec['title'];
-              final IconData icon = sec['icon'];
-              final Color color = sec['color'];
-              final List<String> tags = sec['tags'];
-              final bool isExpanded = _expandedCategoryId == catId;
-
-              return InkWell(
-                onTap: () {
-                  setState(() {
-                    _expandedCategoryId = isExpanded ? null : catId;
-                  });
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isExpanded ? color : (widget.isDark ? color.withOpacity(0.2) : color.withOpacity(0.1)),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: color, width: isExpanded ? 2 : 1),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(icon, size: 14, color: isExpanded ? Colors.white : color),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$title (${tags.length})',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: isExpanded ? Colors.white : (widget.isDark ? Colors.white70 : color),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                        size: 16,
-                        color: isExpanded ? Colors.white : color,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-
-          // Expanded Sub-tags Area (Smooth Animation)
-          if (_expandedCategoryId != null) ...[
-            const SizedBox(height: 12),
-            Builder(
-              builder: (context) {
-                final sec = _categorySections.firstWhere((s) => s['id'] == _expandedCategoryId);
-                final Color color = sec['color'];
-                final List<String> tags = sec['tags'];
-
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: widget.isDark ? Colors.grey[900] : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: color.withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(sec['icon'], size: 14, color: color),
-                          const SizedBox(width: 6),
-                          Text('${sec['title']} 的子標籤 (點擊直接加入)：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: tags.map((t) {
-                          final style = TagCategorizer.getStyle(t, widget.isDark);
-                          return InkWell(
-                            onTap: () {
-                              final current = widget.tagsController.text.trim();
-                              if (!current.contains(t)) {
-                                widget.tagsController.text = current.isEmpty ? t : '$current, $t';
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: style.backgroundColor,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: style.textColor.withOpacity(0.4), width: 1.5),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.add, size: 16, color: style.textColor),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    t,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: style.textColor,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ],
       ),
     );
   }

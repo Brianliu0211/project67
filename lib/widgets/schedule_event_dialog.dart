@@ -5,6 +5,7 @@ import '../models/schedule_event.dart';
 import '../services/app_localizations.dart';
 import 'custom_toast.dart';
 import '../main.dart';
+import 'categorized_tag_accordion_selector.dart';
 
 class ScheduleEventDialog extends StatefulWidget {
   final DateTime initialDate;
@@ -263,7 +264,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                       labelText: '${context.l10n('event_title_label')} *',
                       hintText: context.l10n('event_title_hint'),
                       prefixIcon: const Icon(Icons.event_note),
-                      border: const OutlineInputBorder(),
+                      border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                     ),
                     validator: (val) => (val == null || val.trim().isEmpty) ? context.l10n('event_title_hint') : null,
                   ),
@@ -275,7 +276,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                     decoration: InputDecoration(
                       labelText: context.l10n('event_type_label'),
                       prefixIcon: const Icon(Icons.category_outlined),
-                      border: const OutlineInputBorder(),
+                      border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                     ),
                     items: [
                       DropdownMenuItem(value: 'personal', child: Text('${context.l10n('event_type_personal')} 👤')),
@@ -311,7 +312,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: context.l10n('event_start_date'),
-                              border: const OutlineInputBorder(),
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               prefixIcon: const Icon(Icons.calendar_today, size: 18),
                             ),
                             child: Text(DateFormat('yyyy/MM/dd').format(_startDate)),
@@ -333,7 +334,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: context.l10n('event_start_time'),
-                              border: const OutlineInputBorder(),
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               prefixIcon: const Icon(Icons.access_time, size: 18),
                             ),
                             child: Text(_startTime.format(context)),
@@ -363,7 +364,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: context.l10n('event_end_date'),
-                              border: const OutlineInputBorder(),
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               prefixIcon: const Icon(Icons.calendar_today, size: 18),
                             ),
                             child: Text(DateFormat('yyyy/MM/dd').format(_endDate)),
@@ -385,7 +386,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: context.l10n('event_end_time'),
-                              border: const OutlineInputBorder(),
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               prefixIcon: const Icon(Icons.access_time, size: 18),
                             ),
                             child: Text(_endTime.format(context)),
@@ -405,22 +406,16 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                       labelText: context.l10n('event_location_label'),
                       hintText: context.l10n('event_location_hint'),
                       prefixIcon: const Icon(Icons.location_on_outlined),
-                      border: const OutlineInputBorder(),
+                      border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Custom Tag Input
-                  TextFormField(
-                    controller: _tagController,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _saveEvent(),
-                    decoration: InputDecoration(
-                      labelText: context.l10n('event_tag_label'),
-                      hintText: context.l10n('event_tag_hint'),
-                      prefixIcon: const Icon(Icons.label_outlined),
-                      border: const OutlineInputBorder(),
-                    ),
+                  // Dynamic Categorized Tag Selector (Unified with Customer Tag System)
+                  CategorizedTagAccordionSelector(
+                    tagsController: _tagController,
+                    isDark: Theme.of(context).brightness == Brightness.dark,
+                    primaryColor: const Color(0xFF0369A1),
                   ),
                   const SizedBox(height: 16),
 
@@ -430,7 +425,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                     decoration: InputDecoration(
                       labelText: context.l10n('event_customer_label'),
                       prefixIcon: const Icon(Icons.person_outline),
-                      border: const OutlineInputBorder(),
+                      border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                       suffixIcon: _isLoadingCustomers
                           ? const SizedBox(
                               width: 16,
@@ -464,7 +459,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           label: Text(context.l10n('event_delete_btn'), style: const TextStyle(color: Colors.red)),
                         ),
                       const Spacer(),
-                      OutlinedButton(
+                      TextButton(
                         onPressed: () => Navigator.pop(context),
                         child: Text(context.l10n('cancel')),
                       ),
@@ -472,7 +467,10 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                       ElevatedButton(
                         onPressed: _isSaving ? null : _saveEvent,
                         style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         child: _isSaving
                             ? const SizedBox(
@@ -480,7 +478,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                                 height: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
-                            : Text(isEdit ? context.l10n('profile_save_changes') : context.l10n('event_add_title')),
+                            : Text(isEdit ? context.l10n('profile_save_changes') : context.l10n('event_add_title'), style: const TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
