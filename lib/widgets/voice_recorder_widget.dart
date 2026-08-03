@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/voice_transcription_service.dart';
+import '../services/app_localizations.dart';
 
 /// 語音錄音 UI 元件
 ///
@@ -214,7 +215,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget>
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            '點擊錄音，AI 自動轉為文字備註',
+            context.l10n('voice_note_idle_hint'),
             style: TextStyle(
               fontSize: 12.5,
               color: isDark ? Colors.white54 : Colors.black45,
@@ -224,7 +225,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget>
         const SizedBox(width: 8),
         _RecordButton(
           color: primaryColor,
-          label: '錄音',
+          label: context.l10n('voice_note_record_btn'),
           icon: Icons.fiber_manual_record,
           onTap: _startRecording,
         ),
@@ -261,7 +262,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget>
         const SizedBox(width: 10),
         // 計時器
         Text(
-          '錄音中  ${_formatDuration(_recordingSeconds)}',
+          '${context.l10n('voice_note_recording')}  ${_formatDuration(_recordingSeconds)}',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -280,7 +281,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget>
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
-              '取消',
+              context.l10n('cancel'),
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? Colors.white54 : Colors.black38,
@@ -292,7 +293,7 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget>
         // 完成按鈕
         _RecordButton(
           color: Colors.red.shade600,
-          label: '完成',
+          label: context.l10n('done'),
           icon: Icons.stop_rounded,
           onTap: _stopAndTranscribe,
         ),

@@ -616,7 +616,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
             return AlertDialog(
               backgroundColor: dialogBg,
               title: Text(
-                '建立拜訪專案',
+                context.l10n('pv_dialog_title'),
                 style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
               ),
               content: SingleChildScrollView(
@@ -639,7 +639,9 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                '已篩選客戶數：${_filteredCustomers.length} 位\n(專案將以此名單作為拜訪 Checklist)',
+                                AppSettings.instance.language == 'en_US'
+                                    ? 'Selected Customers: ${_filteredCustomers.length}\n(This list will be used as the visit checklist)'
+                                    : '已篩選客戶數：${_filteredCustomers.length} 位\n(專案將以此名單作為拜訪 Checklist)',
                                 style: TextStyle(color: textColor, fontSize: 13, height: 1.4),
                               ),
                             ),
@@ -651,14 +653,14 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                         controller: titleController,
                         style: TextStyle(color: textColor),
                         textInputAction: TextInputAction.next,
-                        decoration: buildInputDecoration('專案名稱 (必填)', Icons.assignment_outlined, hintText: '如: 2026長照政策關懷專案'),
+                        decoration: buildInputDecoration(context.l10n('pv_name_label'), Icons.assignment_outlined),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: purposeController,
                         style: TextStyle(color: textColor),
                         maxLines: 3,
-                        decoration: buildInputDecoration('建立目的 / 拜訪 Why (必填)', Icons.ads_click_outlined, hintText: '如: 說明最新長照法規影響並關照防護缺口'),
+                        decoration: buildInputDecoration(context.l10n('pv_purpose_label'), Icons.ads_click_outlined),
                       ),
                     ],
                   ),
@@ -667,7 +669,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
               actions: [
                 TextButton(
                   onPressed: isSubmitting ? null : () => Navigator.pop(context),
-                  child: Text('取消', style: TextStyle(color: subTextColor)),
+                  child: Text(context.l10n('cancel'), style: TextStyle(color: subTextColor)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -681,7 +683,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                           height: 16,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : const Text('確認建立'),
+                      : Text(context.l10n('pv_confirm_create')),
                 ),
               ],
             );
@@ -1322,7 +1324,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 ),
                 icon: const Icon(Icons.assignment_outlined, size: 20),
-                label: const Text('建立專案', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: Text(context.l10n('create_project'), style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(

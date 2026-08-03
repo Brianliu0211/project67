@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../main.dart';
 
 /// 語音轉錄服務
@@ -13,6 +14,22 @@ import '../main.dart';
 /// 完全相容 Web、Android、iOS 等平台。
 class VoiceTranscriptionService {
   final AudioRecorder _recorder = AudioRecorder();
+
+  String _getSupabaseUrl() {
+    String? url = dotenv.maybeGet('SUPABASE_URL');
+    if (url == null || url.isEmpty) {
+      url = const String.fromEnvironment('SUPABASE_URL');
+    }
+    return url;
+  }
+
+  String _getSupabaseAnonKey() {
+    String? key = dotenv.maybeGet('SUPABASE_ANON_KEY');
+    if (key == null || key.isEmpty) {
+      key = const String.fromEnvironment('SUPABASE_ANON_KEY');
+    }
+    return key;
+  }
 
   /// 檢查麥克風權限
   Future<bool> hasPermission() async {
@@ -94,9 +111,9 @@ class VoiceTranscriptionService {
       }
     } catch (e) {
       // 若 SDK invoke 失敗，使用 direct HTTP POST 作為 Fallback
-      final baseUrl = const String.fromEnvironment('SUPABASE_URL');
+      final baseUrl = _getSupabaseUrl();
       final url = '$baseUrl/functions/v1/rapid-responder';
-      final anonKey = const String.fromEnvironment('SUPABASE_ANON_KEY');
+      final anonKey = _getSupabaseAnonKey();
 
       final res = await http.post(
         Uri.parse(url),
@@ -127,6 +144,111 @@ class VoiceTranscriptionService {
     }
 
     return transcript;
+  }
+
+  /// 停止錄音並送至 Edge Function 進行智慧行程排程與建立
+  ///
+  /// 返回一個 Map，包含轉錄文字 `transcript` 與已插入資料庫的行程 `event`
+  Future<Map<String, dynamic>> transcribeAndCreateEvent(DateTime localTime) async {
+    if (isOfflineMode) {
+      throw Exception('離線模式下無法使用語音智慧排程，請確認網路連線後再試');
+    }
+
+    // 停止錄音並取得路徑
+    final path = await _recorder.stop();
+    if (path == null || path.isEmpty) {
+      throw Exception('錄音停止失敗或無錄音內容');
+    }
+
+    // 讀取音檔 bytes
+    final List<int> bytes;
+    try {
+      if (path.startsWith('blob:') || path.startsWith('http')) {
+        bytes = await http.readBytes(Uri.parse(path));
+      } else {
+        bytes = await http.readBytes(Uri.file(path));
+      }
+    } catch (e) {
+      throw Exception('讀取錄音資料失敗: $e');
+    }
+
+    if (bytes.isEmpty) {
+      throw Exception('錄音資料為空，請確認麥克風正常運作後重試');
+    }
+
+    final base64Audio = base64Encode(bytes);
+    final localTimeStr = _formatIso8601WithOffset(localTime);
+
+    final supabase = Supabase.instance.client;
+    Map<String, dynamic> result = {};
+
+    try {
+      final response = await supabase.functions.invoke(
+        'voice-scheduler',
+        body: {
+          'audioBase64': base64Audio,
+          'mimeType': 'audio/webm',
+          'localTime': localTimeStr,
+        },
+      );
+
+      final data = response.data;
+      if (data != null && data is Map) {
+        if (data['error'] != null) {
+          throw Exception(data['error'].toString());
+        }
+        result = Map<String, dynamic>.from(data);
+      }
+    } catch (e) {
+      // Direct HTTP Fallback
+      final baseUrl = _getSupabaseUrl();
+      final url = '$baseUrl/functions/v1/voice-scheduler';
+      final anonKey = _getSupabaseAnonKey();
+
+      final res = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${supabase.auth.currentSession?.accessToken ?? anonKey}',
+          'apikey': anonKey,
+        },
+        body: jsonEncode({
+          'audioBase64': base64Audio,
+          'mimeType': 'audio/webm',
+          'localTime': localTimeStr,
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['error'] != null) {
+          throw Exception(data['error'].toString());
+        }
+        result = Map<String, dynamic>.from(data);
+      } else {
+        throw Exception('HTTP ${res.statusCode}: ${res.body.isNotEmpty ? res.body : e}');
+      }
+    }
+
+    if (result.isEmpty || result['success'] != true) {
+      throw Exception('行程智慧解析與建立失敗');
+    }
+
+    return result;
+  }
+
+  /// 將 DateTime 格式化為帶有時區偏移量的 ISO 8601 字串
+  String _formatIso8601WithOffset(DateTime dateTime) {
+    final iso = dateTime.toIso8601String();
+    if (dateTime.isUtc) {
+      return iso.endsWith('Z') ? iso : '${iso}Z';
+    }
+    final offset = dateTime.timeZoneOffset;
+    final hours = offset.inHours.abs().toString().padLeft(2, '0');
+    final minutes = (offset.inMinutes.abs() % 60).toString().padLeft(2, '0');
+    final sign = offset.isNegative ? '-' : '+';
+    final base = iso.endsWith('Z') ? iso.substring(0, iso.length - 1) : iso;
+    return '$base$sign$hours:$minutes';
   }
 
   /// 取消目前錄音（不進行轉錄）
