@@ -15,6 +15,7 @@ import '../widgets/custom_toast.dart';
 import '../widgets/voice_recorder_widget.dart';
 import '../widgets/color_palette_picker.dart';
 import '../widgets/categorized_tag_accordion_selector.dart';
+import '../widgets/batch_import_customers_dialog.dart';
 
 class CustomerManagementTab extends StatefulWidget {
   final ValueChanged<String>? onMenuChanged;
@@ -29,6 +30,10 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   List<Map<String, dynamic>> _filteredCustomers = [];
   final _searchController = TextEditingController();
   bool _isLoading = false;
+
+  // Batch Selection State
+  bool _isSelectionMode = false;
+  Set<String> _selectedCustomerIds = {};
 
   // Initial Mock Data for Offline Mode
   final List<Map<String, dynamic>> _mockCustomers = [
@@ -446,10 +451,225 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     }
   }
 
-  // Show Project Creation Dialog
+  // Show Batch Delete Confirmation Dialog
+  void _confirmBatchDeleteCustomers() {
+    final count = _selectedCustomerIds.length;
+    if (count == 0) return;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 24),
+            const SizedBox(width: 10),
+            Text('確認批量移至垃圾桶', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          '您確定要把選取的 $count 筆客戶資料移至垃圾桶嗎？\n移至垃圾桶後，您仍可隨時前往垃圾桶進行復原。',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(context.l10n('cancel'), style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _executeBatchDelete();
+            },
+            child: Text('確認移至垃圾桶 ($count)'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Execute Batch Soft Delete
+  Future<void> _executeBatchDelete() async {
+    final idsToDelete = _selectedCustomerIds.toList();
+    final count = idsToDelete.length;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    if (isOfflineMode) {
+      final now = DateTime.now().toUtc().toIso8601String();
+      setState(() {
+        for (var id in idsToDelete) {
+          final idx = _allCustomers.indexWhere((c) => c['id'] == id);
+          if (idx != -1) {
+            _allCustomers[idx] = {
+              ..._allCustomers[idx],
+              'deleted_at': now,
+            };
+          }
+        }
+        _isSelectionMode = false;
+        _selectedCustomerIds.clear();
+        _isLoading = false;
+      });
+      _filterCustomers();
+      if (mounted) {
+        CustomToast.show(
+          context,
+          '🟢 成功將 $count 筆客戶移至垃圾桶 (離線暫存)',
+          ToastType.success,
+          actionLabel: context.l10n('trash_bin_goto'),
+          onActionPressed: () {
+            if (widget.onMenuChanged != null) {
+              widget.onMenuChanged!('垃圾桶');
+            }
+          },
+        );
+      }
+      return;
+    }
+
+    try {
+      final supabase = Supabase.instance.client;
+      final now = DateTime.now().toUtc().toIso8601String();
+      await supabase
+          .from('customers')
+          .update({'deleted_at': now})
+          .filter('id', 'in', idsToDelete);
+
+      setState(() {
+        _isSelectionMode = false;
+        _selectedCustomerIds.clear();
+      });
+
+      await _fetchCustomers();
+      if (mounted) {
+        CustomToast.show(
+          context,
+          '🟢 成功將 $count 筆客戶移至垃圾桶',
+          ToastType.success,
+          actionLabel: context.l10n('trash_bin_goto'),
+          onActionPressed: () {
+            if (widget.onMenuChanged != null) {
+              widget.onMenuChanged!('垃圾桶');
+            }
+          },
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        CustomToast.show(
+          context,
+          '🔴 批量刪除失敗: $e',
+          ToastType.error,
+        );
+      }
+    }
+  }
+
+  // Build Batch Selection Floating Control Bar
+  Widget _buildBatchSelectionBar(BuildContext context) {
+    final allFilteredCount = _filteredCustomers.length;
+    final selectedCount = _selectedCustomerIds.length;
+    final isAllSelected = selectedCount > 0 && selectedCount == allFilteredCount;
+    final primaryColor = AppSettings.instance.primaryColor;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF0EA5E9), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0EA5E9).withOpacity(0.2),
+            blurRadius: 15,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            value: isAllSelected,
+            onChanged: (val) {
+              setState(() {
+                if (val == true) {
+                  _selectedCustomerIds = _filteredCustomers.map((c) => c['id'].toString()).toSet();
+                } else {
+                  _selectedCustomerIds.clear();
+                }
+              });
+            },
+            activeColor: const Color(0xFF0EA5E9),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '全選 ($selectedCount / $allFilteredCount)',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: selectedCount == 0 ? null : _showCreateProjectDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            icon: const Icon(Icons.assignment_outlined, size: 18),
+            label: Text('建立專案 ($selectedCount)', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton.icon(
+            onPressed: selectedCount == 0 ? null : _confirmBatchDeleteCustomers,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: Text('移至垃圾桶 ($selectedCount)', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _isSelectionMode = false;
+                _selectedCustomerIds.clear();
+              });
+            },
+            icon: const Icon(Icons.close, color: Colors.white70),
+            tooltip: '退出多選',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Show Project Creation Dialog (Supports Multi-Selected or Filtered Customers)
   void _showCreateProjectDialog() {
-    if (_filteredCustomers.isEmpty) {
-      CustomToast.show(context, '目前無篩選客戶，請先搜尋或篩選出目標客群', ToastType.warning);
+    final targetCustomers = _selectedCustomerIds.isNotEmpty
+        ? _allCustomers.where((c) => _selectedCustomerIds.contains(c['id'].toString())).toList()
+        : _filteredCustomers;
+
+    if (targetCustomers.isEmpty) {
+      CustomToast.show(context, '目前未選取目標客戶，請先勾選或篩選客戶', ToastType.warning);
       return;
     }
 
@@ -527,8 +747,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
 
                   // 2. Save project checklist customers
                   final List<Map<String, dynamic>> projectCustomers = [];
-                  for (var i = 0; i < _filteredCustomers.length; i++) {
-                    final customer = _filteredCustomers[i];
+                  for (var i = 0; i < targetCustomers.length; i++) {
+                    final customer = targetCustomers[i];
                     projectCustomers.add({
                       'id': 'mock-vpc-${projectId}-$i',
                       'visit_project_id': projectId,
@@ -557,7 +777,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   await prefs.setString('offline_visit_project_customers', jsonEncode(localProjCustomers));
 
                   if (mounted) {
-                    CustomToast.show(context, '已成功建立「$title」拜訪專案 (離線暫存)', ToastType.success);
+                    setState(() {
+                      _isSelectionMode = false;
+                      _selectedCustomerIds.clear();
+                    });
+                    CustomToast.show(context, '已成功為 ${targetCustomers.length} 筆客戶建立「$title」拜訪專案 (離線暫存)', ToastType.success);
                     Navigator.pop(context);
                   }
                 } catch (e) {
@@ -588,7 +812,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                 final String projectId = projectResult['id'];
 
                 // 2. Insert into visit_project_customers
-                final List<Map<String, dynamic>> projectCustomers = _filteredCustomers.map((customer) {
+                final List<Map<String, dynamic>> projectCustomers = targetCustomers.map((customer) {
                   return {
                     'visit_project_id': projectId,
                     'customer_id': customer['id'],
@@ -599,7 +823,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                 await supabase.from('visit_project_customers').insert(projectCustomers);
 
                 if (mounted) {
-                  CustomToast.show(context, '已成功建立「$title」拜訪專案', ToastType.success);
+                  setState(() {
+                    _isSelectionMode = false;
+                    _selectedCustomerIds.clear();
+                  });
+                  CustomToast.show(context, '已成功為 ${targetCustomers.length} 筆客戶建立「$title」拜訪專案', ToastType.success);
                   Navigator.pop(context);
                 }
               } catch (e) {
@@ -1144,6 +1372,80 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     );
   }
 
+  // Show Batch Import CSV / Excel Dialog
+  void _showBatchImportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => BatchImportCustomersDialog(
+        existingCustomers: _allCustomers,
+        onImport: (importedList, duplicateStrategy) async {
+          int processedCount = 0;
+          for (var item in importedList) {
+            final name = item['name']?.toString() ?? '';
+            final phone = item['phone']?.toString() ?? '';
+            final nickname = item['nickname']?.toString() ?? '';
+            final email = item['email']?.toString() ?? '';
+            final tags = List<String>.from(item['tags'] ?? []);
+            final notes = item['notes']?.toString() ?? '';
+
+            final existingIdx = _allCustomers.indexWhere((c) =>
+                (phone.isNotEmpty && c['phone'] == phone) ||
+                (name.isNotEmpty && c['name'] == name));
+
+            if (existingIdx != -1) {
+              if (duplicateStrategy == 'skip') {
+                continue;
+              } else if (duplicateStrategy == 'overwrite') {
+                final existingId = _allCustomers[existingIdx]['id'];
+                if (isOfflineMode) {
+                  _allCustomers[existingIdx] = {
+                    ..._allCustomers[existingIdx],
+                    'name': name,
+                    'nickname': nickname.isNotEmpty ? nickname : _allCustomers[existingIdx]['nickname'],
+                    'phone': phone.isNotEmpty ? phone : _allCustomers[existingIdx]['phone'],
+                    'email': email.isNotEmpty ? email : _allCustomers[existingIdx]['email'],
+                    'tags': tags.isNotEmpty ? tags : _allCustomers[existingIdx]['tags'],
+                    'notes': notes.isNotEmpty ? notes : _allCustomers[existingIdx]['notes'],
+                  };
+                } else {
+                  try {
+                    await Supabase.instance.client.from('customers').update({
+                      'name': name,
+                      'nickname': nickname,
+                      'phone': phone,
+                      'email': email,
+                      'tags': tags,
+                      'notes': notes,
+                    }).eq('id', existingId);
+                  } catch (_) {}
+                }
+                processedCount++;
+                continue;
+              }
+            }
+
+            await _createCustomer(
+              name: name,
+              nickname: nickname,
+              avatarUrl: '',
+              phone: phone,
+              email: email,
+              tags: tags,
+              notes: notes,
+              isImageCleared: false,
+            );
+            processedCount++;
+          }
+
+          await _fetchCustomers();
+          if (mounted) {
+            CustomToast.show(context, '成功匯入並處理 $processedCount 筆客戶資料', ToastType.success);
+          }
+        },
+      ),
+    );
+  }
+
   // Show Share & Export Micro-Animation Modal
   void _showShareExportModal() {
     final primaryColor = AppSettings.instance.primaryColor;
@@ -1316,15 +1618,35 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
               ),
               const SizedBox(width: 12),
               OutlinedButton.icon(
-                onPressed: _showCreateProjectDialog,
+                onPressed: _showBatchImportDialog,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: primaryColor,
                   side: BorderSide(color: primaryColor, width: 1.5),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 ),
-                icon: const Icon(Icons.assignment_outlined, size: 20),
-                label: Text(context.l10n('create_project'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.file_upload_outlined, size: 20),
+                label: const Text('批次匯入 📥', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isSelectionMode = !_isSelectionMode;
+                    if (!_isSelectionMode) {
+                      _selectedCustomerIds.clear();
+                    }
+                  });
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _isSelectionMode ? const Color(0xFF38BDF8) : primaryColor,
+                  side: BorderSide(color: _isSelectionMode ? const Color(0xFF0EA5E9) : primaryColor, width: 1.5),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  backgroundColor: _isSelectionMode ? const Color(0xFF0EA5E9).withOpacity(0.15) : Colors.transparent,
+                ),
+                icon: Icon(_isSelectionMode ? Icons.check_box_outlined : Icons.checklist_outlined, size: 20),
+                label: Text(_isSelectionMode ? '結束多選 ✖' : '批量管理 📋', style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(
@@ -1343,6 +1665,8 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           ),
           
           const SizedBox(height: 24),
+
+          if (_isSelectionMode) _buildBatchSelectionBar(context),
           
           // Customer Grid/List Area
           Expanded(
@@ -1389,16 +1713,74 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       itemCount: _filteredCustomers.length,
       itemBuilder: (context, index) {
         final customer = _filteredCustomers[index];
+        final id = customer['id'].toString();
+        final isSelected = _selectedCustomerIds.contains(id);
+
+        Widget cardWidget = HoverAnimatedCard(
+          child: FlippingCustomerCard(
+            customer: customer,
+            onEdit: () => _showCustomerForm(customer: customer),
+            onDelete: () => _showDeleteConfirm(customer['id'], customer['name'] ?? ''),
+            onZoom: () => _showCustomerZoomDetails(customer),
+          ),
+        );
+
+        if (_isSelectionMode) {
+          cardWidget = Stack(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF0EA5E9) : Colors.transparent,
+                    width: 3,
+                  ),
+                ),
+                child: IgnorePointer(
+                  child: cardWidget,
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF0EA5E9) : const Color(0xFF1E293B).withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: Icon(
+                      isSelected ? Icons.check : Icons.circle_outlined,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    setState(() {
+                      if (_selectedCustomerIds.contains(id)) {
+                        _selectedCustomerIds.remove(id);
+                      } else {
+                        _selectedCustomerIds.add(id);
+                      }
+                    });
+                  },
+                ),
+              ),
+            ],
+          );
+        }
+
         return StaggeredFadeIn(
           index: index,
-          child: HoverAnimatedCard(
-            child: FlippingCustomerCard(
-              customer: customer,
-              onEdit: () => _showCustomerForm(customer: customer),
-              onDelete: () => _showDeleteConfirm(customer['id'], customer['name'] ?? ''),
-              onZoom: () => _showCustomerZoomDetails(customer),
-            ),
-          ),
+          child: cardWidget,
         );
       },
     );
@@ -1528,7 +1910,24 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
             width: 180,
             child: Row(
               children: [
-                CircleAvatar(
+                if (_isSelectionMode) ...[
+            Checkbox(
+              value: _selectedCustomerIds.contains(customer['id'].toString()),
+              onChanged: (val) {
+                setState(() {
+                  final id = customer['id'].toString();
+                  if (val == true) {
+                    _selectedCustomerIds.add(id);
+                  } else {
+                    _selectedCustomerIds.remove(id);
+                  }
+                });
+              },
+              activeColor: const Color(0xFF0EA5E9),
+            ),
+            const SizedBox(width: 8),
+          ],
+          CircleAvatar(
                   backgroundColor: primaryColor.withOpacity(0.12),
                   radius: 20,
                   backgroundImage: _getAvatarProvider(avatarUrl),
