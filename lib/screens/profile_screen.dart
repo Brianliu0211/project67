@@ -10,6 +10,7 @@ import '../services/app_localizations.dart';
 import 'customer_management_tab.dart'; // To use CustomToast
 import '../widgets/custom_toast.dart';
 import '../widgets/animations.dart';
+import '../widgets/reset_password_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onProfileUpdated;
@@ -551,6 +552,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
               maxLines: 3,
               style: TextStyle(color: textColor),
               decoration: buildInputDecoration(context.l10n('profile_bio_hint'), Icons.info_outline_rounded),
+            ),
+            
+            const SizedBox(height: 24),
+
+            // Section 3: Password & Security
+            Row(
+              children: [
+                Icon(Icons.shield_outlined, color: primaryColor, size: 20),
+                const SizedBox(width: 8),
+                Text(context.l10n('change_password_title'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: primaryColor.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '帳號安全防護',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '定期更新您的個人密碼以確保客戶 CRM 與行程資料之安全',
+                          style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => const ResetPasswordDialog(),
+                      );
+                    },
+                    icon: const Icon(Icons.key_rounded, size: 16),
+                    label: Text(context.l10n('change_password_btn')),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
             ),
             
             const SizedBox(height: 32),
