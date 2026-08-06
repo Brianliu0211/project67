@@ -14,7 +14,7 @@ jobs:
         run: |
           echo "Sending POST request to fetch-insurance-news Edge Function..."
           response=$(curl -s -w "\n%{http_code}" -X POST \
-            "https://pujyffedmsqlyiikytli.supabase.co/functions/v1/fetch-insurance-news" \
+            "https://algufuoxkeizxwkofmmp.supabase.co/functions/v1/fetch-insurance-news" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}")
           
