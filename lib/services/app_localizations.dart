@@ -127,6 +127,7 @@ class AppLocalizations {
       'profile_save_success_offline': '成功儲存變更 (離線暫存)',
       'profile_save_success': '個人資料已更新',
       'profile_save_failed': '儲存個人資料失敗',
+      'change_password_title': '變更密碼 / 安全設定',
       'profile_avatar_upload_failed': '頭像上傳失敗',
       'profile_load_failed': '載入個人資料失敗',
       'customer_clear_photo': '清除照片',

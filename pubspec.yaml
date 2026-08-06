@@ -50,6 +50,16 @@ dependencies:
   # Voice recording for voice memos (cross-platform including Web)
   record: ^5.2.0
 
+  # File picker for CSV/Excel batch import & export
+  file_picker: ^8.0.0
+
+  # Drag and drop file support (Web & Desktop)
+  desktop_drop: ^0.4.4
+
+  # CSV & Excel parsing and generation
+  csv: ^6.0.0
+  excel: ^4.0.0
+
   # Internationalization support
   flutter_localizations:
     sdk: flutter

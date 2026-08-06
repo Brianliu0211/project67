@@ -698,10 +698,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-              Text(
-                context.l10n('client_helper_v'),
-                style: TextStyle(color: subTextColor, fontSize: 12),
-              ),
             ],
           )
         ],

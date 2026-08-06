@@ -25,7 +25,7 @@ class CustomToast extends StatefulWidget {
     String? actionLabel,
     VoidCallback? onActionPressed,
   }) {
-    late OverlayEntry overlayEntry;
+    OverlayEntry? overlayEntry;
     overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
         bottom: 24,
@@ -38,12 +38,15 @@ class CustomToast extends StatefulWidget {
           actionLabel: actionLabel,
           onActionPressed: onActionPressed,
           onDismiss: () {
-            overlayEntry.remove();
+            try {
+              overlayEntry?.remove();
+              overlayEntry = null;
+            } catch (_) {}
           },
         ),
       ),
     );
-    Overlay.of(context).insert(overlayEntry);
+    Overlay.of(context).insert(overlayEntry!);
   }
 
   @override
