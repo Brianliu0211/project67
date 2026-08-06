@@ -86,6 +86,22 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _appendEmailDomain(String domain) {
+    final currentText = _emailController.text.trim();
+    if (currentText.isEmpty) {
+      _emailController.text = domain;
+    } else if (currentText.contains('@')) {
+      final prefix = currentText.split('@')[0];
+      _emailController.text = '$prefix$domain';
+    } else {
+      _emailController.text = '$currentText$domain';
+    }
+    _emailController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _emailController.text.length),
+    );
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -191,13 +207,105 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const SizedBox(height: 16),
                               ],
 
+                              // Email Input Label & Quick Domain Selector
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    '電子信箱',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  PopupMenuButton<String>(
+                                    onSelected: _appendEmailDomain,
+                                    tooltip: '快速套用常用電子信箱網域',
+                                    offset: const Offset(0, 32),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    color: const Color(0xFF1E293B),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF00ADB5).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: const Color(0xFF00ADB5).withOpacity(0.3),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.alternate_email_rounded, size: 14, color: Color(0xFF00ADB5)),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            '常用信箱網域 ▾',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF00ADB5),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                      const PopupMenuItem<String>(
+                                        value: '@gmail.com',
+                                        child: Row(
+                                          children: [
+                                            Text('🌐 ', style: TextStyle(fontSize: 14)),
+                                            Text('Google ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                            Text('(@gmail.com)', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem<String>(
+                                        value: '@yahoo.com.tw',
+                                        child: Row(
+                                          children: [
+                                            Text('✉️ ', style: TextStyle(fontSize: 14)),
+                                            Text('Yahoo 台灣 ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                            Text('(@yahoo.com.tw)', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem<String>(
+                                        value: '@outlook.com',
+                                        child: Row(
+                                          children: [
+                                            Text('💼 ', style: TextStyle(fontSize: 14)),
+                                            Text('Outlook / Hotmail ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                            Text('(@outlook.com)', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem<String>(
+                                        value: '@icloud.com',
+                                        child: Row(
+                                          children: [
+                                            Text('🍏 ', style: TextStyle(fontSize: 14)),
+                                            Text('Apple iCloud ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                            Text('(@icloud.com)', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+
                               // Email Input
                               TextFormField(
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
-                                  labelText: 'Email',
+                                  hintText: '請輸入 Email 帳號',
                                   prefixIcon: Icon(Icons.email_outlined),
                                   border: OutlineInputBorder(),
                                 ),
@@ -239,6 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 },
                               ),
                               if (!_isSignUp) ...[
+                                const SizedBox(height: 12),
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton(
@@ -251,7 +360,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       );
                                     },
                                     style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                       minimumSize: Size.zero,
                                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
@@ -260,12 +369,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                       style: TextStyle(
                                         color: Color(0xFF00ADB5),
                                         fontSize: 13,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
                                 ),
                               ],
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
                               
                               // Submit Button
                               ElevatedButton(

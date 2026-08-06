@@ -53,10 +53,15 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
     try {
       final email = _emailController.text.trim();
       
-      // Determine dynamic redirect URL for Web/App
+      // Determine dynamic redirect URL for Web/App (預設引導至 port 8080)
       String? redirectTo;
       if (kIsWeb) {
-        redirectTo = Uri.base.origin;
+        final origin = Uri.base.origin;
+        redirectTo = (origin.contains('localhost') && !origin.contains(':8080'))
+            ? 'http://localhost:8080'
+            : origin;
+      } else {
+        redirectTo = 'http://localhost:8080';
       }
 
       await Supabase.instance.client.auth.resetPasswordForEmail(
@@ -146,21 +151,21 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _handleSendResetLink(),
             style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              labelStyle: TextStyle(color: Colors.white60),
-              prefixIcon: Icon(Icons.email_outlined, color: Color(0xFF00ADB5)),
-              border: OutlineInputBorder(),
-              focusedBorder: OutlineInputBorder(
+            decoration: InputDecoration(
+              labelText: context.l10n('email_label'),
+              labelStyle: const TextStyle(color: Colors.white60),
+              prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF00ADB5)),
+              border: const OutlineInputBorder(),
+              focusedBorder: const OutlineInputBorder(
                 borderSide: BorderSide(color: Color(0xFF00ADB5), width: 2),
               ),
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return '請輸入 Email';
+                return context.l10n('enter_email_hint');
               }
               if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
-                return '請輸入有效的 Email 格式';
+                return context.l10n('enter_valid_email_hint');
               }
               return null;
             },
