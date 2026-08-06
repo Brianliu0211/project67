@@ -1,0 +1,32 @@
+name: 📰 Daily Insurance News Crawler & AI Summarizer
+
+on:
+  schedule:
+    # 台灣時間 一天兩更：早上 06:00 (UTC 22:00) 晨報 與 傍晚 18:00 (UTC 10:00) 夕報
+    - cron: '0 10,22 * * *'
+  workflow_dispatch: # 支援手動於 GitHub 點擊 Trigger 測試
+
+jobs:
+  fetch-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚀 Trigger Supabase Edge Function (fetch-insurance-news)
+        run: |
+          echo "Sending POST request to fetch-insurance-news Edge Function..."
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://pujyffedmsqlyiikytli.supabase.co/functions/v1/fetch-insurance-news" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}")
+          
+          http_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "HTTP Response Code: $http_code"
+          echo "Response Body: $body"
+          
+          if [ "$http_code" -ne 200 ]; then
+            echo "❌ Error: Edge Function failed with status $http_code"
+            exit 1
+          fi
+          
+          echo "✅ Successfully fetched and updated daily insurance news!"

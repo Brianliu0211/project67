@@ -630,3 +630,54 @@ CREATE POLICY "Users can update their own schedule_events" ON public.schedule_ev
 
 CREATE POLICY "Users can delete their own schedule_events" ON public.schedule_events
     FOR DELETE TO authenticated USING (auth.uid() = profile_id);
+
+-- =============================================================
+-- 8. Insurance News Topics & Articles Table (Phase 7)
+-- =============================================================
+
+-- Insurance News Topics Table
+CREATE TABLE IF NOT EXISTS public.insurance_news_topics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    topic_title TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT '保險焦點',
+    main_image_url TEXT,
+    ai_summary TEXT NOT NULL,
+    daily_trend TEXT,        -- 當日全網總體產業趨勢的一句話
+    daily_overview TEXT,     -- 當日新聞整合摘要文章
+    publish_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Insurance News Articles Table
+CREATE TABLE IF NOT EXISTS public.insurance_news_articles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    topic_id UUID NOT NULL REFERENCES public.insurance_news_topics(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    article_summary TEXT,    -- 單篇新聞 AI 重點摘要
+    published_at TIMESTAMPTZ,
+    is_primary BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_insurance_news_topics_date ON public.insurance_news_topics(publish_date DESC);
+CREATE INDEX IF NOT EXISTS idx_insurance_news_articles_topic_id ON public.insurance_news_articles(topic_id);
+
+-- Enable RLS
+ALTER TABLE public.insurance_news_topics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.insurance_news_articles ENABLE ROW LEVEL SECURITY;
+
+-- Public RLS Policies (Read Access)
+DROP POLICY IF EXISTS "Allow public read access for insurance_news_topics" ON public.insurance_news_topics;
+CREATE POLICY "Allow public read access for insurance_news_topics"
+    ON public.insurance_news_topics FOR SELECT
+    TO public
+    USING (true);
+
+DROP POLICY IF EXISTS "Allow public read access for insurance_news_articles" ON public.insurance_news_articles;
+CREATE POLICY "Allow public read access for insurance_news_articles"
+    ON public.insurance_news_articles FOR SELECT
+    TO public
+    USING (true);
+
