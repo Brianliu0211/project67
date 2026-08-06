@@ -225,6 +225,16 @@ serve(async (req) => {
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const todayDate = new Date().toISOString().split('T')[0];
 
+    // 每次寫入前先自動清除當天先前的舊記錄，避免多次點擊 Workflow 導致資料庫累積重複話題卡片
+    const { error: delErr } = await supabaseClient
+      .from('insurance_news_topics')
+      .delete()
+      .eq('publish_date', todayDate);
+
+    if (delErr) {
+      console.warn('清除當日舊新聞記錄時提示:', delErr);
+    }
+
     let insertedTopicCount = 0;
     let insertedArticleCount = 0;
 

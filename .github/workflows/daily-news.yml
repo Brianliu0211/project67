@@ -11,12 +11,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 🚀 Trigger Supabase Edge Function (fetch-insurance-news)
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           echo "Sending POST request to fetch-insurance-news Edge Function..."
-          response=$(curl -s -w "\n%{http_code}" -X POST \
-            "https://algufuoxkeizxwkofmmp.supabase.co/functions/v1/fetch-insurance-news" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}")
+          
+          if [ -n "$SERVICE_KEY" ]; then
+            response=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://algufuoxkeizxwkofmmp.supabase.co/functions/v1/fetch-insurance-news" \
+              -H "Content-Type: application/json" \
+              -H "apikey: $SERVICE_KEY" \
+              -H "Authorization: Bearer $SERVICE_KEY")
+          else
+            response=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://algufuoxkeizxwkofmmp.supabase.co/functions/v1/fetch-insurance-news" \
+              -H "Content-Type: application/json")
+          fi
           
           http_code=$(echo "$response" | tail -n 1)
           body=$(echo "$response" | sed '$d')
