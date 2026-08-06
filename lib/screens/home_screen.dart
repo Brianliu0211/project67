@@ -16,6 +16,7 @@ import 'visit_projects_tab.dart';
 import 'settings_screen.dart';
 import 'profile_screen.dart';
 import 'trash_bin_screen.dart';
+import 'insurance_news_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -482,6 +483,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   children: [
                     _buildSidebarItem(Icons.calendar_today_outlined, '今日行程', isDark, primaryColor),
+                    _buildSidebarItem(Icons.newspaper_outlined, '新聞頭條', isDark, primaryColor),
                     _buildSidebarItem(Icons.people_outline, '客戶管理', isDark, primaryColor),
                     _buildSidebarItem(Icons.assignment_outlined, '專案拜訪', isDark, primaryColor),
                     _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
@@ -574,23 +576,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: _activeMenu == '今日行程'
                       ? _buildScheduleView(isWideScreen, isDark, textColor, subTextColor, borderColor, primaryColor)
-                      : _activeMenu == '客戶管理'
-                          ? CustomerManagementTab(
-                              onMenuChanged: (menu) {
-                                setState(() {
-                                  _activeMenu = menu;
-                                });
-                              },
-                            )
-                          : _activeMenu == '專案拜訪'
-                              ? const VisitProjectsTab()
-                              : _activeMenu == '個人帳號'
-                                  ? ProfileScreen(onProfileUpdated: _loadUserProfile)
-                                  : _activeMenu == '垃圾桶'
-                                      ? const TrashBinScreen()
-                                  : _activeMenu == '系統設定'
-                                      ? const SettingsScreen()
-                                      : _buildFallbackScreen(),
+                      : _activeMenu == '新聞頭條'
+                          ? const InsuranceNewsTab()
+                          : _activeMenu == '客戶管理'
+                              ? CustomerManagementTab(
+                                  onMenuChanged: (menu) {
+                                    setState(() {
+                                      _activeMenu = menu;
+                                    });
+                                  },
+                                )
+                              : _activeMenu == '專案拜訪'
+                                  ? const VisitProjectsTab()
+                                  : _activeMenu == '個人帳號'
+                                      ? ProfileScreen(onProfileUpdated: _loadUserProfile)
+                                      : _activeMenu == '垃圾桶'
+                                          ? const TrashBinScreen()
+                                      : _activeMenu == '系統設定'
+                                          ? const SettingsScreen()
+                                          : _buildFallbackScreen(),
                 ),
               ],
             ),
