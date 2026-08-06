@@ -161,5 +161,18 @@
   "pv_confirm_create": "Confirm Create",
   "voice_note_idle_hint": "Tap record, AI transcribes to notes",
   "voice_note_record_btn": "Record",
-  "voice_note_recording": "Recording"
+  "voice_note_recording": "Recording",
+  "forgot_password_btn": "Forgot password?",
+  "forgot_password_title": "Reset Password",
+  "forgot_password_desc": "Enter your registered email address to receive a password reset link.",
+  "send_reset_link": "Send Reset Link",
+  "reset_link_sent_title": "Reset Link Sent",
+  "reset_link_sent_desc": "A password reset link has been sent to your email. Please check your inbox and click the link.",
+  "reset_password_title": "Set New Password",
+  "new_password_label": "New Password (min. 6 characters)",
+  "confirm_new_password_label": "Confirm New Password",
+  "passwords_do_not_match": "Passwords do not match",
+  "password_reset_success": "Password reset successfully!",
+  "change_password_title": "Password & Security",
+  "change_password_btn": "Change Password"
 }
