@@ -218,6 +218,24 @@ class AppLocalizations {
       'voice_note_idle_hint': '點擊錄音，AI 自動轉為文字備註',
       'voice_note_record_btn': '錄音',
       'voice_note_recording': '錄音中',
+
+      // Forgot Password & Reset Password
+      'forgot_password_btn': '忘記密碼？',
+      'forgot_password_title': '重設密碼',
+      'forgot_password_desc': '請輸入您的註冊 Email，我們將發送重設密碼連結至您的信箱。',
+      'send_reset_link': '發送重設連結',
+      'reset_link_sent_title': '驗證信件已寄出',
+      'reset_link_sent_desc': '重設密碼連結已發送，請至您的電子信箱查收並點擊連結進行密碼重設。',
+      'reset_password_title': '設定新密碼',
+      'new_password_label': '新密碼 (至少 6 個字元)',
+      'confirm_new_password_label': '確認新密碼',
+      'passwords_do_not_match': '兩次輸入的密碼不一致',
+      'password_reset_success': '密碼重設成功！',
+      'change_password_title': '帳號密碼與安全',
+      'change_password_btn': '更換密碼',
+      'email_label': '電子信箱 (Email)',
+      'enter_email_hint': '請輸入 Email',
+      'enter_valid_email_hint': '請輸入有效的 Email 格式',
     },
     'en': {
       'app_title': 'Insurance Customer Assistant',
@@ -422,6 +440,24 @@ class AppLocalizations {
       'voice_note_idle_hint': 'Tap record, AI transcribes to notes',
       'voice_note_record_btn': 'Record',
       'voice_note_recording': 'Recording',
+
+      // Forgot Password & Reset Password
+      'forgot_password_btn': 'Forgot Password?',
+      'forgot_password_title': 'Reset Password',
+      'forgot_password_desc': 'Please enter your registered Email address. We will send a password reset link to your inbox.',
+      'send_reset_link': 'Send Reset Link',
+      'reset_link_sent_title': 'Verification Email Sent',
+      'reset_link_sent_desc': 'Password reset link has been sent. Please check your inbox and click the link to reset your password.',
+      'reset_password_title': 'Set New Password',
+      'new_password_label': 'New Password (min 6 characters)',
+      'confirm_new_password_label': 'Confirm New Password',
+      'passwords_do_not_match': 'Passwords do not match',
+      'password_reset_success': 'Password reset successful!',
+      'change_password_title': 'Account Password & Security',
+      'change_password_btn': 'Change Password',
+      'email_label': 'Email Address',
+      'enter_email_hint': 'Please enter your Email',
+      'enter_valid_email_hint': 'Please enter a valid Email address',
     }
   };
 
