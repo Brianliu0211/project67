@@ -196,8 +196,16 @@ class _InsuranceNewsTabState extends State<InsuranceNewsTab> {
             .map((json) => InsuranceNewsTopic.fromJson(json))
             .toList();
 
+        // 依據話題標題進行前端去重防護，確保不重複顯示相同話題卡片
+        final Map<String, InsuranceNewsTopic> uniqueTopicMap = {};
+        for (var topic in loadedTopics) {
+          if (!uniqueTopicMap.containsKey(topic.topicTitle.trim())) {
+            uniqueTopicMap[topic.topicTitle.trim()] = topic;
+          }
+        }
+
         setState(() {
-          _topics = loadedTopics;
+          _topics = uniqueTopicMap.values.toList();
           _isLoading = false;
         });
         return;
