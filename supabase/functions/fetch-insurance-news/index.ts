@@ -169,11 +169,18 @@ serve(async (req) => {
   try {
     console.log('[fetch-insurance-news] 開始抓取多源 RSS 新聞 (包含 Google News, 金管會, 金融新聞)...');
 
-    // 多源 RSS 抓取頻道
+    // 多源 RSS 抓取頻道 (雙軌聚合：Google News 引擎 + 權威媒體原生 RSS)
     const rssUrls = [
+      // 軌道一：Google News 深度主題聚合 RSS
       'https://news.google.com/rss/search?q=%E4%BF%9D%E9%9A%AA+OR+%E5%A3%BD%E4%BF%9D+OR+%E7%94%A2%E4%BF%9D&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
       'https://news.google.com/rss/search?q=%E9%87%91%E7%AE%A1%E6%9C%83+%E4%BF%9D%E9%9A%AA%E5%B1%80&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
       'https://news.google.com/rss/search?q=%E9%87%91%E8%9E%8D+%E4%BF%9D%E9%9A%AA%E5%85%AC%E6%9C%83&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
+
+      // 軌道二：國內權威財經與新聞媒體原生 RSS
+      'https://www.cna.com.tw/cna2010/market/rss.xml',       // 中央通訊社 (CNA) 財經新聞 RSS
+      'https://news.cnyes.com/rss/pref/news/cat/tw_macro',    // 鉅亨網 (Anue) 台灣總體經濟與金融 RSS
+      'https://ctee.com.tw/feed',                            // 工商時報 (CTEE) 產經理財 RSS
+      'https://udn.com/rss/news/2/6645',                     // 聯合新聞網 (UDN) 保險與理財 RSS
     ];
 
     let allRssItems: RSSItem[] = [];
