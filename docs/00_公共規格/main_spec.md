@@ -65,6 +65,64 @@
 ### 6. 提醒與紀錄表 (`public.reminders`)
 - **用途**: 儲存語音錄音轉錄文字與 Gemini 結構化分析摘要。
 
+### 7. 保險新聞與主題聚類表 (`public.insurance_news_topics` & `public.insurance_news_articles`)
+- **用途**: 提供 Phase 7 每日產業頭條與 Google News 風格主題聚類新聞系統。
+- **關鍵欄位**:
+  - `insurance_news_topics`: `id`, `topic_title`, `daily_trend` (總體趨勢), `daily_overview` (綜合文章), `published_at`
+  - `insurance_news_articles`: `id`, `topic_id`, `article_title`, `source_name`, `article_url`, `article_summary`
+- **RLS 策略**: `public` 唯讀，僅由 `service_role` Edge Function 進行定時寫入與更新。
+
+---
+
+## 🧱 專案五大核心功能模組 (5 Core Modules Architecture)
+
+主系統功能劃分為五大模組，所有開發人員與 AI 助理於撰寫新程式碼時，**必須依此邊界維護與對齊**：
+
+### 1. 模組一：身分驗證、帳號連線與安全管理 (Auth, Accounts & Security)
+- **範圍**: Supabase Auth 登入/註冊、忘記密碼、個人檔案管理、開發者 RBAC 角色 (`admin` / `dev` / `agent`) 與第三方連線 (Google OAuth / LINE Login)。
+- ** UI 排版**: 側邊欄將「個人帳號 👤」置於頂點快捷區，管理性質之「垃圾桶 🗑️」獨立放置於底欄。
+
+### 2. 模組二：客戶資產與名片庫 (Customers & CRM)
+- **範圍**: 客戶 3D 翻轉卡片、綽號與照片上傳、詳情檢視彈窗、拜訪專案 Checklist、客戶批次匯入/匯出 (vCard/.vcf) 與數位名片 Master Studio。
+
+### 3. 模組三：語音助理與 AI 語意分析 (Voice & Gemini AI)
+- **範圍**: 語音轉錄 (`visit_logs`)、Gemini 需求提取、`voice-scheduler` Edge Function (Groq Whisper + Llama 3.3 70B 語音排程與三燈分流)，以及 **Make.com + LINE 官方帳號 (音雪倫斯．艾希斯坦 / 🥕 AI 客服) 雙軌自動化客服**。
+
+### 4. 模組四：排程、日曆與戰情中樞 (Calendar & Operations)
+- **範圍**: 行事曆「月網格」與「日時間軸 Side-by-Side 重疊並排演算法」雙視圖、`schedule_events` 表，以及 **「保經/業務員客戶線上預約系統」** (空閒時段開放、行程自動遮蔽、CRM 客戶掛載、多公司保單健診/理賠諮詢/新保單規劃預約分類與團隊派單)。
+
+### 5. 模組五：系統個性化、情報與多國語系 (Preferences, i18n & Insights)
+- **範圍**: 系統主題色與檢視模式設定、全站 i18n 語系檔 (`app_zh.arb` / `app_en.arb`) 徹底對齊、動態標籤管理器與 16 色選擇器，以及 Phase 7 保險新聞主題聚類 (含跨平台 `url_launcher` 外連修復)。
+
+---
+
+## 🤖 AI 語意與自動化客服服務 (AI Engine & Microservices)
+
+### 1. 核心 AI 引擎與語音服務
+- **Gemini API**: 客戶備註語義萃取、需求提取與標籤自動對齊。
+- **Groq Llama 3.3 70B & Whisper STT**: 
+  - 語音行程排程 (`voice-scheduler` Edge Function): 實現語音轉文字、客戶稱謂去除與三燈防呆機制。
+  - 新聞主題聚類 (`fetch-insurance-news` Edge Function): 兩階段 AI 聚類與 2~3 句重點摘要。
+
+### 2. LINE 官方帳號與 Make.com AI 客服系統
+- **官方帳號角色**: 「音雪倫斯．艾希斯坦」 / 🥕 AI 客服。
+- **雙軌路由分流機制 (Hybrid AI Router)**:
+  - **1st 支線 (固定選單秒回線)**: 點擊「新手教學」繞過 AI Agent，0.1~0.4 秒極速秒回 (0 Token 消耗)。
+  - **2nd 支線 (AI 大腦思考線)**: 自然語言問答由 Make AI Agent 思考與檢索。
+- **即時體驗與防護**:
+  - **LINE 打字中動畫 API**: 調用 `POST https://api.line.me/v2/bot/chat/loading`，消解 2 秒思考焦慮。
+  - **Error Handler 與 Gmail 警報**: 點數用盡時觸發溫馨備援訊息，並自動寄送 HTML 警報信至 `brain2013bb@gmail.com`。
+- **圖文選單 (Rich Menu 4格版型)**: 整合帳號註冊、新手教學、Google 意見回饋表單與專人客服寫入。
+
+---
+
+## ⏱️ 定時排程與 Edge Functions
+
+- **`voice-scheduler` (Edge Function)**: 處理全螢幕磨砂玻璃 UI 傳送之語音音訊，回傳 JSON 與三燈號 (`status` / `warning_messages`)。
+- **`fetch-insurance-news` (Edge Function)**: 聚合 Google News 及 7 大保險 RSS，執行 Groq AI 摘要並寫入資料庫。
+- **`daily-news.yml` (GitHub Actions)**: 定時 Cron 排程（台灣時間 06:00 與 18:00 一日兩更）自動觸發 `fetch-insurance-news`。
+- **`pg_cron` (Supabase Cron)**: 每日自動實體刪除逾 30 天之垃圾桶軟刪除紀錄 (`deleted_at`)。
+
 ---
 
 ## 🗑️ 資料垃圾桶與 30 天自動清理機制
@@ -102,6 +160,7 @@
   - 全站放棄傳統 Material 外突刻痕舊框線，統一使用 **現代圓角外框 (`BorderRadius.circular(12)`)**。
   - 每個輸入框皆需配置前綴 Icon 引導（如：`Icons.person_outline`、`Icons.calendar_today`）。
   - Focus 時高亮為品牌主色 (`0xFF10B981` / `0xFF0369A1`)，邊框加寬至 `1.5 - 2.0`。
+- **行動版 RWD 與 Web App 防護**: 窄螢幕 (`< 600px`) 下輸入框與內距調整，全站頁面必須包覆 `SafeArea` 防止 Web App 手機瀏覽器上方網址列與下方導覽列裁切。
 
 ### 3. 按鈕視覺階層 (Action Button Hierarchy)
 - **主要動作按鈕 (Primary Action Button - 儲存/新增/確定)**:
