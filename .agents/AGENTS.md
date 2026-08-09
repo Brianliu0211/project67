@@ -43,12 +43,16 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 - **Rule**: When the user says **「收工」**, you **MUST** automatically perform the following actions in order:
 
 ### Actions
-1. **撰寫開發日誌**: Create a new development log in [docs/03_開發日誌/](docs/03_開發日誌/) following the established specification, documenting all technical changes made during the current session.
-2. **更新進度表**: Review and update [進度.md](docs/進度.md) — check off (`[x]`) any completed items, and process the Incubator/Backlog promotion if applicable.
-3. **產出 Git Commit 訊息**: Generate a ready-to-paste **Summary** and **Description** for GitHub Desktop, strictly following the conventions defined in [Git提交訊息規範.md](docs/00_公共規格/Git提交訊息規範.md).
-4. **智慧提交分流引導 (Fast-Track vs Standard PR)**：
+1. **檢查與自動修復 Git 分支狀態 (Branch Safeguard)**：
+   - 檢查當前本機 Git 分支。若包含程式碼變更且發現**未位於標準特徵分支**（例如位於 `main` 主線，或位於自動產生的非標準分支名稱）：
+   - 自動依開發者身分 (蘿蔔 lobo / 巨獸 beast) 生成標準分支名稱 `feature/username-featurename`（如 `feature/lobo-email-auth-fix`）。
+   - 主動在背景執行分支重命名/切換（`git branch -m <branch-name>`），防止將程式碼提交至 `main` 或異常分支名稱。
+2. **撰寫開發日誌**: Create a new development log in [docs/03_開發日誌/](docs/03_開發日誌/) following the established specification, documenting all technical changes made during the current session.
+3. **更新進度表**: Review and update [進度.md](docs/進度.md) — check off (`[x]`) any completed items, and process the Incubator/Backlog promotion if applicable.
+4. **產出 Git Commit 訊息與分支指引**: Generate a ready-to-paste **Summary** and **Description** for GitHub Desktop, strictly following the conventions defined in [Git提交訊息規範.md](docs/00_公共規格/Git提交訊息規範.md)，並**明確輸出對應的特徵分支名稱**。
+5. **智慧提交分流引導 (Fast-Track vs Standard PR)**：
    - **純文件修訂 (Fast-Track 快速通道)**：若本次變更僅包含 `docs/` 或 `.md` 文件（未修改 `lib/` 或程式碼），直接引導在 GitHub Desktop 提交並推送至 `main` 主線分支。
-   - **程式碼修訂 (Standard PR 流程)**：若本次包含程式碼變更，引導透過 GitHub Desktop 將特徵分支推送至遠端、建立 PR 並進行 Merge。
+   - **程式碼修訂 (Standard PR 流程)**：若本次包含程式碼變更，引導透過 GitHub Desktop 將該特徵分支推送至遠端、建立 PR 並進行 Merge。
 
 ---
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
@@ -48,9 +49,20 @@ class _LoginScreenState extends State<LoginScreen> {
       final supabase = Supabase.instance.client;
       if (_isSignUp) {
         // Sign up
+        String? redirectTo;
+        if (kIsWeb) {
+          final origin = Uri.base.origin;
+          redirectTo = (origin.contains('localhost') && !origin.contains(':8080'))
+              ? 'http://localhost:8080'
+              : origin;
+        } else {
+          redirectTo = 'http://localhost:8080';
+        }
+
         await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
+          emailRedirectTo: redirectTo,
           data: {
             'full_name': _nameController.text.trim(),
           },
