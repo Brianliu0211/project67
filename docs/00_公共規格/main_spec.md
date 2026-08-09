@@ -79,8 +79,11 @@
 主系統功能劃分為五大模組，所有開發人員與 AI 助理於撰寫新程式碼時，**必須依此邊界維護與對齊**：
 
 ### 1. 模組一：身分驗證、帳號連線與安全管理 (Auth, Accounts & Security)
-- **範圍**: Supabase Auth 登入/註冊、忘記密碼、個人檔案管理、開發者 RBAC 角色 (`admin` / `dev` / `agent`) 與第三方連線 (Google OAuth / LINE Login)。
+- **範圍**: Supabase Auth 登入/註冊、Email 轉址驗證修復 (`emailRedirectTo: redirectTo`)、忘記密碼、個人檔案管理、開發者 RBAC 角色 (`admin` / `dev` / `agent`) 與第三方連線 (Google OAuth / LINE Login)。
 - ** UI 排版**: 側邊欄將「個人帳號 👤」置於頂點快捷區，管理性質之「垃圾桶 🗑️」獨立放置於底欄。
+- **🎮 遊戲化登入成就與新手指引**:
+  - 於用戶『首次註冊登入成功』與『完成新手教學』雙階段，觸發全螢幕解鎖成就卡片：包含兩側 `confetti` 彩帶噴發與 360 度 3D 徽章旋轉彈出。
+  - 自動讀取/寫入 `is_first_login` 標記，老用戶登入時自動順暢跳過直接進入系統首頁。
 
 ### 2. 模組二：客戶資產與名片庫 (Customers & CRM)
 - **範圍**: 客戶 3D 翻轉卡片、綽號與照片上傳、詳情檢視彈窗、拜訪專案 Checklist、客戶批次匯入/匯出 (vCard/.vcf) 與數位名片 Master Studio。
@@ -92,7 +95,7 @@
 - **範圍**: 行事曆「月網格」與「日時間軸 Side-by-Side 重疊並排演算法」雙視圖、`schedule_events` 表，以及 **「保經/業務員客戶線上預約系統」** (空閒時段開放、行程自動遮蔽、CRM 客戶掛載、多公司保單健診/理賠諮詢/新保單規劃預約分類與團隊派單)。
 
 ### 5. 模組五：系統個性化、情報與多國語系 (Preferences, i18n & Insights)
-- **範圍**: 系統主題色與檢視模式設定、全站 i18n 語系檔 (`app_zh.arb` / `app_en.arb`) 徹底對齊、動態標籤管理器與 16 色選擇器，以及 Phase 7 保險新聞主題聚類 (含跨平台 `url_launcher` 外連修復)。
+- **範圍**: 系統主題色與檢視模式設定、全站 i18n 語系檔 (`app_zh.arb` / `app_en.arb`) 徹底對齊、動態標籤管理器與 16 色選擇器、Phase 7 保險新聞主題聚類，以及 **設定頁面「章節式新手導覽」控制器**（支援重新播放完整教學、按章節分區選看重播與隨時跳過功能）。
 
 ---
 
@@ -173,6 +176,11 @@
 ### 4. 標籤選擇器 (Categorized Tag Selector)
 - **全站統一組件**: 任何需要標籤維護與點選的模組，**必須 100% 調用 [`CategorizedTagAccordionSelector`](../../lib/widgets/categorized_tag_accordion_selector.dart)**。
 - 嚴禁使用傳統單行純文字輸入框或自訂逗號分隔字串。
+
+### 5. 行動端 RWD 響應式跑板優化與防溢出規範 (Mobile Responsive Standard) 🔥
+- **全站元件嚴禁跑板 (Zero Yellow Overflow)**：全站所有卡片、彈窗、表單與視圖在窄螢幕（手機寬度 `< 600px`）下，**嚴禁出現黃黑色條紋溢出警告 (Yellow Overflow Striped Bar)**。
+- **邊距與字體自適應**：手機端卡片 padding 應由 24px 自動微調為 12~16px，文字標題過長時強制套用 `TextOverflow.ellipsis` 或包裹 `FittedBox` / `Flexible`。
+- **可滾動容器防護**：彈窗與對話框主體必須包裹 `SingleChildScrollView` 或 `ListView`，確保在手機彈出軟鍵盤時畫面可平滑滾動，防止輸入框被軟鍵盤遮擋或壓迫溢出。
 
 ---
 
