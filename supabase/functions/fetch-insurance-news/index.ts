@@ -61,6 +61,7 @@ interface ClusteringOutput {
     category: string;
     ai_summary: string;
     articles: {
+      rss_index?: number;    // 對應原始 RSS 列表編號
       title: string;
       source_name: string;
       source_url: string;
@@ -74,7 +75,11 @@ interface ClusteringOutput {
 async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutput> {
   if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY 未在 Supabase Secrets 設定');
 
-  const formattedItems = rssItems.slice(0, 40).map((item, idx) => `[${idx + 1}] 標題: ${item.title} | 來源: ${item.source} | 連結: ${item.link}`).join('\n');
+  // 控管 Prompt Token 數量，精選當日前 15 條權威 RSS 保險新聞 (控制在 Groq 6000 TPM 限制內)
+  const formattedItems = rssItems
+    .slice(0, 15)
+    .map((item, idx) => `[${idx + 1}] ${item.title} (來源: ${item.source})`)
+    .join('\n');
 
   const systemPrompt = `你是一位頂尖的台灣金融保險產業總編輯。
 請審視今日從各大權威新聞、金管會保險局公告及金融頻道抓取的 RSS 新聞列表，完成以下三項工作：
@@ -85,6 +90,7 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
    - 每個主題底下包含 2~4 篇報導（標示 1 篇主要主頭條 is_primary=true，其餘為次要媒體報導 is_primary=false）。
    - ai_summary: 為該主題撰寫一段約 80~150 字的單一段落重點摘要。
    - 針對其中的每一篇新聞報導 (article)，皆撰寫 2~3 句的「單篇新聞重點摘要 (article_summary)」。
+   - rss_index: 請務必填入該篇新聞在「今日熱門保險 RSS 新聞列表」中對應的 [ID] 數字（例如: 1, 2, 3）。
    - category: 請從「法規政策」、「產品趨勢」、「理賠法規」、「社會熱點」、「保險焦點」中擇一。
 
 請務必輸出嚴格 JSON 格式：
@@ -98,6 +104,7 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
       "ai_summary": "主題單段摘要",
       "articles": [
         {
+          "rss_index": 1,
           "title": "新聞標題",
           "source_name": "媒體名稱",
           "source_url": "連結",
@@ -110,6 +117,8 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
 }`;
 
   const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+  let lastGroqError = '';
+
   for (const model of models) {
     try {
       console.log(`[Groq News Clustering] 嘗試使用模型: ${model}...`);
@@ -126,12 +135,15 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
             { role: 'system', content: systemPrompt },
             { role: 'user', content: `今日熱門保險 RSS 新聞列表：\n${formattedItems}` }
           ],
-          temperature: 0.3,
+          temperature: 0.2,
+          max_tokens: 4096,
         }),
       });
 
       if (!res.ok) {
-        console.error(`[Groq ${model} Error]:`, res.status, await res.text());
+        const errText = await res.text();
+        console.error(`[Groq ${model} Error]:`, res.status, errText);
+        lastGroqError = `[HTTP ${res.status}] ${errText}`;
         continue;
       }
 
@@ -146,19 +158,23 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
         if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
       }
 
-      if (parsed && parsed.topics && parsed.topics.length > 0) {
-        return {
-          daily_trend: parsed.daily_trend || '從今日新聞可看出保險市場法規與產品結構正積極調整。',
-          daily_overview: parsed.daily_overview || '今日保險產業新聞涵蓋主管機關政策宣導、商品轉型與社會熱點。',
-          topics: parsed.topics,
-        };
+      if (parsed && (parsed.topics || parsed.items || parsed.news)) {
+        const rawTopics = parsed.topics || parsed.items || parsed.news || [];
+        if (Array.isArray(rawTopics) && rawTopics.length > 0) {
+          return {
+            daily_trend: parsed.daily_trend || '從今日新聞可看出保險市場法規與產品結構正積極調整。',
+            daily_overview: parsed.daily_overview || '今日保險產業新聞涵蓋主管機關政策宣導、商品轉型與社會熱點。',
+            topics: rawTopics,
+          };
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(`[Groq Catch Error ${model}]:`, err);
+      lastGroqError = err.message || String(err);
     }
   }
 
-  throw new Error('Groq 新聞聚類解析失敗');
+  throw new Error(`Groq 新聞聚類解析失敗: ${lastGroqError}`);
 }
 
 serve(async (req) => {
@@ -169,28 +185,35 @@ serve(async (req) => {
   try {
     console.log('[fetch-insurance-news] 開始抓取多源 RSS 新聞 (包含 Google News, 金管會, 金融新聞)...');
 
-    // 多源 RSS 抓取頻道 (雙軌聚合：Google News 引擎 + 權威媒體原生 RSS)
+    // 多源 RSS 抓取頻道 (雙軌主題與四大權威媒體頻道：CNA/cnyes/CTEE/UDN)
     const rssUrls = [
-      // 軌道一：Google News 深度主題聚合 RSS
+      // 軌道一：全網保險話題與金管會保險局新聞
       'https://news.google.com/rss/search?q=%E4%BF%9D%E9%9A%AA+OR+%E5%A3%BD%E4%BF%9D+OR+%E7%94%A2%E4%BF%9D&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
       'https://news.google.com/rss/search?q=%E9%87%91%E7%AE%A1%E6%9C%83+%E4%BF%9D%E9%9A%AA%E5%B1%80&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
-      'https://news.google.com/rss/search?q=%E9%87%91%E8%9E%8D+%E4%BF%9D%E9%9A%AA%E5%85%AC%E6%9C%83&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
 
-      // 軌道二：國內權威財經與新聞媒體原生 RSS
-      'https://www.cna.com.tw/cna2010/market/rss.xml',       // 中央通訊社 (CNA) 財經新聞 RSS
-      'https://news.cnyes.com/rss/pref/news/cat/tw_macro',    // 鉅亨網 (Anue) 台灣總體經濟與金融 RSS
-      'https://ctee.com.tw/feed',                            // 工商時報 (CTEE) 產經理財 RSS
-      'https://udn.com/rss/news/2/6645',                     // 聯合新聞網 (UDN) 保險與理財 RSS
+      // 軌道二：四大國內權威媒體專屬保險新聞頻道
+      'https://news.google.com/rss/search?q=site:cna.com.tw+%E4%BF%9D%E9%9A%AA&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',   // 中央通訊社 (CNA)
+      'https://news.google.com/rss/search?q=site:cnyes.com+%E4%BF%9D%E9%9A%AA&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',   // 鉅亨網 (cnyes)
+      'https://news.google.com/rss/search?q=site:ctee.com.tw+%E4%BF%9D%E9%9A%AA&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',  // 工商時報 (CTEE)
+      'https://news.google.com/rss/search?q=site:udn.com+%E4%BF%9D%E9%9A%AA&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',   // 聯合新聞網 (UDN)
     ];
 
     let allRssItems: RSSItem[] = [];
     for (const url of rssUrls) {
       try {
-        const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const resp = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+          }
+        });
         if (resp.ok) {
           const xml = await resp.text();
           const items = parseRSSXml(xml);
           allRssItems = allRssItems.concat(items);
+        } else {
+          console.warn(`抓取 RSS 回傳非 200 (${resp.status}): ${url}`);
         }
       } catch (e) {
         console.error(`抓取 RSS 失敗 (${url}):`, e);
@@ -221,8 +244,11 @@ serve(async (req) => {
     console.log('[fetch-insurance-news] 呼叫 Groq AI 聚類歸納與今日大勢趨勢...');
     const result = await clusterNewsWithGroq(uniqueItems);
 
-    // 初始化 Supabase Service Role Client
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // 初始化 Supabase Service Role Client (支援 Deno Secret 與 Request Header 雙軌 Auth 回退)
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const serviceKey = SUPABASE_SERVICE_ROLE_KEY || bearerToken || Deno.env.get('SUPABASE_ANON_KEY') || '';
+    const supabaseClient = createClient(SUPABASE_URL, serviceKey);
     const todayDate = new Date().toISOString().split('T')[0];
 
     // 每次寫入前先自動清除當天先前的舊記錄，避免多次點擊 Workflow 導致資料庫累積重複話題卡片
@@ -237,6 +263,7 @@ serve(async (req) => {
 
     let insertedTopicCount = 0;
     let insertedArticleCount = 0;
+    let lastError = null;
 
     for (const topic of result.topics) {
       // 1. 寫入主題表 (包含 daily_trend 與 daily_overview)
@@ -255,23 +282,69 @@ serve(async (req) => {
 
       if (topicErr || !topicData) {
         console.error('寫入 insurance_news_topics 失敗:', topicErr);
+        lastError = topicErr;
         continue;
       }
 
       insertedTopicCount++;
       const topicId = topicData.id;
 
-      // 2. 寫入報導來源表 (包含 article_summary)
-      if (topic.articles && topic.articles.length > 0) {
-        const articleRows = topic.articles.map((art) => ({
-          topic_id: topicId,
-          title: art.title,
-          source_name: art.source_name,
-          source_url: art.source_url,
-          article_summary: art.article_summary || art.title,
-          is_primary: art.is_primary ?? false,
-          published_at: new Date().toISOString(),
-        }));
+      // 2. 寫入報導來源表 (相容多元 LLM 鍵名 articles/news/items + 精密網址對照)
+      const rawArticles = topic.articles || topic.news || topic.items || topic.news_list || topic.article_list || [];
+
+      if (Array.isArray(rawArticles) && rawArticles.length > 0) {
+        const articleRows = rawArticles.map((art: any) => {
+          let matchedUrl = '';
+
+          // A) 優先依據 Groq 回傳之 rss_index (相容字串與數字，1-based 轉 0-based 索引)
+          const rawIdx = parseInt(String(art.rss_index || ''), 10);
+          if (!isNaN(rawIdx) && rawIdx >= 1 && rawIdx <= uniqueItems.length) {
+            matchedUrl = uniqueItems[rawIdx - 1].link;
+          }
+
+          // B) 若 rss_index 未對中，以新聞標題去除空白進行語意對照
+          if (!matchedUrl) {
+            const cleanArtTitle = (art.title || '').replace(/\s+/g, '').toLowerCase();
+            const foundItem = uniqueItems.find((item) => {
+              const cleanItemTitle = (item.title || '').replace(/\s+/g, '').toLowerCase();
+              return cleanItemTitle.includes(cleanArtTitle) || cleanArtTitle.includes(cleanItemTitle);
+            });
+            if (foundItem) {
+              matchedUrl = foundItem.link;
+            }
+          }
+
+          // C) 若 Groq 回傳之 source_url 存在且不為通用首頁，作為三級對照
+          if (!matchedUrl && art.source_url && art.source_url.trim().length > 0) {
+            const rawUrl = art.source_url.trim();
+            const isGenericHome = rawUrl === 'https://news.google.com' ||
+                rawUrl === 'https://news.google.com/' ||
+                rawUrl === 'https://news.google.com/news';
+            if (!isGenericHome) {
+              matchedUrl = rawUrl;
+            }
+          }
+
+          // D) 備援：若無有效文章連結，拿標題做關鍵字對照
+          if (!matchedUrl) {
+            matchedUrl = uniqueItems[0]?.link || '';
+          }
+
+          const articleRow: any = {
+            topic_id: topicId,
+            title: art.title || topic.topic_title,
+            source_name: art.source_name || '權威媒體',
+            source_url: matchedUrl,
+            is_primary: art.is_primary ?? false,
+            published_at: new Date().toISOString(),
+          };
+
+          if (art.article_summary && art.article_summary.trim().length > 0) {
+            articleRow.article_summary = art.article_summary.trim();
+          }
+
+          return articleRow;
+        });
 
         const { error: artErr } = await supabaseClient
           .from('insurance_news_articles')
@@ -279,6 +352,7 @@ serve(async (req) => {
 
         if (artErr) {
           console.error(`寫入 topic (${topicId}) 的報導失敗:`, artErr);
+          lastError = artErr;
         } else {
           insertedArticleCount += articleRows.length;
         }
@@ -293,6 +367,7 @@ serve(async (req) => {
         daily_trend: result.daily_trend,
         topics_count: insertedTopicCount,
         articles_count: insertedArticleCount,
+        last_error: lastError,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
