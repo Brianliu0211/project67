@@ -211,100 +211,36 @@ class _InsuranceNewsTabState extends State<InsuranceNewsTab> {
         return;
       }
     } catch (e) {
-      debugPrint('讀取保險新聞失敗，使用預設展示範例數據: $e');
+      debugPrint('讀取 Supabase 保險新聞失敗: $e');
     }
 
-    _loadMockData();
-  }
-
-  void _loadMockData() {
-    final mockPrimaryTime = DateTime.now().subtract(const Duration(hours: 3)).toIso8601String();
-    
     setState(() {
-      _topics = [
-        InsuranceNewsTopic(
-          id: 'demo-topic-1',
-          topicTitle: '醫療險實支實付新制上路與損害防阻原則落實',
-          category: '法規政策',
-          aiSummary: '金管會推動實支實付醫療險新制正式生效，全面落實損害防阻原則。壽險公司已完成全系列實支實付保單結構調整，未來保戶投保多張實支實付險將受核保限制。業務員在協助客戶規劃與理賠申請時，需特別注意新舊保單條款適用時點與副本理賠機制之差異。',
-          dailyTrend: '從今日新聞可看出，主管機關正加速推動實支實付醫療險損害防阻與長照險商品結構轉型。',
-          dailyOverview: '今日台灣保險市場受金管會保險局多項新制正式生效影響，壽險業全面進行商品結構與核保機制調整。實支實付醫療險正本理賠試行制度引起保戶與業務員高度關注，未來保單設計將更著重於損害防阻與健康促進。同時，各大金控與產壽險公司亦紛紛推出高CP值長照與零工族意外保障專案，展現極高的市場適應力。',
-          publishDate: DateTime.now().toIso8601String().split('T')[0],
-          articles: [
-            InsuranceNewsArticle(
-              id: 'a1',
-              topicId: 'demo-topic-1',
-              title: '實支實付新制今正式上路！壽險業產品全面下架調整',
-              sourceName: '經濟日報',
-              sourceUrl: 'https://news.google.com',
-              articleSummary: '主管機關實支實付新制今日生效，壽險公司配合政策將舊有副本理賠商品全面停售，改以損害防阻為核心之新保單上架，確保保戶理賠回歸填補實際醫療費用損失本質。',
-              publishedAt: mockPrimaryTime,
-              isPrimary: true,
-            ),
-            InsuranceNewsArticle(
-              id: 'a2',
-              topicId: 'demo-topic-1',
-              title: '醫療險副本理賠走入歷史？專家深入分析保戶三招權益保障',
-              sourceName: 'Yahoo新聞',
-              sourceUrl: 'https://news.google.com',
-              articleSummary: '針對實支實付新制上路後保戶常見的疑惑，理賠專家指出既有舊保單不受溯及既往影響，新投保案件則須遵循正本理賠原則，建議業務代表協助保戶定期檢視既有保障額度。',
-              publishedAt: mockPrimaryTime,
-              isPrimary: false,
-            ),
-            InsuranceNewsArticle(
-              id: 'a3',
-              topicId: 'demo-topic-1',
-              title: '金管會保險局宣導實支實付正本理賠試行要點與宣導事項',
-              sourceName: '鏡週刊 Mirror Media',
-              sourceUrl: 'https://news.google.com',
-              articleSummary: '保險局召開記者會說明新制實施注意事項，強調壽險公會已建立配套機制，防範重複投保帶來的道德風險，並期許保險業者持續優化理賠給付服務流程。',
-              publishedAt: mockPrimaryTime,
-              isPrimary: false,
-            ),
-          ],
-        ),
-        InsuranceNewsTopic(
-          id: 'demo-topic-2',
-          topicTitle: '長照險與外送員專屬意外險銷售熱度升溫',
-          category: '產品趨勢',
-          aiSummary: '隨著高齡化社會加劇及零工經濟崛起，各大產壽險公司紛紛推出高CP值長照險與零工族專屬外送意外綜合險。最新市場數據顯示，2026年第三季長照保單投保率成長逾二成，業者更提供健康促進折抵保費機制，成為近期業務拜訪的熱門商品話題。',
-          dailyTrend: '從今日新聞可看出，主管機關正加速推動實支實付醫療險損害防阻與長照險商品結構轉型。',
-          dailyOverview: '今日台灣保險市場受金管會保險局多項新制正式生效影響，壽險業全面進行商品結構與核保機制調整。實支實付醫療險正本理賠試行制度引起保戶與業務員高度關注，未來保單設計將更著重於損害防阻與健康促進。同時，各大金控與產壽險公司亦紛紛推出高CP值長照與零工族意外保障專案，展現極高的市場適應力。',
-          publishDate: DateTime.now().toIso8601String().split('T')[0],
-          articles: [
-            InsuranceNewsArticle(
-              id: 'a4',
-              topicId: 'demo-topic-2',
-              title: '超高齡社會衝擊！高性價比長照險投保率創年度新高',
-              sourceName: '工商時報',
-              sourceUrl: 'https://news.google.com',
-              articleSummary: '因應長照需求高漲，壽險業者推出具備分期給付與實物給付雙軌機制的長照終身險，結合健檢指數給付保費折扣，帶動業績大幅躍升。',
-              publishedAt: mockPrimaryTime,
-              isPrimary: true,
-            ),
-            InsuranceNewsArticle(
-              id: 'a5',
-              topicId: 'demo-topic-2',
-              title: '外送平台合作專案意外險上架 打造碎粒化保障體驗',
-              sourceName: '鉅亨網',
-              sourceUrl: 'https://news.google.com',
-              articleSummary: '產險公司與零工平台跨界合作，提供按次或按日扣款的碎粒化意外險，為高風險外送員提供實時傷害醫療與責任保障。',
-              publishedAt: mockPrimaryTime,
-              isPrimary: false,
-            ),
-          ],
-        ),
-      ];
+      _topics = [];
       _isLoading = false;
     });
   }
 
-  Future<void> _launchExternalUrl(String urlStr) async {
-    if (urlStr.isEmpty) {
-      CustomToast.show(context, '此新聞未提供外部連結', ToastType.warning);
-      return;
+  Future<void> _launchExternalUrl(String urlStr, {String? title, String? sourceName}) async {
+    String finalUrlStr = urlStr.trim();
+
+    // 檢查是否為無效/通用首頁網址 (如 https://news.google.com 或 https://news.google.com/)
+    final isGenericGoogleNews = finalUrlStr.isEmpty ||
+        finalUrlStr == 'https://news.google.com' ||
+        finalUrlStr == 'https://news.google.com/' ||
+        finalUrlStr == 'https://news.google.com/news' ||
+        finalUrlStr == 'https://news.google.com/news/';
+
+    if (isGenericGoogleNews) {
+      if (title != null && title.trim().isNotEmpty) {
+        // 使用標準 Google 搜尋作為安全備援，直跳搜尋結果頁面
+        finalUrlStr = 'https://www.google.com/search?q=${Uri.encodeComponent(title.trim())}';
+      } else {
+        CustomToast.show(context, '此新聞未提供有效外部連結', ToastType.warning);
+        return;
+      }
     }
-    final Uri uri = Uri.parse(urlStr);
+
+    final Uri uri = Uri.parse(finalUrlStr);
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -312,6 +248,14 @@ class _InsuranceNewsTabState extends State<InsuranceNewsTab> {
         CustomToast.show(context, '無法開啟外部新聞連結', ToastType.warning);
       }
     } catch (e) {
+      // 若原始網址開啟異常且存在標題，嘗試以標準 Google 搜尋作為二次備援
+      if (title != null && title.trim().isNotEmpty) {
+        try {
+          final fallbackUri = Uri.parse('https://www.google.com/search?q=${Uri.encodeComponent(title.trim())}');
+          await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+          return;
+        } catch (_) {}
+      }
       CustomToast.show(context, '連結跳轉異常 (原始網站可能已調整): $e', ToastType.error);
     }
   }
@@ -645,7 +589,11 @@ class _InsuranceNewsTabState extends State<InsuranceNewsTab> {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           Navigator.of(ctx).pop();
-                          _launchExternalUrl(article.sourceUrl);
+                          _launchExternalUrl(
+                            article.sourceUrl,
+                            title: article.title,
+                            sourceName: article.sourceName,
+                          );
                         },
                         icon: const Icon(Icons.open_in_new, size: 18),
                         label: const Text('🔗 前往媒體原網址閱讀全文'),

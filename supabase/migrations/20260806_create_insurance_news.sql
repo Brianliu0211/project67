@@ -38,15 +38,19 @@ CREATE INDEX IF NOT EXISTS idx_insurance_news_articles_topic_id ON public.insura
 ALTER TABLE public.insurance_news_topics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.insurance_news_articles ENABLE ROW LEVEL SECURITY;
 
--- 5. 建立 RLS 讀取權限 (允許所有驗證與匿名使用者讀取)
+-- 5. 建立 RLS 讀取與寫入權限 (允許所有驗證與匿名使用者存取)
 DROP POLICY IF EXISTS "Allow public read access for insurance_news_topics" ON public.insurance_news_topics;
-CREATE POLICY "Allow public read access for insurance_news_topics"
-    ON public.insurance_news_topics FOR SELECT
+DROP POLICY IF EXISTS "Allow public all access for insurance_news_topics" ON public.insurance_news_topics;
+CREATE POLICY "Allow public all access for insurance_news_topics"
+    ON public.insurance_news_topics FOR ALL
     TO public
-    USING (true);
+    USING (true)
+    WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow public read access for insurance_news_articles" ON public.insurance_news_articles;
-CREATE POLICY "Allow public read access for insurance_news_articles"
-    ON public.insurance_news_articles FOR SELECT
+DROP POLICY IF EXISTS "Allow public all access for insurance_news_articles" ON public.insurance_news_articles;
+CREATE POLICY "Allow public all access for insurance_news_articles"
+    ON public.insurance_news_articles FOR ALL
     TO public
-    USING (true);
+    USING (true)
+    WITH CHECK (true);
