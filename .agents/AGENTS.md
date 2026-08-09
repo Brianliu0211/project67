@@ -44,14 +44,14 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 
 ### Actions
 1. **檢查與自動修復 Git 分支狀態 (Branch Safeguard)**：
-   - 檢查當前本機 Git 分支。若包含程式碼變更且發現**未位於標準特徵分支**（例如位於 `main` 主線，或位於自動產生的非標準分支名稱）：
-   - 自動依開發者身分 (蘿蔔 lobo / 巨獸 beast) 生成標準分支名稱 `feature/username-featurename`（如 `feature/lobo-email-auth-fix`）。
-   - 主動在背景執行分支重命名/切換（`git branch -m <branch-name>`），防止將程式碼提交至 `main` 或異常分支名稱。
+   - 檢查當前本機 Git 分支與變更檔案：
+     - **純文件修訂 (Fast-Track 快速通道)**：若本次變更 100% 僅包含 `docs/` 或 `.md` 文件（未修改 `lib/` 或程式碼），**目標分支一律為 `main` 主線**。若當前本機處於特徵分支，AI 應提示並引導專案人員在 GitHub Desktop 切換回 `main` 主線（或在背景切換），並明確輸出 **目標分支: `main`**。
+     - **程式碼修訂 (Standard PR 流程)**：若包含程式碼變更，且發現未部位於標準特徵分支（例如位於 `main` 主線，或位於自動產生的非標準分支名稱），自動依開發者身分 (蘿蔔 lobo / 巨獸 beast) 生成標準分支名稱 `feature/username-featurename`（如 `feature/lobo-email-auth-fix`），並在背景執行分支切換（`git branch -m <branch-name>`）。
 2. **撰寫開發日誌**: Create a new development log in [docs/03_開發日誌/](docs/03_開發日誌/) following the established specification, documenting all technical changes made during the current session.
 3. **更新進度表**: Review and update [進度.md](docs/進度.md) — check off (`[x]`) any completed items, and process the Incubator/Backlog promotion if applicable.
-4. **產出 Git Commit 訊息與分支指引**: Generate a ready-to-paste **Summary** and **Description** for GitHub Desktop, strictly following the conventions defined in [Git提交訊息規範.md](docs/00_公共規格/Git提交訊息規範.md)，並**明確輸出對應的特徵分支名稱**。
+4. **產出 Git Commit 訊息與分支指引**: Generate a ready-to-paste **Summary** and **Description** for GitHub Desktop, strictly following the conventions defined in [Git提交訊息規範.md](docs/00_公共規格/Git提交訊息規範.md)，並**明確輸出對應的特徵分支名稱（若為純文件則明確輸出 `main` 分支）**。
 5. **智慧提交分流引導 (Fast-Track vs Standard PR)**：
-   - **純文件修訂 (Fast-Track 快速通道)**：若本次變更僅包含 `docs/` 或 `.md` 文件（未修改 `lib/` 或程式碼），直接引導在 GitHub Desktop 提交並推送至 `main` 主線分支。
+   - **純文件修訂 (Fast-Track 快速通道)**：直接引導在 GitHub Desktop 將分支切換至 `main`，提交並推送至 `main` 主線分支（免發起 PR）。
    - **程式碼修訂 (Standard PR 流程)**：若本次包含程式碼變更，引導透過 GitHub Desktop 將該特徵分支推送至遠端、建立 PR 並進行 Merge。
 
 ---
@@ -94,8 +94,14 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 
 ### Actions
 1. **全面巡檢現有程式碼與資料庫結構**：對比 `lib/` 原始碼、`docs/進度.md` 與 Supabase Schema。
-2. **對齊補全主系統規格書**：更新 [docs/00_公共規格/main_spec.md](docs/00_公共規格/main_spec.md)，補充最新落地的資料庫資料表結構 (如 `schedule_events`, `visit_projects`, `tag_categories` 與垃圾桶 `deleted_at`)、UI Toast 視覺標準與第三方授權邏輯，確保主規格書反映最新的最高指導狀態。
-3. **報告對齊結果**：向專案人員摘要說明本次 `main_spec.md` 補全了哪些欄位與核心架構。
+2. **廢棄與陳舊資訊清掃 (Deprecation Sweep Step)**：
+   - 檢查規格書中記載但實體程式碼/SQL 中已刪除或已被新邏輯取代的廢棄欄位、舊 SOP 或舊規範。
+   - 將已廢棄之項目予以更新移除，或移至廢棄歷史區加註 `[Deprecated / 已廢棄]`，防止規格書膨脹為歷史堆疊垃圾場。
+3. **對齊補全全套公共規格文件 (SSOT & Full Specs Synchronization)**：
+   - 以 `.agents/AGENTS.md`（規則 SSOT）與 `docs/00_公共規格/main_spec.md`（架構 SSOT）為單一真理來源。
+   - 更新 [docs/00_公共規格/main_spec.md](docs/00_公共規格/main_spec.md)（補充最新資料庫表、UI Toast 標準、維運防護 SOP 與快捷指令體系）。
+   - **強制同步修訂** [docs/00_公共規格/開發人員快捷指令.md](docs/00_公共規格/開發人員快捷指令.md) 與 [docs/00_公共規格/開發人員手冊.md](docs/00_公共規格/開發人員手冊.md)，採用精簡表格與 SSOT 條文超連結引用，徹底防止多檔案重複寫入產生的版本漂移 (Version Drift)。
+4. **報告對齊結果**：向專案人員摘要說明本次 `main_spec.md`、`開發人員快捷指令.md` 與 `開發人員手冊.md` 補全與清掃了哪些欄位與核心架構。
 
 ---
 
@@ -111,6 +117,27 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
    - **Type B (單向唯讀巡檢 - 人類領地)**：`個人工作區` $\rightarrow$ `進度.md` (AI 僅讀取，不改動人類筆記)
    - **Type C (按需實體對齊)**：`lib/` + `*.sql` + `開發日誌` $\rightarrow$ `main_spec.md` (輸入 `對齊` 時觸發)
    - **Type D (里程碑自動備份)**：`lib/` $\rightarrow$ `04_專題報告/` (有改 Code 時收工自動備份 Mermaid/ERD)
+
+---
+
+## 「自我修復」Automation (Self-Correction & Rule Repair Command)
+
+### Trigger
+- **Rule**: When the user says **「自我修復」**, or when a logical contradiction/edge-case inconsistency with original system design is detected, you **MUST** automatically perform the following actions:
+
+### Actions
+1. **剖析矛盾與根因 (Root Cause Analysis)**：
+   - 清楚條列出「原本設計意圖 (Original Design)」、「發生的實際矛盾/邏輯漏洞 (Actual Contradiction)」與「造成該問題的根因 (Root Cause)」。
+2. **修復底層運作規則 (`.agents/AGENTS.md`)**：
+   - 即刻修改本檔案（`AGENTS.md`）對應的指令、自動化防護或驗證條件，確保邏輯閉環無死角。
+3. **單一真理來源 (SSOT) 防漂移對齊**：
+   - 確保 `.agents/AGENTS.md`（運作 SSOT）與 `main_spec.md`（架構 SSOT）為核心源頭，所有手冊以連結與簡明對照表引用，避免重複文義產生的版本漂移。
+4. **廢棄與陳舊資訊清掃 (Deprecation Sweep)**：
+   - 巡檢並廢除舊版矛盾邏輯，清理舊招式與舊 SOP，移至歷史區或更換為新版標準。
+5. **雙向自動對齊全套手冊與規格書**：
+   - 嚴格落實 Type A 雙向自動對齊，同步更新 `開發人員快捷指令.md`、`開發人員手冊.md`、`main_spec.md` 與 `進度.md`。
+6. **報告自我修復結果**：
+   - 摘要說明修正了哪些底層規則條文、清掃了哪些廢棄資訊、同步對齊了哪些實體文檔，並說明全新的防呆運作邏輯。
 
 ---
 

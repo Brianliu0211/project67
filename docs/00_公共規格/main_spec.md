@@ -116,6 +116,14 @@
   - **LINE 打字中動畫 API**: 調用 `POST https://api.line.me/v2/bot/chat/loading`，消解 2 秒思考焦慮。
   - **Error Handler 與 Gmail 警報**: 點數用盡時觸發溫馨備援訊息，並自動寄送 HTML 警報信至 `brain2013bb@gmail.com`。
 - **圖文選單 (Rich Menu 4格版型)**: 整合帳號註冊、新手教學、Google 意見回饋表單與專人客服寫入。
+- **🛡️ 維運防護與 4 大錯誤診斷矩陣 (Observability & Fortification SOP)**:
+  - **Scenario 防護設定**: ⚙️ Scenario settings 將 `Store incomplete executions` 切換為 `Yes`，防止偶發錯誤導致 Scenario 被自動切換為 Active: OFF。
+  - **雙重告警機制 (Dual Alert System)**: 第一重 Make 系統自動寄發停用/額度信件；第二重 Make AI Agent Error Handler 後端掛載 Gmail 模組 0.1 秒發送 `⚠️ [系統警報]` 至 `brain2013bb@gmail.com`。
+  - **4 大系統錯誤診斷矩陣**:
+    - **【類別 1】Scenario 遭自動停用**: 模組未捕捉連續錯誤（已讀不回）➔ Make 發送信件 ➔ 登入 Make 重開 Active 並檢視 History 補齊 Filter。
+    - **【類別 2】Make Operations 額度耗盡**: 每月 1,000 次用罄 ➔ 收到 quota reached 警報 ➔ 匯出 Scenario JSON 至備用帳號或升級。
+    - **【類別 3】AI Agent 點數/模型報錯**: OpenAI 餘額不足/逾時 ➔ 用戶收到備援回覆，開發者收到 Gmail HTML 警報 ➔ 補充點數或調整 Prompt。
+    - **【類別 4】LINE API 憑證失效**: Channel Access Token 過期 (401 Unauthorized) ➔ History 顯示紅色 401 標籤 ➔ 至 LINE Developers 重新發行 Token 並更新 Connection。
 
 ---
 
@@ -187,3 +195,19 @@
 ## 🔒 安全與金鑰管理規範
 - 所有 API 金鑰（`SUPABASE_URL`、`SUPABASE_ANON_KEY`、`GEMINI_API_KEY`）**絕對禁止**明文寫入程式碼。
 - 本地開發使用 `.env`（被 `.gitignore` 排除），並由團隊於 Line 記事本安全範本集中維護；正式部署由 GitHub Secrets 動態注入。
+
+---
+
+## 🛠️ 開發協作與 AI 快捷指令體系 (Developer Automation & Shortcuts)
+
+為確保開發品質、團隊防呆與維運規範，全專案定義 7 大 AI 快捷指令，由 [`.agents/AGENTS.md`](../../.agents/AGENTS.md) 作為實體運作條文驅動，並與 [`開發人員快捷指令.md`](開發人員快捷指令.md) 保持 Type A 雙向自動對齊：
+
+1. **`開工`**：實施 Git 狀態檢查、確認身分 (lobo / beast)、讀取 `進度.md` 任務並給予特徵分支建議。
+2. **`收工`**：自動建立開發日誌、更新 `進度.md`，並執行**智慧 Git 提交分流**：
+   - 🟢 **純文件修訂 (Fast-Track 快速通道)**：100% 僅包含 `docs/` 或 `.md` 時，**目標分支一律鎖定為 `main`**，直接在 `main` 分支提交並推送至遠端（免發起 PR）。
+   - 🔴 **程式碼修訂 (Standard PR 流程)**：包含 `lib/` 或程式碼變更時，強制位於特徵分支 `feature/username-featurename` 並提供 PR 合併指引。
+3. **`讓我看看`**：自動在背景啟動 Flutter Web 預覽伺服器並提供 [http://localhost:8080](http://localhost:8080) 測試連結。
+4. **`確認狀況`**：啟動安全凍結狀態，只讀不寫，列出目前修改檔案、脈絡與預期變化。
+5. **`對齊`**：對比現有程式碼、Supabase Schema 與 `進度.md`，自動將最新資料表與系統規範補全至本主規格書 (`main_spec.md`)。
+6. **`book`**：渲染 Mermaid 視覺化全專案文檔關係地圖與說明 4 種連動型態。
+7. **`自我修復`**：當發現 AI 行為瑕疵、邏輯死角或與原本設計違背時觸發。AI 將自動進行「根因剖析 ➔ 修訂 `.agents/AGENTS.md` 條文 ➔ 全套連動更新 `開發人員快捷指令.md` / `main_spec.md` / `進度.md` ➔ 報告修復結果與全新防呆邏輯」。
