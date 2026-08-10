@@ -40,6 +40,18 @@ function parseRSSXml(xmlText: string): RSSItem[] {
       rawTitle = parts.join(' - ').trim();
     }
 
+    // 嚴格比對文章實體發布時間 (pubDate)，強制過濾早於 36 小時前之過期歷史新聞
+    if (pubDate) {
+      const pubTime = Date.parse(pubDate);
+      if (!isNaN(pubTime)) {
+        const now = Date.now();
+        const maxAgeMs = 36 * 60 * 60 * 1000; // 36 小時 (精準過濾舊聞，並兼顧週末新聞空窗期)
+        if ((now - pubTime) > maxAgeMs) {
+          continue; // 直接徹底排除過期歷史舊聞！
+        }
+      }
+    }
+
     if (rawTitle && link) {
       items.push({
         title: rawTitle,
@@ -58,7 +70,6 @@ interface ClusteringOutput {
   daily_overview: string;   // 今日新聞整合摘要文章
   topics: {
     topic_title: string;
-    category: string;
     ai_summary: string;
     articles: {
       rss_index?: number;    // 對應原始 RSS 列表編號
@@ -75,9 +86,9 @@ interface ClusteringOutput {
 async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutput> {
   if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY 未在 Supabase Secrets 設定');
 
-  // 控管 Prompt Token 數量，精選當日前 15 條權威 RSS 保險新聞 (控制在 Groq 6000 TPM 限制內)
+  // 控管 Prompt Token 數量，精選當日前 30 條權威 RSS 保險新聞 (精準控管在 ~5,000 Tokens, 達 Groq 6000 TPM 限額之 80%)
   const formattedItems = rssItems
-    .slice(0, 15)
+    .slice(0, 30)
     .map((item, idx) => `[${idx + 1}] ${item.title} (來源: ${item.source})`)
     .join('\n');
 
@@ -91,7 +102,6 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
    - ai_summary: 為該主題撰寫一段約 80~150 字的單一段落重點摘要。
    - 針對其中的每一篇新聞報導 (article)，皆撰寫 2~3 句的「單篇新聞重點摘要 (article_summary)」。
    - rss_index: 請務必填入該篇新聞在「今日熱門保險 RSS 新聞列表」中對應的 [ID] 數字（例如: 1, 2, 3）。
-   - category: 請從「法規政策」、「產品趨勢」、「理賠法規」、「社會熱點」、「保險焦點」中擇一。
 
 請務必輸出嚴格 JSON 格式：
 {
@@ -100,7 +110,6 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
   "topics": [
     {
       "topic_title": "主題名稱",
-      "category": "法規政策",
       "ai_summary": "主題單段摘要",
       "articles": [
         {
@@ -185,17 +194,26 @@ serve(async (req) => {
   try {
     console.log('[fetch-insurance-news] 開始抓取多源 RSS 新聞 (包含 Google News, 金管會, 金融新聞)...');
 
-    // 多源 RSS 抓取頻道 (雙軌主題與四大權威媒體頻道：CNA/cnyes/CTEE/UDN)
+    // 多源 RSS 抓取頻道 (3 大關鍵字軌道 + 7 大國內權威媒體頻道，強制限縮在 24h 內 when:1d)
     const rssUrls = [
-      // 軌道一：全網保險話題與金管會保險局新聞
-      'https://news.google.com/rss/search?q=%E4%BF%9D%E9%9A%AA+OR+%E5%A3%BD%E4%BF%9D+OR+%E7%94%A2%E4%BF%9D&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
-      'https://news.google.com/rss/search?q=%E9%87%91%E7%AE%A1%E6%9C%83+%E4%BF%9D%E9%9A%AA%E5%B1%80&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
+      // 軌道一：全網保險焦點、壽險、產險與金管會保險局新聞
+      'https://news.google.com/rss/search?q=%E4%BF%9D%E9%9A%AA+OR+%E5%A3%BD%E4%BF%9D+OR+%E7%94%A2%E4%BF%9D+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
+      'https://news.google.com/rss/search?q=%E9%87%91%E7%AE%A1%E6%9C%83+%E4%BF%9D%E9%9A%AA%E5%B1%80+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
 
-      // 軌道二：四大國內權威媒體專屬保險新聞頻道
-      'https://news.google.com/rss/search?q=site:cna.com.tw+%E4%BF%9D%E9%9A%AA&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',   // 中央通訊社 (CNA)
-      'https://news.google.com/rss/search?q=site:cnyes.com+%E4%BF%9D%E9%9A%AA&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',   // 鉅亨網 (cnyes)
-      'https://news.google.com/rss/search?q=site:ctee.com.tw+%E4%BF%9D%E9%9A%AA&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',  // 工商時報 (CTEE)
-      'https://news.google.com/rss/search?q=site:udn.com+%E4%BF%9D%E9%9A%AA&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',   // 聯合新聞網 (UDN)
+      // 軌道二：醫療理賠、實支實付與長照險熱勢議題
+      'https://news.google.com/rss/search?q=%E9%86%AB%E7%99%82%E9%9A%AA+OR+%E5%AF%A6%E6%94%AF%E7%AF%A6%E4%BF%9D+OR+%E4%BF%9D%E9%9A%AA%E7%90%86%E8%B3%A0+OR+%E9%95%B7%E7%85%A7%E9%9A%AA+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
+
+      // 軌道三：四大龍頭金控壽險巨頭動態
+      'https://news.google.com/rss/search?q=%E5%9C%8B%E6%B3%B0%E4%BA%BA%E5%A3%BD+OR+%E5%AF%8C%E9%82%A6%E4%BA%BA%E5%A3%BD+OR+%E5%8D%97%E5%B1%B1%E4%BA%BA%E5%A3%BD+OR+%E6%96%B0%E5%85%89%E4%BA%BA%E5%A3%BD+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',
+
+      // 軌道四：七大國內權威媒體專屬保險新聞頻道
+      'https://news.google.com/rss/search?q=site:cna.com.tw+%E4%BF%9D%E9%9A%AA+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',        // 中央通訊社 (CNA)
+      'https://news.google.com/rss/search?q=site:cnyes.com+%E4%BF%9D%E9%9A%AA+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',        // 鉅亨網 (cnyes)
+      'https://news.google.com/rss/search?q=site:ctee.com.tw+%E4%BF%9D%E9%9A%AA+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',       // 工商時報 (CTEE)
+      'https://news.google.com/rss/search?q=site:udn.com+%E4%BF%9D%E9%9A%AA+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',        // 聯合新聞網 (UDN)
+      'https://news.google.com/rss/search?q=site:chinatimes.com+%E4%BF%9D%E9%9A%AA+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',  // 中時新聞網 (Chinatimes)
+      'https://news.google.com/rss/search?q=site:ettoday.net+%E4%BF%9D%E9%9A%AA+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',     // ETtoday財經
+      'https://news.google.com/rss/search?q=site:mirrormedia.mg+%E4%BF%9D%E9%9A%AA+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant',   // 鏡週刊理財
     ];
 
     let allRssItems: RSSItem[] = [];
@@ -251,27 +269,31 @@ serve(async (req) => {
     const supabaseClient = createClient(SUPABASE_URL, serviceKey);
     const todayDate = new Date().toISOString().split('T')[0];
 
-    // 每次寫入前先自動清除當天先前的舊記錄，避免多次點擊 Workflow 導致資料庫累積重複話題卡片
-    const { error: delErr } = await supabaseClient
+    // 讀取當天已存在之新聞話題（夕報 18:00 追加模式：不刷掉晨報 06:00 已發布話題，而是無縫累加新話題）
+    const { data: existingTodayTopics } = await supabaseClient
       .from('insurance_news_topics')
-      .delete()
+      .select('topic_title')
       .eq('publish_date', todayDate);
 
-    if (delErr) {
-      console.warn('清除當日舊新聞記錄時提示:', delErr);
-    }
+    const existingTitleSet = new Set(
+      (existingTodayTopics || []).map((t: any) => (t.topic_title || '').replace(/\s+/g, '').toLowerCase())
+    );
 
     let insertedTopicCount = 0;
     let insertedArticleCount = 0;
     let lastError = null;
 
     for (const topic of result.topics) {
+      const cleanTopicTitle = (topic.topic_title || '').replace(/\s+/g, '').toLowerCase();
+      if (existingTitleSet.has(cleanTopicTitle)) {
+        console.log(`[fetch-insurance-news] 當日話題已存在，跳過重複追加: ${topic.topic_title}`);
+        continue;
+      }
       // 1. 寫入主題表 (包含 daily_trend 與 daily_overview)
       const { data: topicData, error: topicErr } = await supabaseClient
         .from('insurance_news_topics')
         .insert({
           topic_title: topic.topic_title,
-          category: topic.category || '保險焦點',
           ai_summary: topic.ai_summary,
           daily_trend: result.daily_trend,
           daily_overview: result.daily_overview,
