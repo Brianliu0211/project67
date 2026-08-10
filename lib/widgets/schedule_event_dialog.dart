@@ -229,7 +229,10 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        constraints: BoxConstraints(
+          maxWidth: 480,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Form(

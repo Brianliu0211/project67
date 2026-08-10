@@ -67,10 +67,12 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Container(
-        width: 860,
-        height: 680,
+        constraints: BoxConstraints(
+          maxWidth: 860,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
         decoration: BoxDecoration(
           color: dialogBg,
           borderRadius: BorderRadius.circular(20),

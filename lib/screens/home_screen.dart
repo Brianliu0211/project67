@@ -17,6 +17,7 @@ import 'settings_screen.dart';
 import 'profile_screen.dart';
 import 'trash_bin_screen.dart';
 import 'insurance_news_tab.dart';
+import '../widgets/responsive_layout.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -949,174 +950,340 @@ class _HomeScreenState extends State<HomeScreen> {
       return Column(
         children: [
           _buildWeeklyCalendarStrip(isDark, textColor, subTextColor, borderColor, primaryColor),
-          Expanded(child: _buildScheduleTimeline()),
+          _buildTimelineHeader(isDark, primaryColor),
+          Expanded(
+            child: _calendarViewMode == 'month_grid'
+                ? _buildMonthGridView(isDark, borderColor, primaryColor)
+                : _buildScheduleTimeline(),
+          ),
         ],
       );
     }
   }
 
   Widget _buildTimelineHeader(bool isDark, Color primaryColor) {
+    final bool isMobileScreen = context.isMobile;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobileScreen ? 12 : 20,
+        vertical: isMobileScreen ? 8 : 12,
+      ),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade200)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.today, color: primaryColor, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _calendarViewMode == 'month_grid'
-                    ? DateFormat('yyyy/MM', AppSettings.instance.language).format(_selectedDate)
-                    : DateFormat('yyyy/MM/dd (EEE)', AppSettings.instance.language).format(_selectedDate),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.chevron_left, size: 30),
-                onPressed: () {
-                  setState(() {
-                    if (_calendarViewMode == 'month_grid') {
-                      _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1, 1);
-                    } else {
-                      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
-                    }
-                  });
-                  _fetchEventsForSelectedDate(silent: true);
-                },
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right, size: 30),
-                onPressed: () {
-                  setState(() {
-                    if (_calendarViewMode == 'month_grid') {
-                      _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1, 1);
-                    } else {
-                      _selectedDate = _selectedDate.add(const Duration(days: 1));
-                    }
-                  });
-                  _fetchEventsForSelectedDate(silent: true);
-                },
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              ),
-              const SizedBox(width: 4),
-              OutlinedButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedDate = DateTime.now();
-                  });
-                  _fetchEventsForSelectedDate(silent: true);
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: primaryColor,
-                  side: BorderSide(color: primaryColor.withOpacity(0.5)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                ),
-                child: Text(context.l10n('calendar_back_to_today'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              // 視圖切換按鈕 (日時間軸 vs 月網格)
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF161B22) : Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade300),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+      child: isMobileScreen
+          ? Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    InkWell(
-                      onTap: () => _updateCalendarViewMode('timeline'),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _calendarViewMode == 'timeline' ? primaryColor : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
+                    Row(
+                      children: [
+                        Icon(Icons.today, color: primaryColor, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          _calendarViewMode == 'month_grid'
+                              ? DateFormat('yyyy/MM', AppSettings.instance.language).format(_selectedDate)
+                              : DateFormat('yyyy/MM/dd (EEE)', AppSettings.instance.language).format(_selectedDate),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.view_day_outlined,
-                              size: 16,
-                              color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              context.l10n('calendar_view_timeline'),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: () => _updateCalendarViewMode('month_grid'),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _calendarViewMode == 'month_grid' ? primaryColor : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.chevron_left, size: 24),
+                          onPressed: () {
+                            setState(() {
+                              if (_calendarViewMode == 'month_grid') {
+                                _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1, 1);
+                              } else {
+                                _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                              }
+                            });
+                            _fetchEventsForSelectedDate(silent: true);
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.grid_on_outlined,
-                              size: 16,
-                              color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              context.l10n('calendar_view_month'),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                              ),
-                            ),
-                          ],
+                        IconButton(
+                          icon: const Icon(Icons.chevron_right, size: 24),
+                          onPressed: () {
+                            setState(() {
+                              if (_calendarViewMode == 'month_grid') {
+                                _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1, 1);
+                              } else {
+                                _selectedDate = _selectedDate.add(const Duration(days: 1));
+                              }
+                            });
+                            _fetchEventsForSelectedDate(silent: true);
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                         ),
-                      ),
+                        OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedDate = DateTime.now();
+                            });
+                            _fetchEventsForSelectedDate(silent: true);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: primaryColor,
+                            side: BorderSide(color: primaryColor.withOpacity(0.5)),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                          child: Text(context.l10n('calendar_back_to_today'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              if (_isLoadingEvents)
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // View mode switcher on mobile
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF161B22) : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade300),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: () => _updateCalendarViewMode('timeline'),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _calendarViewMode == 'timeline' ? primaryColor : Colors.transparent,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.view_day_outlined,
+                                    size: 14,
+                                    color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    context.l10n('calendar_view_timeline'),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          InkWell(
+                            onTap: () => _updateCalendarViewMode('month_grid'),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _calendarViewMode == 'month_grid' ? primaryColor : Colors.transparent,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.grid_on_outlined,
+                                    size: 14,
+                                    color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    context.l10n('calendar_view_month'),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_isLoadingEvents)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  ],
                 ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.refresh, size: 20),
-                onPressed: _fetchEventsForSelectedDate,
-                tooltip: '重新整理行程',
-              ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.today, color: primaryColor, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      _calendarViewMode == 'month_grid'
+                          ? DateFormat('yyyy/MM', AppSettings.instance.language).format(_selectedDate)
+                          : DateFormat('yyyy/MM/dd (EEE)', AppSettings.instance.language).format(_selectedDate),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, size: 30),
+                      onPressed: () {
+                        setState(() {
+                          if (_calendarViewMode == 'month_grid') {
+                            _selectedDate = DateTime(_selectedDate.year, _selectedDate.month - 1, 1);
+                          } else {
+                            _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                          }
+                        });
+                        _fetchEventsForSelectedDate(silent: true);
+                      },
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, size: 30),
+                      onPressed: () {
+                        setState(() {
+                          if (_calendarViewMode == 'month_grid') {
+                            _selectedDate = DateTime(_selectedDate.year, _selectedDate.month + 1, 1);
+                          } else {
+                            _selectedDate = _selectedDate.add(const Duration(days: 1));
+                          }
+                        });
+                        _fetchEventsForSelectedDate(silent: true);
+                      },
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                    const SizedBox(width: 4),
+                    OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedDate = DateTime.now();
+                        });
+                        _fetchEventsForSelectedDate(silent: true);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: primaryColor,
+                        side: BorderSide(color: primaryColor.withOpacity(0.5)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      child: Text(context.l10n('calendar_back_to_today'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF161B22) : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade300),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: () => _updateCalendarViewMode('timeline'),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _calendarViewMode == 'timeline' ? primaryColor : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.view_day_outlined,
+                                    size: 16,
+                                    color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    context.l10n('calendar_view_timeline'),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () => _updateCalendarViewMode('month_grid'),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _calendarViewMode == 'month_grid' ? primaryColor : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.grid_on_outlined,
+                                    size: 16,
+                                    color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    context.l10n('calendar_view_month'),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    if (_isLoadingEvents)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 20),
+                      onPressed: _fetchEventsForSelectedDate,
+                      tooltip: '重新整理行程',
+                    ),
+                  ],
+                ),
+              ],
+            ),
     );
   }
 
