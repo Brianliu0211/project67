@@ -365,65 +365,84 @@ class SettingsScreen extends StatelessWidget {
                   // Section 3.5: Third-Party Account & Service Connection
                   _buildSectionHeader(context, Icons.account_tree_outlined, '🔗 第三方帳號與服務連線管理', primaryColor),
                   const SizedBox(height: 12),
-                  _buildCardContainer(
-                    context,
-                    isDark,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEA4335).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(8),
+                  Builder(
+                    builder: (context) {
+                      final currentUser = Supabase.instance.client.auth.currentUser;
+                      final bool isGoogleConnected = (currentUser?.identities?.any((i) => i.provider == 'google') ?? false) ||
+                          (currentUser?.appMetadata['provider'] == 'google') ||
+                          ((currentUser?.appMetadata['providers'] as List?)?.contains('google') ?? false);
+
+                      return _buildCardContainer(
+                        context,
+                        isDark,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEA4335).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const GoogleGLogoIcon(size: 22),
+                              ),
+                              title: const Text('Google 帳號連線與授權', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                              subtitle: Text(
+                                isGoogleConnected
+                                    ? '已成功連結 Google 帳號，可雙向同步 Google 行事曆與雲端備份'
+                                    : '尚未連結 Google 帳號，點擊以啟用日曆雙向同步與雲端備份',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isGoogleConnected ? const Color(0xFF10B981) : (isDark ? Colors.white70 : Colors.black54),
+                                ),
+                              ),
+                              trailing: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isOfflineMode
+                                      ? Colors.grey
+                                      : (isGoogleConnected ? const Color(0xFF10B981) : const Color(0xFFF59E0B)),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: isOfflineMode
+                                    ? null
+                                    : () async {
+                                        try {
+                                          final supabase = Supabase.instance.client;
+                                          String? redirectTo;
+                                          if (kIsWeb) {
+                                            final origin = Uri.base.origin;
+                                            redirectTo = (origin.contains('localhost') && !origin.contains(':8080'))
+                                                ? 'http://localhost:8080'
+                                                : origin;
+                                          } else {
+                                            redirectTo = 'http://localhost:8080';
+                                          }
+                                          await supabase.auth.signInWithOAuth(
+                                            OAuthProvider.google,
+                                            redirectTo: redirectTo,
+                                            queryParams: {
+                                              'prompt': 'select_account',
+                                            },
+                                          );
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('連線發起失敗: $e'), backgroundColor: Colors.redAccent),
+                                            );
+                                          }
+                                        }
+                                      },
+                                icon: Icon(isGoogleConnected ? Icons.check_circle_outline : Icons.link, size: 16),
+                                label: Text(isGoogleConnected ? '已連線 / 重新授權' : '未連線 / 點擊授權'),
+                              ),
                             ),
-                            child: const GoogleGLogoIcon(size: 22),
-                          ),
-                          title: const Text('Google 帳號連線與授權', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          subtitle: const Text('用於雙向同步 Google 行事曆拜訪行程與 Google Drive 雲端備份', style: TextStyle(fontSize: 12)),
-                          trailing: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isOfflineMode ? Colors.grey : primaryColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: isOfflineMode
-                                ? null
-                                : () async {
-                                    try {
-                                      final supabase = Supabase.instance.client;
-                                      String? redirectTo;
-                                      if (kIsWeb) {
-                                        final origin = Uri.base.origin;
-                                        redirectTo = (origin.contains('localhost') && !origin.contains(':8080'))
-                                            ? 'http://localhost:8080'
-                                            : origin;
-                                      } else {
-                                        redirectTo = 'http://localhost:8080';
-                                      }
-                                      await supabase.auth.signInWithOAuth(
-                                        OAuthProvider.google,
-                                        redirectTo: redirectTo,
-                                        queryParams: {
-                                          'prompt': 'select_account',
-                                        },
-                                      );
-                                    } catch (e) {
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('連線發起失敗: $e'), backgroundColor: Colors.redAccent),
-                                        );
-                                      }
-                                    }
-                                  },
-                            icon: const Icon(Icons.link, size: 16),
-                            label: Text(Supabase.instance.client.auth.currentUser?.appMetadata['provider'] == 'google' ? '已連線' : '重新連結 / 授權'),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 32),
 
