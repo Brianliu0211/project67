@@ -17,6 +17,7 @@ import 'settings_screen.dart';
 import 'profile_screen.dart';
 import 'trash_bin_screen.dart';
 import 'insurance_news_tab.dart';
+import '../widgets/route_planner_dialog.dart';
 import '../widgets/responsive_layout.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -579,23 +580,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? _buildScheduleView(isWideScreen, isDark, textColor, subTextColor, borderColor, primaryColor)
                       : _activeMenu == '新聞頭條'
                           ? const InsuranceNewsTab()
-                          : _activeMenu == '客戶管理'
-                              ? CustomerManagementTab(
-                                  onMenuChanged: (menu) {
-                                    setState(() {
-                                      _activeMenu = menu;
-                                    });
-                                  },
-                                )
-                              : _activeMenu == '專案拜訪'
-                                  ? const VisitProjectsTab()
-                                  : _activeMenu == '個人帳號'
-                                      ? ProfileScreen(onProfileUpdated: _loadUserProfile)
-                                      : _activeMenu == '垃圾桶'
-                                          ? const TrashBinScreen()
-                                      : _activeMenu == '系統設定'
-                                          ? const SettingsScreen()
-                                          : _buildFallbackScreen(),
+                              : _activeMenu == '客戶管理'
+                                  ? CustomerManagementTab(
+                                      onMenuChanged: (menu) {
+                                        setState(() {
+                                          _activeMenu = menu;
+                                        });
+                                      },
+                                    )
+                                  : _activeMenu == '專案拜訪'
+                                      ? const VisitProjectsTab()
+                                      : _activeMenu == '個人帳號'
+                                          ? ProfileScreen(onProfileUpdated: _loadUserProfile)
+                                          : _activeMenu == '垃圾桶'
+                                              ? const TrashBinScreen()
+                                          : _activeMenu == '系統設定'
+                                              ? const SettingsScreen()
+                                              : _buildFallbackScreen(),
                 ),
               ],
             ),
@@ -1046,78 +1047,103 @@ class _HomeScreenState extends State<HomeScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // View mode switcher on mobile
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF161B22) : Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade300),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            onTap: () => _updateCalendarViewMode('timeline'),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _calendarViewMode == 'timeline' ? primaryColor : Colors.transparent,
-                                borderRadius: BorderRadius.circular(6),
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => RoutePlannerDialog(
+                                selectedDate: _selectedDate,
+                                events: _events,
                               ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.view_day_outlined,
-                                    size: 14,
-                                    color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    context.l10n('calendar_view_timeline'),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            );
+                          },
+                          icon: const Icon(Icons.alt_route, size: 14, color: Colors.white),
+                          label: const Text('路線規劃', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                           ),
-                          const SizedBox(width: 2),
-                          InkWell(
-                            onTap: () => _updateCalendarViewMode('month_grid'),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _calendarViewMode == 'month_grid' ? primaryColor : Colors.transparent,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.grid_on_outlined,
-                                    size: 14,
-                                    color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    context.l10n('calendar_view_month'),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                        ),
+                        const SizedBox(width: 8),
+                        // View mode switcher on mobile
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF161B22) : Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade300),
                           ),
-                        ],
-                      ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: () => _updateCalendarViewMode('timeline'),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _calendarViewMode == 'timeline' ? primaryColor : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.view_day_outlined,
+                                        size: 14,
+                                        color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        context.l10n('calendar_view_timeline'),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: _calendarViewMode == 'timeline' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              InkWell(
+                                onTap: () => _updateCalendarViewMode('month_grid'),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _calendarViewMode == 'month_grid' ? primaryColor : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.grid_on_outlined,
+                                        size: 14,
+                                        color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        context.l10n('calendar_view_month'),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: _calendarViewMode == 'month_grid' ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     if (_isLoadingEvents)
                       const SizedBox(
@@ -1195,6 +1221,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Row(
                   children: [
+                    // 路線規劃按鈕
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => RoutePlannerDialog(
+                            selectedDate: _selectedDate,
+                            events: _events,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.alt_route, size: 16, color: Colors.white),
+                      label: const Text('路線規劃', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // 視圖切換按鈕 (日時間軸 vs 月網格)
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(

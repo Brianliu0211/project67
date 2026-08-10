@@ -597,6 +597,8 @@ CREATE TABLE IF NOT EXISTS public.schedule_events (
     start_at TIMESTAMPTZ NOT NULL,
     end_at TIMESTAMPTZ NOT NULL,
     location TEXT,
+    latitude NUMERIC,
+    longitude NUMERIC,
     tag TEXT, -- 自訂標籤名稱
     event_type TEXT DEFAULT 'personal', -- e.g., 'personal', 'meeting', 'visit', 'reminder'
     is_completed BOOLEAN DEFAULT FALSE NOT NULL,
