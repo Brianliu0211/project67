@@ -60,6 +60,12 @@ dependencies:
   csv: ^6.0.0
   excel: ^4.0.0
 
+  # Map & Geospatial location support
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  http: ^1.2.1
+  url_launcher: ^6.3.0
+
   # Internationalization support
   flutter_localizations:
     sdk: flutter

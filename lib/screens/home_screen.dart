@@ -17,6 +17,7 @@ import 'settings_screen.dart';
 import 'profile_screen.dart';
 import 'trash_bin_screen.dart';
 import 'insurance_news_tab.dart';
+import '../widgets/route_planner_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -578,23 +579,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? _buildScheduleView(isWideScreen, isDark, textColor, subTextColor, borderColor, primaryColor)
                       : _activeMenu == '新聞頭條'
                           ? const InsuranceNewsTab()
-                          : _activeMenu == '客戶管理'
-                              ? CustomerManagementTab(
-                                  onMenuChanged: (menu) {
-                                    setState(() {
-                                      _activeMenu = menu;
-                                    });
-                                  },
-                                )
-                              : _activeMenu == '專案拜訪'
-                                  ? const VisitProjectsTab()
-                                  : _activeMenu == '個人帳號'
-                                      ? ProfileScreen(onProfileUpdated: _loadUserProfile)
-                                      : _activeMenu == '垃圾桶'
-                                          ? const TrashBinScreen()
-                                      : _activeMenu == '系統設定'
-                                          ? const SettingsScreen()
-                                          : _buildFallbackScreen(),
+                              : _activeMenu == '客戶管理'
+                                  ? CustomerManagementTab(
+                                      onMenuChanged: (menu) {
+                                        setState(() {
+                                          _activeMenu = menu;
+                                        });
+                                      },
+                                    )
+                                  : _activeMenu == '專案拜訪'
+                                      ? const VisitProjectsTab()
+                                      : _activeMenu == '個人帳號'
+                                          ? ProfileScreen(onProfileUpdated: _loadUserProfile)
+                                          : _activeMenu == '垃圾桶'
+                                              ? const TrashBinScreen()
+                                          : _activeMenu == '系統設定'
+                                              ? const SettingsScreen()
+                                              : _buildFallbackScreen(),
                 ),
               ],
             ),
@@ -1027,6 +1028,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Row(
             children: [
+              // 路線規劃按鈕
+              ElevatedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => RoutePlannerDialog(
+                      selectedDate: _selectedDate,
+                      events: _events,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.alt_route, size: 16, color: Colors.white),
+                label: const Text('路線規劃', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              const SizedBox(width: 12),
               // 視圖切換按鈕 (日時間軸 vs 月網格)
               Container(
                 padding: const EdgeInsets.all(4),

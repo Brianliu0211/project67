@@ -6,6 +6,8 @@ class ScheduleEvent {
   final DateTime startAt;
   final DateTime endAt;
   final String? location;
+  final double? latitude;
+  final double? longitude;
   final String? tag;
   final String eventType;
   final bool isCompleted;
@@ -18,6 +20,8 @@ class ScheduleEvent {
     required this.startAt,
     required this.endAt,
     this.location,
+    this.latitude,
+    this.longitude,
     this.tag,
     this.eventType = 'personal',
     this.isCompleted = false,
@@ -33,6 +37,8 @@ class ScheduleEvent {
       startAt: DateTime.parse(json['start_at'] as String).toLocal(),
       endAt: DateTime.parse(json['end_at'] as String).toLocal(),
       location: json['location'] as String?,
+      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
+      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
       tag: json['tag'] as String?,
       eventType: json['event_type'] as String? ?? 'personal',
       isCompleted: json['is_completed'] as bool? ?? false,
@@ -49,6 +55,8 @@ class ScheduleEvent {
       'start_at': startAt.toUtc().toIso8601String(),
       'end_at': endAt.toUtc().toIso8601String(),
       'location': location,
+      'latitude': latitude,
+      'longitude': longitude,
       'tag': tag,
       'event_type': eventType,
       'is_completed': isCompleted,
