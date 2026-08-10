@@ -5,6 +5,7 @@ import '../services/app_settings.dart';
 import '../services/app_localizations.dart';
 import '../widgets/google_sign_in_button.dart';
 import '../main.dart';
+import '../services/spotlight_tour_service.dart';
 import 'tag_manager_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -443,6 +444,72 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       );
                     },
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Section 4: Spotlight Onboarding Tour Controller
+                  _buildSectionHeader(context, Icons.school_outlined, '🎓 新手教學與功能導覽', primaryColor),
+                  const SizedBox(height: 12),
+                  _buildCardContainer(
+                    context,
+                    isDark,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '系統功能導覽控制器',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '隨時可播放完整系統導覽，或按章節獨立選看複習各項功能示範。',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 播放完整導覽按鈕
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => SpotlightTourService.instance.startTour(chapterIndex: 0),
+                          icon: const Icon(Icons.play_circle_fill, size: 18),
+                          label: const Text('▶️ 播放完整新手導覽 (4 章節)'),
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 8),
+
+                        // 4 大章節分區選看選單
+                        const Text(
+                          '按章節分區選看：',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8.0,
+                          runSpacing: 8.0,
+                          children: List.generate(
+                            SpotlightTourService.instance.chapters.length,
+                            (index) {
+                              final chapter = SpotlightTourService.instance.chapters[index];
+                              return ActionChip(
+                                avatar: Icon(chapter.icon, size: 16, color: primaryColor),
+                                label: Text(chapter.title),
+                                backgroundColor: isDark ? const Color(0xFF21262D) : Colors.grey.shade100,
+                                onPressed: () => SpotlightTourService.instance.startTour(chapterIndex: index),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 32),
 

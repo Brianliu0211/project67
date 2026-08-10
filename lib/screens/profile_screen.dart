@@ -40,6 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   late TextEditingController _websiteController;
   late TextEditingController _addressController;
   late TextEditingController _bioController;
+  late TextEditingController _licenseNoController;
   late TextEditingController _customHonorController;
   late TextEditingController _customBadgeController;
 
@@ -93,6 +94,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   final FocusNode _websiteFocus = FocusNode();
   final FocusNode _addressFocus = FocusNode();
   final FocusNode _bioFocus = FocusNode();
+  final FocusNode _licenseNoFocus = FocusNode();
 
   late final Listenable _controllersListenable;
 
@@ -107,6 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _websiteController = TextEditingController();
     _addressController = TextEditingController();
     _bioController = TextEditingController();
+    _licenseNoController = TextEditingController();
     _customHonorController = TextEditingController();
     _customBadgeController = TextEditingController();
 
@@ -119,6 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       _websiteController,
       _addressController,
       _bioController,
+      _licenseNoController,
     ]);
 
     _loadProfileData();
@@ -134,6 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _websiteController.dispose();
     _addressController.dispose();
     _bioController.dispose();
+    _licenseNoController.dispose();
     _customHonorController.dispose();
     _customBadgeController.dispose();
 
@@ -145,6 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _websiteFocus.dispose();
     _addressFocus.dispose();
     _bioFocus.dispose();
+    _licenseNoFocus.dispose();
     super.dispose();
   }
 
@@ -163,6 +169,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         _lineIdController.text = prefs.getString('profile_line_id') ?? '';
         _companyController.text = prefs.getString('profile_company') ?? '國泰人壽';
         _jobTitleController.text = prefs.getString('profile_job_title') ?? '資深理財顧問';
+        _licenseNoController.text = prefs.getString('profile_license_no') ?? '110登字第389201號';
         _websiteController.text = prefs.getString('profile_website') ?? '';
         _addressController.text = prefs.getString('profile_address') ?? '';
         _bioController.text = prefs.getString('profile_bio') ?? '專業、誠信、客戶至上。致力於為每個家庭規劃最完善的保障方案與資產傳承策略。';
@@ -271,6 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await prefs.setString('profile_line_id', _lineIdController.text.trim());
         await prefs.setString('profile_company', _companyController.text.trim());
         await prefs.setString('profile_job_title', _jobTitleController.text.trim());
+        await prefs.setString('profile_license_no', _licenseNoController.text.trim());
         await prefs.setString('profile_website', _websiteController.text.trim());
         await prefs.setString('profile_address', _addressController.text.trim());
         await prefs.setString('profile_bio', _bioController.text.trim());
@@ -562,18 +570,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ),
         Row(
           children: [
-            OutlinedButton.icon(
-              onPressed: _open3DTheaterModal,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: primaryColor,
-                side: BorderSide(color: primaryColor, width: 1.5),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
-              icon: const Icon(Icons.view_in_ar_rounded, size: 18),
-              label: const Text('3D 劇院', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            ),
-            const SizedBox(width: 12),
             ElevatedButton.icon(
               onPressed: _isLoading ? null : _saveProfile,
               style: ElevatedButton.styleFrom(
@@ -703,6 +699,42 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ),
                 ),
               ),
+
+              const SizedBox(height: 18),
+
+              // Realistic Business Card Quick Action Bar (Underneath Card Stage)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildActionHubBtn(Icons.phone_in_talk_rounded, '撥打電話', primaryColor, () {
+                        final p = _phoneController.text.trim();
+                        CustomToast.show(context, p.isNotEmpty ? '撥打電話至 $p' : '未設定電話號碼', ToastType.warning);
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildActionHubBtn(Icons.chat_bubble_outline_rounded, '加 LINE', Colors.greenAccent, () {
+                        final l = _lineIdController.text.trim();
+                        CustomToast.show(context, l.isNotEmpty ? 'LINE ID: $l 已複製' : '未設定 LINE ID', ToastType.success);
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildActionHubBtn(Icons.mail_outline_rounded, '發送 Email', Colors.amberAccent, () {
+                        final e = _userEmail;
+                        CustomToast.show(context, e.isNotEmpty ? '發送郵件至 $e' : '未設定 Email', ToastType.warning);
+                      }),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -756,7 +788,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               duration: const Duration(milliseconds: 300),
               child: _isCardFlipped
                   ? _buildCardBackSide(cardTextColor, cardSubColor, cardAccentColor, theme, bio, website)
-                  : _buildCardFrontSide(avatarProvider, initialLetter, name, jobTitle, company, phone, lineId, email, address, website, cardTextColor, cardSubColor, cardAccentColor, theme),
+                  : _buildCardFrontSide(avatarProvider, initialLetter, name, jobTitle, company, phone, lineId, email, address, website, cardTextColor, cardSubColor, cardAccentColor, theme, isDark),
             ),
             // Dynamic Holographic Foil Overlay (Inspired by todo-tcg.vercel.app mouse-following foil shimmer spotlight!)
             if (_glareMode == 'tcg_rainbow')
@@ -820,204 +852,213 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     Color cardSubColor,
     Color cardAccentColor,
     Map<String, dynamic> theme,
+    bool isDark,
   ) {
     return Padding(
       key: const ValueKey('front'),
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Company Header Row (Clickable -> Tab 1 Business)
-          InkWell(
-            onTap: () => _focusInlineField(1, _companyFocus),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.verified_user_rounded, color: cardAccentColor, size: 18),
-                      const SizedBox(width: 6),
-                      Text(
-                        company,
-                        style: TextStyle(color: cardTextColor, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                  // Professional Honor Title Chip (Dynamic Theme Color Adaptation, renders ONLY if non-empty!)
-                  if (_honorTitle.isNotEmpty)
+          // 1. Company Header Row & Registration Number
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              InkWell(
+                onTap: () => _focusInlineField(1, _companyFocus),
+                borderRadius: BorderRadius.circular(8),
+                child: Row(
+                  children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: cardAccentColor,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(color: cardAccentColor.withOpacity(0.4), blurRadius: 6),
-                        ],
+                        color: cardAccentColor.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: cardAccentColor.withOpacity(0.4), width: 1),
                       ),
-                      child: Text(
-                        _honorTitle,
-                        style: TextStyle(
-                          color: (cardAccentColor.computeLuminance() > 0.6) ? const Color(0xFF0F172A) : Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      child: Icon(Icons.verified_user_rounded, color: cardAccentColor, size: 16),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      company,
+                      style: TextStyle(
+                        color: cardTextColor,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-
-          // Avatar & Name Row (Clickable -> Tab 0 Basic)
-          InkWell(
-            onTap: () => _focusInlineField(0, _nameFocus),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: _pickImage,
-                    borderRadius: BorderRadius.circular(36),
-                    child: Stack(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: cardAccentColor, width: 2),
-                            boxShadow: [
-                              BoxShadow(color: cardAccentColor.withOpacity(0.3), blurRadius: 8),
-                            ],
-                          ),
-                          child: CircleAvatar(
-                            radius: 32,
-                            backgroundColor: cardAccentColor.withOpacity(0.15),
-                            backgroundImage: avatarProvider,
-                            child: avatarProvider == null
-                                ? Text(
-                                    initialLetter,
-                                    style: TextStyle(color: cardAccentColor, fontSize: 28, fontWeight: FontWeight.bold),
-                                  )
-                                : null,
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: CircleAvatar(
-                            radius: 10,
-                            backgroundColor: cardAccentColor,
-                            child: const Icon(Icons.camera_alt, size: 10, color: Colors.white),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: cardTextColor),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          jobTitle,
-                          style: TextStyle(fontSize: 14, color: cardAccentColor, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Badges Row (MDRT, CFP...) (Clickable -> Tab 2 Badges)
-          if (_selectedBadges.isNotEmpty)
-            InkWell(
-              onTap: () => setState(() => _activeTabIndex = 2),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: _selectedBadges.map((badge) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: theme['badgeBg'],
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: cardAccentColor.withOpacity(0.3)),
-                      ),
-                      child: Text(
-                        '🏆 $badge',
-                        style: TextStyle(color: theme['badgeText'], fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    );
-                  }).toList(),
+                  ],
                 ),
               ),
-            ),
-          const SizedBox(height: 16),
+              if (_honorTitle.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [cardAccentColor, cardAccentColor.withOpacity(0.8)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: cardAccentColor.withOpacity(0.35), blurRadius: 6),
+                    ],
+                  ),
+                  child: Text(
+                    _honorTitle,
+                    style: TextStyle(
+                      color: (cardAccentColor.computeLuminance() > 0.6) ? const Color(0xFF0F172A) : Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+            ],
+          ),
 
-          // Quick Action Hub Buttons
+          const SizedBox(height: 14),
+
+          // 2. Main Profile Info Row (Avatar + Name + Job Title + Registration No.)
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(
-                child: _buildActionHubBtn(Icons.phone_in_talk_rounded, '撥打電話', cardAccentColor, () {
-                  final p = phone.isNotEmpty ? phone : '未設定電話';
-                  CustomToast.show(context, '通話已連線至 $p', ToastType.success);
-                }),
+              InkWell(
+                onTap: _pickImage,
+                borderRadius: BorderRadius.circular(40),
+                child: Stack(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: cardAccentColor, width: 2),
+                        boxShadow: [
+                          BoxShadow(color: cardAccentColor.withOpacity(0.35), blurRadius: 10),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        radius: 30,
+                        backgroundColor: cardAccentColor.withOpacity(0.15),
+                        backgroundImage: avatarProvider,
+                        child: avatarProvider == null
+                            ? Text(
+                                initialLetter,
+                                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: cardAccentColor),
+                              )
+                            : null,
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: CircleAvatar(
+                        radius: 10,
+                        backgroundColor: cardAccentColor,
+                        child: const Icon(Icons.camera_alt, size: 10, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 14),
               Expanded(
-                child: _buildActionHubBtn(Icons.chat_bubble_outline_rounded, '加 LINE', Colors.greenAccent, () {
-                  final l = lineId.isNotEmpty ? lineId : '未設定 LINE ID';
-                  CustomToast.show(context, 'LINE ID: $l 已開啟', ToastType.success);
-                }),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionHubBtn(Icons.mail_outline_rounded, '發送 Email', Colors.amberAccent, () {
-                  final e = email.isNotEmpty ? email : '未設定 Email';
-                  CustomToast.show(context, '郵件連線至 $e', ToastType.success);
-                }),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: cardTextColor, letterSpacing: 0.5),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      jobTitle,
+                      style: TextStyle(fontSize: 13, color: cardAccentColor, fontWeight: FontWeight.bold),
+                    ),
+                    if (_licenseNoController.text.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '登錄字號：${_licenseNoController.text.trim()}',
+                        style: TextStyle(fontSize: 11, color: cardSubColor, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
+
           const SizedBox(height: 14),
 
-          // Info Rows with STRICT EMPTY FIELD PROTECTION (Only show if non-empty!)
-          if (phone.isNotEmpty)
-            InkWell(
-              onTap: () => _focusInlineField(0, _phoneFocus),
-              child: _buildCardInfoRow(Icons.phone_android_rounded, phone, cardSubColor),
+          // 3. Clean Contact Info Row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: cardAccentColor.withOpacity(0.15)),
             ),
-          if (lineId.isNotEmpty)
-            InkWell(
-              onTap: () => _focusInlineField(0, _lineIdFocus),
-              child: _buildCardInfoRow(Icons.chat_rounded, 'LINE ID: $lineId', cardSubColor),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.phone_android_rounded, size: 13, color: cardAccentColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      phone.isNotEmpty ? phone : '未填寫電話',
+                      style: TextStyle(fontSize: 11, color: cardTextColor, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                if (lineId.isNotEmpty)
+                  Row(
+                    children: [
+                      Icon(Icons.chat_bubble_outline_rounded, size: 13, color: Colors.greenAccent),
+                      const SizedBox(width: 4),
+                      Text(
+                        'LINE: $lineId',
+                        style: TextStyle(fontSize: 11, color: cardTextColor, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                if (email.isNotEmpty)
+                  Row(
+                    children: [
+                      Icon(Icons.mail_outline_rounded, size: 13, color: cardSubColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        email.length > 18 ? '${email.substring(0, 15)}...' : email,
+                        style: TextStyle(fontSize: 11, color: cardSubColor),
+                      ),
+                    ],
+                  ),
+              ],
             ),
-          if (email.isNotEmpty)
-            _buildCardInfoRow(Icons.mail_outline_rounded, email, cardSubColor),
-          if (address.isNotEmpty)
-            InkWell(
-              onTap: () => _focusInlineField(1, _addressFocus),
-              child: _buildCardInfoRow(Icons.location_on_outlined, address, cardSubColor),
-            ),
-          if (website.isNotEmpty)
-            InkWell(
-              onTap: () => _focusInlineField(1, _websiteFocus),
-              child: _buildCardInfoRow(Icons.web_rounded, website, cardSubColor),
+          ),
+
+          const SizedBox(height: 10),
+
+          // 4. Professional Badges Horizontal Row
+          if (_selectedBadges.isNotEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _selectedBadges.map((badge) {
+                  return Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: theme['badgeBg'],
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: cardAccentColor.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      '🏆 $badge',
+                      style: TextStyle(color: theme['badgeText'], fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
         ],
       ),
@@ -1143,84 +1184,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
         ],
       ),
-    );
-  }
-
-  // --- 3D IMMERSIVE FULLSCREEN THEATER MODAL ---
-  void _open3DTheaterModal() {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black87,
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final primaryColor = AppSettings.instance.primaryColor;
-
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(20),
-          child: StatefulBuilder(
-            builder: (context, setModalState) {
-              return Container(
-                width: 600,
-                height: 520,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A).withOpacity(0.9) : Colors.white.withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: primaryColor.withOpacity(0.4), width: 2),
-                  boxShadow: [
-                    BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 40, spreadRadius: 5),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.view_in_ar_rounded, color: primaryColor, size: 24),
-                              const SizedBox(width: 10),
-                              Text(
-                                '3D 劇院沉浸式預覽舞台',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Expanded(
-                      child: Center(
-                        child: Text(
-                          '滑鼠懸停傾斜與光影極致體驗中...',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: SizedBox(
-                        width: 380,
-                        child: _buildDynamicBusinessCard(isDark, primaryColor),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
     );
   }
 
@@ -1413,6 +1376,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ),
         const SizedBox(height: 14),
         TextFormField(
+          controller: _licenseNoController,
+          focusNode: _licenseNoFocus,
+          style: TextStyle(color: textColor),
+          decoration: _buildInputDeco('保險業務員登錄字號', Icons.verified_outlined, isDark, primaryColor, subTextColor, hintText: '例: 110登字第389201號'),
+        ),
+        const SizedBox(height: 14),
+        TextFormField(
           controller: _websiteController,
           focusNode: _websiteFocus,
           style: TextStyle(color: textColor),
@@ -1430,253 +1400,268 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  // --- TAB 2: BADGES, CUSTOM HONOR TITLE AND THEMES WITH FULL CRUD TAG MANAGEMENT ---
+  // --- TAB 2: BADGES, CUSTOM HONOR TITLE AND THEMES WITH FULL STRUCTURED MANAGEMENT ---
   Widget _buildTab2BadgesAndTheme(bool isDark, Color primaryColor, Color textColor, Color subTextColor) {
     return Column(
       key: const ValueKey(2),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('顧問榮譽頭銜與專業認證標籤管理', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+        Text('顧問榮譽頭銜與專業認證標籤管理', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: textColor)),
         const SizedBox(height: 4),
-        Text('可自由新增、選擇與刪除展現於名片上之榮譽頭銜與專業認證標籤', style: TextStyle(fontSize: 12, color: subTextColor)),
-        const SizedBox(height: 16),
+        Text('管理展現於商務名片上的頭銜、認證徽章與名片實體視覺主題', style: TextStyle(fontSize: 12, color: subTextColor)),
+        const SizedBox(height: 18),
 
-        // 1. Honor Title CRUD
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('1. 榮譽頭銜標籤 (選擇 / 刪除)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
-            Text('目前共 ${_availableHonorTitles.length} 項', style: TextStyle(fontSize: 11, color: subTextColor)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            // Option 0: Don't display any honor title (Deselect / 不顯示)
-            ChoiceChip(
-              selected: _honorTitle.isEmpty,
-              label: const Text('🚫 不顯示頭銜 (空白)'),
-              checkmarkColor: primaryColor.computeLuminance() > 0.45 ? const Color(0xFF0F172A) : Colors.white,
-              selectedColor: primaryColor,
-              labelStyle: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: _honorTitle.isEmpty
-                    ? (primaryColor.computeLuminance() > 0.45 ? const Color(0xFF0F172A) : Colors.white)
-                    : textColor,
-              ),
-              backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-              onSelected: (val) {
-                if (val) {
-                  setState(() {
-                    _honorTitle = '';
-                  });
-                }
-              },
-            ),
-            ..._availableHonorTitles.map((honor) {
-              final isSelected = _honorTitle == honor;
-              final isBright = primaryColor.computeLuminance() > 0.45;
-              final activeFontColor = isBright ? const Color(0xFF0F172A) : Colors.white;
-
-              return InputChip(
-                selected: isSelected,
-                label: Text(honor),
-                selectedColor: primaryColor,
-                checkmarkColor: activeFontColor,
-                deleteIcon: const Icon(Icons.cancel_rounded, size: 14),
-                deleteIconColor: isSelected ? activeFontColor.withOpacity(0.8) : subTextColor,
-                onDeleted: () {
-                  setState(() {
-                    _availableHonorTitles.remove(honor);
-                    if (_honorTitle == honor) {
-                      _honorTitle = '';
-                    }
-                  });
-                  CustomToast.show(context, '已刪除頭銜標籤：$honor', ToastType.warning);
-                },
-                labelStyle: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: isSelected ? activeFontColor : textColor,
-                ),
-                backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                onPressed: () {
-                  setState(() {
-                    _honorTitle = honor;
-                  });
-                },
-              );
-            }),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _customHonorController,
-                style: TextStyle(color: textColor, fontSize: 13),
-                decoration: _buildInputDeco('新增自訂榮譽頭銜 (如: 首席理財大師)', Icons.add_moderator_rounded, isDark, primaryColor, subTextColor),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: () {
-                final txt = _customHonorController.text.trim();
-                if (txt.isNotEmpty) {
-                  if (!_availableHonorTitles.contains(txt)) {
-                    setState(() {
-                      _availableHonorTitles.add(txt);
-                      _honorTitle = txt;
-                      _customHonorController.clear();
-                    });
-                    CustomToast.show(context, '已新增並套用頭銜：$txt', ToastType.success);
-                  } else {
-                    CustomToast.show(context, '此頭銜已存在！', ToastType.warning);
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('新增頭銜', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // 2. Professional Certification Badges CRUD
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('2. 專業證照與榮譽徽章 (多選 / 新增 / 刪除)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
-            Text('已選 ${_selectedBadges.length} / 共 ${_availableBadges.length} 項', style: TextStyle(fontSize: 11, color: subTextColor)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _availableBadges.map((badge) {
-            final isSelected = _selectedBadges.contains(badge);
-            final isPrimaryBright = primaryColor.computeLuminance() > 0.45;
-            final selectedFontColor = isPrimaryBright ? const Color(0xFF0F172A) : Colors.white;
-
-            return InputChip(
-              selected: isSelected,
-              label: Text(badge),
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedBadges.add(badge);
-                  } else {
-                    _selectedBadges.remove(badge);
-                  }
-                });
-              },
-            );
-          }).toList(),
-        ),
-        // Section 2 Dedicated Add Badge TextField & Button
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _customBadgeController,
-                style: TextStyle(color: textColor, fontSize: 13),
-                decoration: _buildInputDeco('新增自訂證照/榮譽徽章 (如: 美國百萬圓桌)', Icons.verified_outlined, isDark, primaryColor, subTextColor),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: () {
-                final txt = _customBadgeController.text.trim();
-                if (txt.isNotEmpty) {
-                  if (!_availableBadges.contains(txt)) {
-                    setState(() {
-                      _availableBadges.add(txt);
-                      _selectedBadges.add(txt);
-                      _customBadgeController.clear();
-                    });
-                    CustomToast.show(context, '已新增並勾選證照：$txt', ToastType.success);
-                  } else {
-                    CustomToast.show(context, '此證照標籤已存在！', ToastType.warning);
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('新增證照', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // 3. Theme Presets & Custom Color Palette
-        Text('3. 選擇名片質感主題配色與自訂自由色盤', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildThemePresetChip('system_primary', '全站主題 (預設)', primaryColor, isDark),
-            _buildThemePresetChip('cyan_slate', '極致藍曜', const Color(0xFF0EA5E9), isDark),
-            _buildThemePresetChip('dark_gold', '尊爵黑金', const Color(0xFFEAB308), isDark),
-            _buildThemePresetChip('emerald', '活力翡翠', const Color(0xFF10B981), isDark),
-            _buildThemePresetChip('custom_color', '🎨 自訂自由色盤', _customCardColor, isDark),
-          ],
-        ),
-        if (_selectedTheme == 'custom_color') ...[
-          const SizedBox(height: 12),
-          Text('點選色票客製名片主色：', style: TextStyle(fontSize: 11, color: subTextColor, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
+        // Section A: 👑 Honor Title Selection Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildColorSwatch(const Color(0xFF8B5CF6), '紫羅蘭'),
-              _buildColorSwatch(const Color(0xFFEC4899), '玫瑰粉紅'),
-              _buildColorSwatch(const Color(0xFF3B82F6), '皇家寶藍'),
-              _buildColorSwatch(const Color(0xFFF97316), '活力珊瑚橘'),
-              _buildColorSwatch(const Color(0xFF06B6D4), '極光靛青'),
-              _buildColorSwatch(const Color(0xFF64748B), '高雅石墨灰'),
-              _buildColorSwatch(const Color(0xFF14B8A6), '湖水碧綠'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.workspace_premium_rounded, color: primaryColor, size: 18),
+                      const SizedBox(width: 6),
+                      Text('1. 專屬榮譽頭銜 (選擇 / 新增)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
+                    ],
+                  ),
+                  Text('目前選用：${_honorTitle.isEmpty ? "未設定" : _honorTitle}', style: TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ChoiceChip(
+                    selected: _honorTitle.isEmpty,
+                    label: const Text('🚫 無頭銜'),
+                    selectedColor: primaryColor,
+                    onSelected: (val) {
+                      if (val) setState(() => _honorTitle = '');
+                    },
+                  ),
+                  ..._availableHonorTitles.map((honor) {
+                    final isSelected = _honorTitle == honor;
+                    return ChoiceChip(
+                      selected: isSelected,
+                      label: Text(honor),
+                      selectedColor: primaryColor,
+                      labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Colors.white : textColor,
+                      ),
+                      onSelected: (selected) {
+                        if (selected) setState(() => _honorTitle = honor);
+                      },
+                    );
+                  }),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _customHonorController,
+                      style: TextStyle(color: textColor, fontSize: 13),
+                      decoration: _buildInputDeco('新增自訂榮譽頭銜 (如: 首席理財大師)', Icons.add_moderator_rounded, isDark, primaryColor, subTextColor),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final txt = _customHonorController.text.trim();
+                      if (txt.isNotEmpty) {
+                        if (!_availableHonorTitles.contains(txt)) {
+                          setState(() {
+                            _availableHonorTitles.add(txt);
+                            _honorTitle = txt;
+                            _customHonorController.clear();
+                          });
+                          CustomToast.show(context, '已新增頭銜：$txt', ToastType.success);
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('新增', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
             ],
           ),
-        ],
-        const SizedBox(height: 20),
-
-        // 4. Glare Mode Selector (Default: 🚫 無光澤)
-        Text('4. 選擇 3D 名片雷射光澤模式', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildGlareChip('none', '🚫 無光澤 (預設純淨)', isDark, primaryColor),
-            _buildGlareChip('tcg_rainbow', '🌈 TCG 炫彩彩虹雷射', isDark, primaryColor),
-            _buildGlareChip('metallic_tint', '✨ 同色系金屬琉光', isDark, primaryColor),
-          ],
         ),
+
+        const SizedBox(height: 16),
+
+        // Section B: 🏆 Professional Badges Selection Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.verified_rounded, color: primaryColor, size: 18),
+                      const SizedBox(width: 6),
+                      Text('2. 專業證照與榮譽徽章', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
+                    ],
+                  ),
+                  Text('已選 ${_selectedBadges.length} / ${_availableBadges.length} 項', style: TextStyle(fontSize: 11, color: subTextColor)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _availableBadges.map((badge) {
+                  final isSelected = _selectedBadges.contains(badge);
+                  return FilterChip(
+                    selected: isSelected,
+                    label: Text(badge),
+                    selectedColor: primaryColor.withOpacity(0.2),
+                    checkmarkColor: primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: isSelected ? primaryColor : Colors.grey.withOpacity(0.3)),
+                    ),
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? primaryColor : textColor,
+                    ),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedBadges.add(badge);
+                        } else {
+                          _selectedBadges.remove(badge);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _customBadgeController,
+                      style: TextStyle(color: textColor, fontSize: 13),
+                      decoration: _buildInputDeco('新增自訂專業證照 (如: CFP 國際理財師)', Icons.card_membership_rounded, isDark, primaryColor, subTextColor),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final txt = _customBadgeController.text.trim();
+                      if (txt.isNotEmpty) {
+                        if (!_availableBadges.contains(txt)) {
+                          setState(() {
+                            _availableBadges.add(txt);
+                            _selectedBadges.add(txt);
+                            _customBadgeController.clear();
+                          });
+                          CustomToast.show(context, '已新增並勾選證照：$txt', ToastType.success);
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('新增', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Section C: 🎨 Luxe Business Card Theme Swatches Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.palette_outlined, color: primaryColor, size: 18),
+                  const SizedBox(width: 6),
+                  Text('3. 名片實體材質與視覺主題', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildThemePresetChip('system_primary', '全站綠松石 (預設)', primaryColor, isDark),
+                  _buildThemePresetChip('cyan_slate', '極致藍曜', const Color(0xFF0EA5E9), isDark),
+                  _buildThemePresetChip('dark_gold', '尊爵黑金', const Color(0xFFEAB308), isDark),
+                  _buildThemePresetChip('emerald', '活力翡翠', const Color(0xFF10B981), isDark),
+                  _buildThemePresetChip('custom_color', '🎨 自訂自由色盤', _customCardColor, isDark),
+                ],
+              ),
+              if (_selectedTheme == 'custom_color') ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildColorSwatch(const Color(0xFF8B5CF6), '紫羅蘭'),
+                    _buildColorSwatch(const Color(0xFFEC4899), '玫瑰粉紅'),
+                    _buildColorSwatch(const Color(0xFF3B82F6), '皇家寶藍'),
+                    _buildColorSwatch(const Color(0xFFF97316), '活力珊瑚橘'),
+                    _buildColorSwatch(const Color(0xFF06B6D4), '極光靛青'),
+                    _buildColorSwatch(const Color(0xFF64748B), '石墨灰'),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+
         const SizedBox(height: 16),
         TextFormField(
           controller: _bioController,
           focusNode: _bioFocus,
           maxLines: 3,
           style: TextStyle(color: textColor),
-          decoration: _buildInputDeco('服務理念與個人簡介', Icons.info_outline_rounded, isDark, primaryColor, subTextColor),
+          decoration: _buildInputDeco('服務理念與個人簡介 (名片背面展示)', Icons.info_outline_rounded, isDark, primaryColor, subTextColor),
         ),
         const SizedBox(height: 14),
 

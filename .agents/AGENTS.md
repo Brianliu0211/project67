@@ -29,9 +29,9 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 
 ### Actions
 1. **前置安全檢查 (Check Previous Closing Status)**：在執行任何開工動作前，**必須**先檢查本地 Git 倉庫狀態（如執行 `git status`）。若偵測到當前工作目錄有未提交的變更，或前次開發分支尚未執行收工與合併流程，**必須**主動發出黃色/橙色警示，提醒專案人員先進行「收工」或合併，待確認安全後始得繼續開工。
-2. **確認開發者身分與工作區**：主動詢問開發者為 **蘿蔔 (lobo)** 還是 **巨獸 (beast)**，以鎖定對應的分支前綴與沙盒路徑。
+2. **確認開發者身分與工作區 (強制常駐點選彈窗)**：**必須【強制呼叫 `ask_question` 互動選單工具】**，彈出互動選項讓專案人員直接點選身分（`我是 蘿蔔 (lobo)` 或 `我是 巨獸 (beast)`），以鎖定對應的分支前綴與沙盒路徑，徹底免去手動打字負擔。
 3. **巡檢個人工作區新靈感 (Read-Only Scan)**：唯讀巡檢 `docs/01_蘿蔔_工作區/想法存放區/` 與 `docs/02_巨獸_工作區/想法存放區/`，若發現全新未討論靈感，詢問是否提報摘要至 `docs/進度.md` 萬能收件匣。（注意：AI 嚴禁修改或刪除人類工作區原始筆記）。
-4. **對齊進度表任務**：讀取 [進度.md](docs/進度.md) 並展示當前未完成的大模組任務列表，請開發者選擇本次要進行的任務。
+4. **對齊進度表任務 (強制常駐點選彈窗)**：讀取 [進度.md](docs/進度.md) 並**透過 `ask_question` 彈窗**展示當前未完成的大模組任務列表，讓開發者能直接點選本次要進行的任務。
 5. **大任務微型拆解協定 (Task Decomposition Protocol)**：當開發者選定特定大模組任務時，AI **必須**自動進行 4 階段微型拆解（`(1) Schema/RLS` $\rightarrow$ `(2) Service/邏輯層` $\rightarrow$ `(3) UI組件` $\rightarrow$ `(4) 驗證`），將大任務拆為微型 Tickets 並展示於對話與 sub-task 脈絡中，避免一次變更規模過大。
 6. **建議分支名稱**：若為程式碼開發，生成格式為 `feature/username-featurename` 的分支名稱（例如：`feature/lobo-customer-list-ui`）。
 7. **提供分支指令/介面操作指引**：引導 GitHub Desktop 建立特徵分支（純文件類修改除外）。
@@ -44,10 +44,10 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 - **Rule**: When the user says **「收工」**, you **MUST** automatically perform the following actions in order:
 
 ### Actions
-1. **檢查與自動修復 Git 分支狀態 (Branch Safeguard)**：
+1. **檢查與自動修復 Git 分支狀態 (Branch Safeguard & Auto-Switch)**：
    - 檢查當前本機 Git 分支與變更檔案：
-     - **純文件修訂 (Fast-Track 快速通道)**：若本次變更 100% 僅包含 `docs/` 或 `.md` 文件（未修改 `lib/` 或程式碼），**目標分支一律為 `main` 主線**。若當前本機處於特徵分支，AI 應提示並引導專案人員在 GitHub Desktop 切換回 `main` 主線（或在背景切換），並明確輸出 **目標分支: `main`**。
-     - **程式碼修訂 (Standard PR 流程)**：若包含程式碼變更，且發現未部位於標準特徵分支（例如位於 `main` 主線，或位於自動產生的非標準分支名稱），自動依開發者身分 (蘿蔔 lobo / 巨獸 beast) 生成標準分支名稱 `feature/username-featurename`（如 `feature/lobo-email-auth-fix`），並在背景執行分支切換（`git branch -m <branch-name>`）。
+     - **純文件修訂 (Fast-Track 快速通道)**：若本次變更 100% 僅包含 `docs/` 或 `.md` 文件（未修改 `lib/` 或程式碼），**目標分支一律為 `main` 主線**。若當前本機處於特徵分支，AI **必須直接在背景執行 `git checkout main`** 自動切換回 `main` 主線，並明確輸出 **「已自動幫您切換至目標分支: main」**。
+     - **程式碼修訂 (Standard PR 流程)**：若包含程式碼變更，且發現未部位於標準特徵分支（例如位於 `main` 主線，或位於非標準名稱），AI **必須直接在背景執行 `git checkout -b feature/username-featurename`（或 `git branch -m`）** 自動幫開發者建好並切換至標準特徵分支，徹底免去手動手動建立/切換分支的負擔！
 2. **Quality Gate 4 項品質稽核檢驗**：在產出 Commit 與日誌前，強制審查以下 4 項品質門檻：
    - **Supabase RLS 安全**：若涉 SQL/Table 改動，確認已配置安全性政策。
    - **UI 規範驗證**：若改動 UI，確認符合 `main_spec.md` 之 Toast / 彈窗與主題標準。
