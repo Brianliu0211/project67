@@ -32,8 +32,9 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 2. **確認開發者身分與工作區**：主動詢問開發者為 **蘿蔔 (lobo)** 還是 **巨獸 (beast)**，以鎖定對應的分支前綴與沙盒路徑。
 3. **巡檢個人工作區新靈感 (Read-Only Scan)**：唯讀巡檢 `docs/01_蘿蔔_工作區/想法存放區/` 與 `docs/02_巨獸_工作區/想法存放區/`，若發現全新未討論靈感，詢問是否提報摘要至 `docs/進度.md` 萬能收件匣。（注意：AI 嚴禁修改或刪除人類工作區原始筆記）。
 4. **對齊進度表任務**：讀取 [進度.md](docs/進度.md) 並展示當前未完成的大模組任務列表，請開發者選擇本次要進行的任務。
-5. **建議分支名稱**：若為程式碼開發，生成格式為 `feature/username-featurename` 的分支名稱（例如：`feature/lobo-customer-list-ui`）。
-6. **提供分支指令/介面操作指引**：引導 GitHub Desktop 建立特徵分支（純文件類修改除外）。
+5. **大任務微型拆解協定 (Task Decomposition Protocol)**：當開發者選定特定大模組任務時，AI **必須**自動進行 4 階段微型拆解（`(1) Schema/RLS` $\rightarrow$ `(2) Service/邏輯層` $\rightarrow$ `(3) UI組件` $\rightarrow$ `(4) 驗證`），將大任務拆為微型 Tickets 並展示於對話與 sub-task 脈絡中，避免一次變更規模過大。
+6. **建議分支名稱**：若為程式碼開發，生成格式為 `feature/username-featurename` 的分支名稱（例如：`feature/lobo-customer-list-ui`）。
+7. **提供分支指令/介面操作指引**：引導 GitHub Desktop 建立特徵分支（純文件類修改除外）。
 
 ---
 
@@ -47,12 +48,31 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
    - 檢查當前本機 Git 分支與變更檔案：
      - **純文件修訂 (Fast-Track 快速通道)**：若本次變更 100% 僅包含 `docs/` 或 `.md` 文件（未修改 `lib/` 或程式碼），**目標分支一律為 `main` 主線**。若當前本機處於特徵分支，AI 應提示並引導專案人員在 GitHub Desktop 切換回 `main` 主線（或在背景切換），並明確輸出 **目標分支: `main`**。
      - **程式碼修訂 (Standard PR 流程)**：若包含程式碼變更，且發現未部位於標準特徵分支（例如位於 `main` 主線，或位於自動產生的非標準分支名稱），自動依開發者身分 (蘿蔔 lobo / 巨獸 beast) 生成標準分支名稱 `feature/username-featurename`（如 `feature/lobo-email-auth-fix`），並在背景執行分支切換（`git branch -m <branch-name>`）。
-2. **撰寫開發日誌**: Create a new development log in [docs/03_開發日誌/](docs/03_開發日誌/) following the established specification, documenting all technical changes made during the current session.
-3. **更新進度表**: Review and update [進度.md](docs/進度.md) — check off (`[x]`) any completed items, and process the Incubator/Backlog promotion if applicable.
-4. **產出 Git Commit 訊息與分支指引**: Generate a ready-to-paste **Summary** and **Description** for GitHub Desktop, strictly following the conventions defined in [Git提交訊息規範.md](docs/00_公共規格/Git提交訊息規範.md)，並**明確輸出對應的特徵分支名稱（若為純文件則明確輸出 `main` 分支）**。
-5. **智慧提交分流引導 (Fast-Track vs Standard PR)**：
+2. **Quality Gate 4 項品質稽核檢驗**：在產出 Commit 與日誌前，強制審查以下 4 項品質門檻：
+   - **Supabase RLS 安全**：若涉 SQL/Table 改動，確認已配置安全性政策。
+   - **UI 規範驗證**：若改動 UI，確認符合 `main_spec.md` 之 Toast / 彈窗與主題標準。
+   - **工具包同步**：若新增 Package/SDK，確認已同步更新至 `docs/工具包.md`。
+   - **Null-Safety 防護**：確認核心流程具備 Exception 捕獲與防空值處理。
+3. **撰寫開發日誌與 Handoff 條文**: Create a new development log in [docs/03_開發日誌/](docs/03_開發日誌/) following the established specification. **MUST** include a dedicated `[Handoff 狀態條言]` section at the end of the log documenting exact session context, current state, key decisions, and recommended next steps for seamless cross-developer/agent handoff.
+4. **更新進度表**: Review and update [進度.md](docs/進度.md) — check off (`[x]`) any completed items, and process the Incubator/Backlog promotion if applicable.
+5. **產出 Git Commit 訊息與分支指引**: Generate a ready-to-paste **Summary** and **Description** for GitHub Desktop, strictly following the conventions defined in [Git提交訊息規範.md](docs/00_公共規格/Git提交訊息規範.md)，並**明確輸出對應的特徵分支名稱（若為純文件則明確輸出 `main` 分支）**。
+6. **智慧提交分流引導 (Fast-Track vs Standard PR)**：
    - **純文件修訂 (Fast-Track 快速通道)**：直接引導在 GitHub Desktop 將分支切換至 `main`，提交並推送至 `main` 主線分支（免發起 PR）。
    - **程式碼修訂 (Standard PR 流程)**：若本次包含程式碼變更，引導透過 GitHub Desktop 將該特徵分支推送至遠端、建立 PR 並進行 Merge。
+
+---
+
+## 「精簡模式」與「詳細模式」Automation (Token-Efficiency Protocol Command)
+
+### Trigger
+- **Rule**: When the user says **「精簡模式」** (or `caveman`) or **「詳細模式」**, you **MUST** update your response style accordingly:
+
+### Actions
+1. **「精簡模式」 (Caveman Mode)**：
+   - 去除所有禮貌客套語與贅字，僅輸出高密度的技術關鍵、邏輯變更、代碼與檔案超連結。
+   - 用於密集 Debug、批量重構或連續執行技術任務，極大化節省 Token 消耗與讀取耗時。
+2. **「詳細模式」 (Standard Detailed Mode)**：
+   - 恢復完整的背景說明、步驟拆解與關懷指引，適用於架構討論、教學或綜合專案規劃。
 
 ---
 
