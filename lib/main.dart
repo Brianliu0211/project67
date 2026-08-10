@@ -51,6 +51,9 @@ void main() async {
       await Supabase.initialize(
         url: supabaseUrl,
         anonKey: supabaseKey,
+        authOptions: const FlutterAuthClientOptions(
+          authFlowType: AuthFlowType.implicit,
+        ),
       );
       isOfflineMode = false;
     } catch (e) {

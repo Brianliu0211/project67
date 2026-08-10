@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../widgets/forgot_password_dialog.dart';
+import '../widgets/google_sign_in_button.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -85,6 +86,58 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('操作失敗: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    if (isOfflineMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('離線模式下無法使用 Google 登入。請使用上方橫幅的「直接跳過登入」。'),
+          backgroundColor: Colors.amber,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final supabase = Supabase.instance.client;
+      String? redirectTo;
+      if (kIsWeb) {
+        final origin = Uri.base.origin;
+        redirectTo = (origin.contains('localhost') && !origin.contains(':8080'))
+            ? 'http://localhost:8080'
+            : origin;
+      } else {
+        redirectTo = 'http://localhost:8080';
+      }
+
+      await supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: redirectTo,
+        queryParams: {
+          'prompt': 'select_account',
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google 登入發起失敗: $e'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -410,6 +463,30 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                       )
                                     : Text(_isSignUp ? '註冊帳號' : '登入'),
+                              ),
+                              const SizedBox(height: 16),
+                              
+                              // Divider
+                              const Row(
+                                children: [
+                                  Expanded(child: Divider(color: Colors.white24)),
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 12),
+                                    child: Text(
+                                      '或使用第三方帳號',
+                                      style: TextStyle(fontSize: 12, color: Colors.white54),
+                                    ),
+                                  ),
+                                  Expanded(child: Divider(color: Colors.white24)),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Google Sign-In Button
+                              GoogleStyleSignInButton(
+                                onPressed: _handleGoogleSignIn,
+                                label: '使用 Google 繼續',
+                                isLoading: _isLoading,
                               ),
                               const SizedBox(height: 12),
                               
