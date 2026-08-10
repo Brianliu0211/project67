@@ -19,6 +19,7 @@ import 'trash_bin_screen.dart';
 import 'insurance_news_tab.dart';
 import '../widgets/route_planner_dialog.dart';
 import '../widgets/responsive_layout.dart';
+import '../widgets/spotlight_tour_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -490,8 +491,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildSidebarItem(Icons.assignment_outlined, '專案拜訪', isDark, primaryColor),
                     _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
                     _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
-                    _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
                     _buildSidebarItem(Icons.delete_outline, '垃圾桶', isDark, primaryColor),
+                    _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
                     _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
                   ],
                 ),
@@ -541,75 +542,80 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return Scaffold(
-      drawer: isWideScreen ? null : Drawer(child: sidebarContent()),
-      appBar: isWideScreen
-          ? null
-          : AppBar(
-              title: Text(_getLocalizedMenuTitle(_activeMenu)),
-              backgroundColor: sidebarBg,
-              actions: [
-                if (isOfflineMode)
-                  Container(
-                    margin: const EdgeInsets.only(right: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade900,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      context.l10n('offline_preview'),
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-              ],
-            ),
-      body: Row(
-        children: [
-          if (isWideScreen) sidebarContent(),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Wide Screen Header
-                if (isWideScreen) _buildWebHeader(isDark, textColor, subTextColor, borderColor),
-                
-                // Main Working Area
-                Expanded(
-                  child: _activeMenu == '今日行程'
-                      ? _buildScheduleView(isWideScreen, isDark, textColor, subTextColor, borderColor, primaryColor)
-                      : _activeMenu == '新聞頭條'
-                          ? const InsuranceNewsTab()
-                              : _activeMenu == '客戶管理'
-                                  ? CustomerManagementTab(
-                                      onMenuChanged: (menu) {
-                                        setState(() {
-                                          _activeMenu = menu;
-                                        });
-                                      },
-                                    )
-                                  : _activeMenu == '專案拜訪'
-                                      ? const VisitProjectsTab()
-                                      : _activeMenu == '個人帳號'
-                                          ? ProfileScreen(onProfileUpdated: _loadUserProfile)
-                                          : _activeMenu == '垃圾桶'
-                                              ? const TrashBinScreen()
-                                          : _activeMenu == '系統設定'
-                                              ? const SettingsScreen()
-                                              : _buildFallbackScreen(),
+    return Stack(
+      children: [
+        Scaffold(
+          drawer: isWideScreen ? null : Drawer(child: sidebarContent()),
+          appBar: isWideScreen
+              ? null
+              : AppBar(
+                  title: Text(_getLocalizedMenuTitle(_activeMenu)),
+                  backgroundColor: sidebarBg,
+                  actions: [
+                    if (isOfflineMode)
+                      Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade900,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          context.l10n('offline_preview'),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
+          body: Row(
+            children: [
+              if (isWideScreen) sidebarContent(),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Wide Screen Header
+                    if (isWideScreen) _buildWebHeader(isDark, textColor, subTextColor, borderColor),
+                    
+                    // Main Working Area
+                    Expanded(
+                      child: _activeMenu == '今日行程'
+                          ? _buildScheduleView(isWideScreen, isDark, textColor, subTextColor, borderColor, primaryColor)
+                          : _activeMenu == '新聞頭條'
+                              ? const InsuranceNewsTab()
+                                  : _activeMenu == '客戶管理'
+                                      ? CustomerManagementTab(
+                                          onMenuChanged: (menu) {
+                                            setState(() {
+                                              _activeMenu = menu;
+                                            });
+                                          },
+                                        )
+                                      : _activeMenu == '專案拜訪'
+                                          ? const VisitProjectsTab()
+                                          : _activeMenu == '個人帳號'
+                                              ? ProfileScreen(onProfileUpdated: _loadUserProfile)
+                                              : _activeMenu == '垃圾桶'
+                                                  ? const TrashBinScreen()
+                                              : _activeMenu == '系統設定'
+                                                  ? const SettingsScreen()
+                                                  : _buildFallbackScreen(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      floatingActionButton: _activeMenu == '今日行程'
-          ? _VoiceSchedulerFAB(
-              onPressed: _openVoiceSchedulerDialog,
-              isDark: isDark,
-              primaryColor: primaryColor,
-            )
-          : null,
+          floatingActionButton: _activeMenu == '今日行程'
+              ? _VoiceSchedulerFAB(
+                  onPressed: _openVoiceSchedulerDialog,
+                  isDark: isDark,
+                  primaryColor: primaryColor,
+                )
+              : null,
+        ),
+        const SpotlightTourOverlay(),
+      ],
     );
   }
 

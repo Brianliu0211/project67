@@ -80,13 +80,18 @@
 
 ### 1. 模組一：身分驗證、帳號連線與安全管理 (Auth, Accounts & Security)
 - **範圍**: Supabase Auth 登入/註冊、Email 轉址驗證修復 (`emailRedirectTo: redirectTo`)、忘記密碼、個人檔案管理、開發者 RBAC 角色 (`admin` / `dev` / `agent`) 與第三方連線 (Google OAuth / LINE Login)。
-- ** UI 排版**: 側邊欄將「個人帳號 👤」置於頂點快捷區，管理性質之「垃圾桶 🗑️」獨立放置於底欄。
+- ** UI 排版**: 側邊欄最新佈局為「數據戰情 $\rightarrow$ 垃圾桶 🗑️ $\rightarrow$ 個人帳號 👤 $\rightarrow$ 系統設定 ⚙️」。
 - **🎮 遊戲化登入成就與新手指引**:
   - 於用戶『首次註冊登入成功』與『完成新手教學』雙階段，觸發全螢幕解鎖成就卡片：包含兩側 `confetti` 彩帶噴發與 360 度 3D 徽章旋轉彈出。
   - 自動讀取/寫入 `is_first_login` 標記，老用戶登入時自動順暢跳過直接進入系統首頁。
 
 ### 2. 模組二：客戶資產與名片庫 (Customers & CRM)
 - **範圍**: 客戶 3D 翻轉卡片、綽號與照片上傳、詳情檢視彈窗、拜訪專案 Checklist、客戶批次匯入/匯出 (vCard/.vcf) 與數位名片 Master Studio。
+- **💳 實體化名片 Master Studio (Luxury Printed Card & License Registration)**:
+  - 比照真實印刷高級名片風格，包含「保險業務員登錄字號 (`profile_license_no`)」與質感視覺設計。
+  - **快捷連線工具列**：獨立下移至名片預覽舞台正下方 (`[撥打電話]`、`[加 LINE]`、`[發送 Email]`)。
+  - **榮譽頭銜 3 大結構化面板 (Tab 2)**：拆解為「👑 專屬榮譽頭銜 (選擇/自訂)」、「🏆 專業證照與榮譽徽章 (FilterChip 多選)」、「🎨 名片實體材質與視覺主題 (黑金尊榮、極光藍曜等色票)」。
+  - **`[Deprecated / 已廢棄]`**: 原「3D 劇院沉浸式預覽舞台」獨立 Modal 彈窗（因實用性低已全面刪除清掃）。
 
 ### 3. 模組三：語音助理與 AI 語意分析 (Voice & Gemini AI)
 - **範圍**: 語音轉錄 (`visit_logs`)、Gemini 需求提取、`voice-scheduler` Edge Function (Groq Whisper + Llama 3.3 70B 語音排程與三燈分流)，以及 **Make.com + LINE 官方帳號 (音雪倫斯．艾希斯坦 / 🥕 AI 客服) 雙軌自動化客服**。
@@ -95,7 +100,7 @@
 - **範圍**: 行事曆「月網格」與「日時間軸 Side-by-Side 重疊並排演算法」雙視圖、`schedule_events` 表，以及 **「保經/業務員客戶線上預約系統」** (空閒時段開放、行程自動遮蔽、CRM 客戶掛載、多公司保單健診/理賠諮詢/新保單規劃預約分類與團隊派單)。
 
 ### 5. 模組五：系統個性化、情報與多國語系 (Preferences, i18n & Insights)
-- **範圍**: 系統主題色與檢視模式設定、全站 i18n 語系檔 (`app_zh.arb` / `app_en.arb`) 徹底對齊、動態標籤管理器與 16 色選擇器、Phase 7 保險新聞主題聚類，以及 **設定頁面「章節式新手導覽」控制器**（支援重新播放完整教學、按章節分區選看重播與隨時跳過功能）。
+- **範圍**: 系統主題色與檢視模式設定、全站 i18n 語系檔 (`app_zh.arb` / `app_en.arb`) 徹底對齊、動態標籤管理器與 16 色選擇器、Phase 7 保險新聞主題聚類、**9 大 AI Agent 開源審美與美學規約技能庫 (`.agents/skills/`)**，以及 **設定頁面「章節式新手導覽」控制器**。
 
 ---
 
