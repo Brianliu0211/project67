@@ -174,5 +174,9 @@
   "passwords_do_not_match": "Passwords do not match",
   "password_reset_success": "Password reset successfully!",
   "change_password_title": "Password & Security",
-  "change_password_btn": "Change Password"
+  "change_password_btn": "Change Password",
+  "role_admin": "👑 System Admin",
+  "role_dev": "🛠️ Core Developer",
+  "role_agent": "💼 Insurance Agent",
+  "role_identity_badge": "Account Role & Permissions"
 }

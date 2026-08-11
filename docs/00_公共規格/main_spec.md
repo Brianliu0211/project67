@@ -29,8 +29,8 @@
 
 ### 1. 使用者個人檔案表 (`public.profiles`)
 - **用途**: 儲存業務員（App 使用者）的基本資訊，與 `auth.users` 進行 1-to-1 串接。
-- **關鍵欄位**: `id` (UUID, 參考 `auth.users`), `email`, `full_name`, `avatar_url`, `updated_at`。
-- **觸發器**: 當 `auth.users` 新增帳號時自動建立 Profile。
+- **關鍵欄位**: `id` (UUID, 參考 `auth.users`), `email`, `full_name`, `avatar_url`, `role` (`admin`/`dev`/`agent`), `is_google_connected` (BOOLEAN), `connected_providers` (TEXT[]), `updated_at`。
+- **觸發器**: 當 `auth.users` 新增帳號時自動建立 Profile 並寫入初始角色與連線狀態。
 
 ### 2. 客戶資料表 (`public.customers`)
 - **用途**: 儲存業務員所擁有的客戶基本檔案（支援名片化 3D 翻轉與詳情檢視）。
@@ -65,7 +65,12 @@
 ### 6. 提醒與紀錄表 (`public.reminders`)
 - **用途**: 儲存語音錄音轉錄文字與 Gemini 結構化分析摘要。
 
-### 7. 保險新聞與主題聚類表 (`public.insurance_news_topics` & `public.insurance_news_articles`)
+### 7. 全台保險商品與條款庫存表 (`public.policy_clauses`)
+- **用途**: 提供 SafeCheck 商品跨公司 PK 比較、5 大理賠桶條款精算對照與自動化爬蟲庫存。
+- **關鍵欄位**: `id` (UUID), `product_name` (TEXT, 唯一性約束 `unique_product_name`), `company_name` (TEXT), `category` (TEXT), `waiting_days` (TEXT), `tags` (TEXT[]), `room_limit` (TEXT), `surgery_limit` (TEXT), `misc_limit` (TEXT), `benefits_json` (JSONB, 5 大桶給付上限), `raw_pdf_url` (TEXT), `crawled_at` (TIMESTAMPTZ)。
+- **RLS 策略**: `Public read` 所有人可讀，`Authenticated insert` / `anon update/insert` 支援 Edge Function 與爬蟲自動寫入。
+
+### 8. 保險新聞與主題聚類表 (`public.insurance_news_topics` & `public.insurance_news_articles`)
 - **用途**: 提供 Phase 7 每日產業頭條與 Google News 風格主題聚類新聞系統。
 - **關鍵欄位**:
   - `insurance_news_topics`: `id`, `topic_title`, `daily_trend` (總體趨勢), `daily_overview` (綜合文章), `published_at`
@@ -79,7 +84,7 @@
 主系統功能劃分為五大模組，所有開發人員與 AI 助理於撰寫新程式碼時，**必須依此邊界維護與對齊**：
 
 ### 1. 模組一：身分驗證、帳號連線與安全管理 (Auth, Accounts & Security)
-- **範圍**: Supabase Auth 登入/註冊、Email 轉址驗證修復 (`emailRedirectTo: redirectTo`)、忘記密碼、個人檔案管理、開發者 RBAC 角色 (`admin` / `dev` / `agent`) 與第三方連線 (Google OAuth / LINE Login)。
+- **範圍**: Supabase Auth 登入/註冊、Email 轉址驗證修復 (`emailRedirectTo: redirectTo`)、忘記密碼、個人檔案管理、開發者 RBAC 角色 (`admin` / `dev` / `agent`)、第三方連線 (Google OAuth 授權與日曆同步；`[Deprecated / 已廢棄]`: LINE Login 連線登入需求已全面廢除清掃)。
 - ** UI 排版**: 側邊欄最新佈局為「數據戰情 $\rightarrow$ 垃圾桶 🗑️ $\rightarrow$ 個人帳號 👤 $\rightarrow$ 系統設定 ⚙️」。
 - **🎮 遊戲化登入成就與新手指引**:
   - 於用戶『首次註冊登入成功』與『完成新手教學』雙階段，觸發全螢幕解鎖成就卡片：包含兩側 `confetti` 彩帶噴發與 360 度 3D 徽章旋轉彈出。

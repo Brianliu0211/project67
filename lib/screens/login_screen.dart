@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
+import '../models/user_role.dart';
 import '../widgets/forgot_password_dialog.dart';
 import '../widgets/google_sign_in_button.dart';
+import '../widgets/custom_toast.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -18,6 +21,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _teamCodeController = TextEditingController(text: 'TAIPEI-01');
+  UserRole _selectedRole = UserRole.agent;
   bool _isLoading = false;
   bool _isSignUp = false;
 
@@ -26,6 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _teamCodeController.dispose();
     super.dispose();
   }
 
@@ -60,18 +66,47 @@ class _LoginScreenState extends State<LoginScreen> {
           redirectTo = 'http://localhost:8080';
         }
 
+        final prefs = await SharedPreferences.getInstance();
+        final bool enableAutoApproval = prefs.getBool('enable_auto_approval') ?? true;
+        final String status = (_selectedRole == UserRole.admin || enableAutoApproval) ? 'active' : 'pending';
+
         await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
           emailRedirectTo: redirectTo,
           data: {
             'full_name': _nameController.text.trim(),
+            'role': _selectedRole.value,
+            'team_code': _teamCodeController.text.trim(),
+            'team_name': '國泰台北第一通訊處',
+            'status': status,
           },
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('註冊成功！請檢查您的 Email 以驗證帳號。')),
-          );
+          if (status == 'pending') {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('📋 帳號提交成功（待審核）'),
+                content: Text(
+                  '您的帳號已成功註冊！\n'
+                  '申請通訊處：國泰台北第一通訊處 (${_teamCodeController.text.trim()})\n'
+                  '申請身分：${_selectedRole.labelZh}\n\n'
+                  '目前為企業嚴格模式，需等待同通訊處團隊主管審核開通後方可登入使用。',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('我知道了'),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('註冊成功！帳號已自動授權開通，請檢查 Email 進行驗證。')),
+            );
+          }
         }
       } else {
         // Sign in
@@ -252,13 +287,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 20),
                               
-                              // Name Input (Only shown on Sign Up)
+                              // Name, Team Code, Role Inputs (Only shown on Sign Up)
                               if (_isSignUp) ...[
                                 TextFormField(
                                   controller: _nameController,
                                   textInputAction: TextInputAction.next,
                                   decoration: const InputDecoration(
-                                    labelText: '姓名',
+                                    labelText: '姓名 (真實姓名)',
                                     prefixIcon: Icon(Icons.person_outline),
                                     border: OutlineInputBorder(),
                                   ),
@@ -267,6 +302,49 @@ class _LoginScreenState extends State<LoginScreen> {
                                       return '請輸入姓名';
                                     }
                                     return null;
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _teamCodeController,
+                                  textInputAction: TextInputAction.next,
+                                  decoration: const InputDecoration(
+                                    labelText: '通訊處邀請碼 (Team Code)',
+                                    hintText: '例：TAIPEI-01',
+                                    prefixIcon: Icon(Icons.corporate_fare_rounded),
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return '請輸入通訊處邀請碼';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                DropdownButtonFormField<UserRole>(
+                                  value: _selectedRole,
+                                  decoration: const InputDecoration(
+                                    labelText: '申請帳號類別 (身分權限)',
+                                    prefixIcon: Icon(Icons.badge_rounded),
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: UserRole.agent,
+                                      child: Text('💼 保險業務員 (Agent)'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: UserRole.admin,
+                                      child: Text('👑 團隊主管 (Manager)'),
+                                    ),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _selectedRole = val;
+                                      });
+                                    }
                                   },
                                 ),
                                 const SizedBox(height: 16),

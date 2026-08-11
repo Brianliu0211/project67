@@ -1,0 +1,26 @@
+name: Automated Insurance Products Crawler Cron
+
+on:
+  schedule:
+    # Runs every night at 18:00 UTC (02:00 AM Taiwan Time UTC+8)
+    - cron: '0 18 * * *'
+  workflow_dispatch: # Allows manual 1-click trigger from GitHub Actions UI anytime
+
+jobs:
+  crawl_and_sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13 Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Execute Automated Insurance Products Crawler Engine
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://algufuoxkeizxwkofmmp.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'sb_publishable_hEIRyFKMgmbB2qVOVioGBQ_61oJxceL' }}
+        run: |
+          python scripts/crawl_massive_insurance_products.py
