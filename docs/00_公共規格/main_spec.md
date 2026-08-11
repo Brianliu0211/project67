@@ -65,7 +65,12 @@
 ### 6. 提醒與紀錄表 (`public.reminders`)
 - **用途**: 儲存語音錄音轉錄文字與 Gemini 結構化分析摘要。
 
-### 7. 保險新聞與主題聚類表 (`public.insurance_news_topics` & `public.insurance_news_articles`)
+### 7. 全台保險商品與條款庫存表 (`public.policy_clauses`)
+- **用途**: 提供 SafeCheck 商品跨公司 PK 比較、5 大理賠桶條款精算對照與自動化爬蟲庫存。
+- **關鍵欄位**: `id` (UUID), `product_name` (TEXT, 唯一性約束 `unique_product_name`), `company_name` (TEXT), `category` (TEXT), `waiting_days` (TEXT), `tags` (TEXT[]), `room_limit` (TEXT), `surgery_limit` (TEXT), `misc_limit` (TEXT), `benefits_json` (JSONB, 5 大桶給付上限), `raw_pdf_url` (TEXT), `crawled_at` (TIMESTAMPTZ)。
+- **RLS 策略**: `Public read` 所有人可讀，`Authenticated insert` / `anon update/insert` 支援 Edge Function 與爬蟲自動寫入。
+
+### 8. 保險新聞與主題聚類表 (`public.insurance_news_topics` & `public.insurance_news_articles`)
 - **用途**: 提供 Phase 7 每日產業頭條與 Google News 風格主題聚類新聞系統。
 - **關鍵欄位**:
   - `insurance_news_topics`: `id`, `topic_title`, `daily_trend` (總體趨勢), `daily_overview` (綜合文章), `published_at`
