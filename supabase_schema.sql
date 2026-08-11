@@ -120,6 +120,8 @@ BEGIN
         email, 
         full_name, 
         role, 
+        status,
+        team_name,
         is_google_connected, 
         connected_providers
     )
@@ -128,11 +130,15 @@ BEGIN
         NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'New Sales Rep'),
         COALESCE(NEW.raw_user_meta_data->>'role', 'agent'),
+        COALESCE(NEW.raw_user_meta_data->>'status', 'active'),
+        COALESCE(NEW.raw_user_meta_data->>'team_name', '國泰台北第一通訊處'),
         is_google,
         providers_list
     )
     ON CONFLICT (id) DO UPDATE SET
         role = EXCLUDED.role,
+        status = EXCLUDED.status,
+        team_name = EXCLUDED.team_name,
         is_google_connected = EXCLUDED.is_google_connected,
         connected_providers = EXCLUDED.connected_providers;
 
