@@ -27,6 +27,36 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isSignUp = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkUrlErrors();
+    });
+  }
+
+  void _checkUrlErrors() {
+    if (kIsWeb) {
+      final uri = Uri.base;
+      final error = uri.queryParameters['error'];
+      final errorCode = uri.queryParameters['error_code'];
+
+      if (errorCode == 'otp_expired' || (error != null && error.isNotEmpty)) {
+        CustomToast.show(
+          context,
+          '⚠️ 驗證連結已過期或失效！若您收到了多封驗證信，請務必點擊「最新發出的那一封」，或在下方重試登入/發送。',
+          ToastType.warning,
+          actionLabel: '重發驗證信',
+          onActionPressed: () {
+            setState(() {
+              _isSignUp = false;
+            });
+          },
+        );
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
@@ -68,9 +98,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final prefs = await SharedPreferences.getInstance();
         final bool enableAutoApproval = prefs.getBool('enable_auto_approval') ?? true;
-        final String status = (_selectedRole == UserRole.admin || enableAutoApproval) ? 'active' : 'pending';
+        // Default to active during development so users do not get blocked by approval dialogs
+        final String status = enableAutoApproval ? 'active' : 'pending';
 
-        await supabase.auth.signUp(
+        final response = await supabase.auth.signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
           emailRedirectTo: redirectTo,
@@ -82,6 +113,21 @@ class _LoginScreenState extends State<LoginScreen> {
             'status': status,
           },
         );
+
+        // Ensure profiles table has explicit profile record
+        if (response.user != null) {
+          try {
+            await supabase.from('profiles').upsert({
+              'id': response.user!.id,
+              'email': _emailController.text.trim(),
+              'full_name': _nameController.text.trim(),
+              'role': _selectedRole.value,
+              'status': status,
+              'team_name': '國泰台北第一通訊處',
+            });
+          } catch (_) {}
+        }
+
         if (mounted) {
           if (status == 'pending') {
             showDialog(
@@ -102,9 +148,38 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
             );
+          } else if (response.session == null) {
+            // Email confirmation required by Supabase project
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('✉️ 帳號建立成功 (需驗證 Email)'),
+                content: Text(
+                  '您的帳號已成功建立！\n'
+                  '驗證信已寄送至：${_emailController.text.trim()}\n\n'
+                  '📌 登入指引：\n'
+                  '1. 請至 Email 收件匣點擊驗證連結。\n'
+                  '2. 💡【重要提示】若您目前使用「無痕模式」，點擊 Email 連結後請將開啟的網址「複製並貼回此無痕視窗」，驗證方可生效。\n'
+                  '3. 完成驗證後，點擊下方「返回登入」即可直接輸入密碼登入！',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _isSignUp = false;
+                      });
+                    },
+                    child: const Text('返回登入'),
+                  ),
+                ],
+              ),
+            );
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('註冊成功！帳號已自動授權開通，請檢查 Email 進行驗證。')),
+            CustomToast.show(
+              context,
+              '註冊成功！帳號已開通並自動登入。',
+              ToastType.success,
             );
           }
         }
@@ -114,16 +189,53 @@ class _LoginScreenState extends State<LoginScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
-        // AuthGateway will automatically switch to HomeScreen because of the reactive stream listener.
+        if (mounted) {
+          CustomToast.show(context, '登入成功！歡迎回來', ToastType.success);
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        String msg = e.message;
+        if (msg.contains('User already registered') || msg.contains('already exists')) {
+          msg = '此 Email 已被註冊！請直接切換至「業務員登入」或點擊「忘記密碼」。';
+        } else if (msg.contains('Password should be at least')) {
+          msg = '密碼長度不足，請輸入至少 6 位字元。';
+        } else if (msg.contains('Invalid login credentials')) {
+          msg = '帳號或密碼錯誤，請重新確認。';
+        } else if (msg.contains('Email not confirmed')) {
+          CustomToast.show(
+            context,
+            '電子信箱尚未完成驗證！請至 Email 收件匣點擊「最新的」驗證連結。',
+            ToastType.warning,
+            actionLabel: '重發驗證信',
+            onActionPressed: () async {
+              final email = _emailController.text.trim();
+              if (email.isEmpty) {
+                CustomToast.show(context, '請先在上方填寫您的 Email 帳號', ToastType.warning);
+                return;
+              }
+              try {
+                await Supabase.instance.client.auth.resend(
+                  type: OtpType.signup,
+                  email: email,
+                );
+                if (mounted) {
+                  CustomToast.show(context, '全新驗證信已寄出！請至 Email 收件匣點擊最新信件。', ToastType.success);
+                }
+              } catch (resendErr) {
+                if (mounted) {
+                  CustomToast.show(context, '重發失敗: $resendErr', ToastType.error);
+                }
+              }
+            },
+          );
+          return;
+        }
+        CustomToast.show(context, msg, ToastType.error);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('操作失敗: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        CustomToast.show(context, '操作失敗: $e', ToastType.error);
       }
     } finally {
       if (mounted) {
@@ -287,13 +399,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 20),
                               
-                              // Name, Team Code, Role Inputs (Only shown on Sign Up)
+                              // Name Input (Only shown on Sign Up)
                               if (_isSignUp) ...[
                                 TextFormField(
                                   controller: _nameController,
                                   textInputAction: TextInputAction.next,
                                   decoration: const InputDecoration(
-                                    labelText: '姓名 (真實姓名)',
+                                    labelText: '姓名 (綽號就好惹~)',
+                                    hintText: '例：王大明',
                                     prefixIcon: Icon(Icons.person_outline),
                                     border: OutlineInputBorder(),
                                   ),
@@ -302,49 +415,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                       return '請輸入姓名';
                                     }
                                     return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _teamCodeController,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: const InputDecoration(
-                                    labelText: '通訊處邀請碼 (Team Code)',
-                                    hintText: '例：TAIPEI-01',
-                                    prefixIcon: Icon(Icons.corporate_fare_rounded),
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return '請輸入通訊處邀請碼';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                DropdownButtonFormField<UserRole>(
-                                  value: _selectedRole,
-                                  decoration: const InputDecoration(
-                                    labelText: '申請帳號類別 (身分權限)',
-                                    prefixIcon: Icon(Icons.badge_rounded),
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: UserRole.agent,
-                                      child: Text('💼 保險業務員 (Agent)'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: UserRole.admin,
-                                      child: Text('👑 團隊主管 (Manager)'),
-                                    ),
-                                  ],
-                                  onChanged: (val) {
-                                    if (val != null) {
-                                      setState(() {
-                                        _selectedRole = val;
-                                      });
-                                    }
                                   },
                                 ),
                                 const SizedBox(height: 16),
@@ -573,8 +643,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onPressed: () {
                                   setState(() {
                                     _isSignUp = !_isSignUp;
-                                    _nameController.clear();
-                                    _formKey.currentState?.reset();
+                                    if (_isSignUp) {
+                                      if (_teamCodeController.text.trim().isEmpty) {
+                                        _teamCodeController.text = 'TAIPEI-01';
+                                      }
+                                      if (_nameController.text.trim().isEmpty && _emailController.text.contains('@')) {
+                                        _nameController.text = _emailController.text.split('@')[0];
+                                      }
+                                    }
                                   });
                                 },
                                 child: Text(
