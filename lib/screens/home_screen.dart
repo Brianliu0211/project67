@@ -20,6 +20,14 @@ import 'insurance_news_tab.dart';
 import '../widgets/route_planner_dialog.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/spotlight_tour_overlay.dart';
+import '../models/user_role.dart';
+import '../services/notification_service.dart';
+import '../widgets/notification_center_popover.dart';
+import '../widgets/dev_god_mode_bar.dart';
+import 'admin_dashboard_tab.dart';
+import 'dev_console_screen.dart';
+import 'relationship_topology_tab.dart';
+import 'data_dashboard_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,6 +41,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String _activeMenu = '今日行程';
 
   String _getLocalizedMenuTitle(String menu) {
+    if (menu == '👑 團隊戰情室') return '👑 團隊戰情室';
+    if (menu == '🛠️ 實體服務診斷') return '🛠️ 實體服務診斷';
     if (menu == '今日行程') return context.l10n('today_schedule');
     if (menu == '客戶管理') return context.l10n('customer_mgmt');
     if (menu == '專案拜訪') return context.l10n('project_visits');
@@ -59,14 +69,30 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingEvents = false;
   String _calendarViewMode = 'timeline'; // 'timeline' (日時間軸) 或 'month_grid' (月網格)
 
+  UserRole _userRole = UserRole.dev;
+  UserRole _activeViewRole = UserRole.dev;
+  final NotificationService _notifService = NotificationService();
+
   @override
   void initState() {
     super.initState();
     _isSidebarCollapsed = AppSettings.instance.isSidebarCollapsedByDefault;
     AppSettings.instance.addListener(_handleSettingsChanged);
+    _notifService.addListener(_handleNotifChanged);
     _loadUserProfile();
     _loadSavedMenu();
     _fetchEventsForSelectedDate();
+  }
+
+  @override
+  void dispose() {
+    _notifService.removeListener(_handleNotifChanged);
+    AppSettings.instance.removeListener(_handleSettingsChanged);
+    super.dispose();
+  }
+
+  void _handleNotifChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchEventsForSelectedDate({bool silent = false}) async {
@@ -191,12 +217,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    AppSettings.instance.removeListener(_handleSettingsChanged);
-    super.dispose();
-  }
-
   void _handleSettingsChanged() {
     if (mounted) {
       setState(() {
@@ -268,7 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Query from profiles table
         final data = await supabase
             .from('profiles')
-            .select('full_name, email, avatar_url')
+            .select('full_name, email, avatar_url, role')
             .eq('id', user.id)
             .maybeSingle();
 
@@ -281,6 +301,11 @@ class _HomeScreenState extends State<HomeScreen> {
             }
             _userEmail = data?['email'] ?? user.email ?? '';
             _userAvatarUrl = data?['avatar_url'] ?? '';
+            if (data != null && data['role'] != null) {
+              final fetchedRole = UserRole.fromString(data['role'] as String);
+              _userRole = fetchedRole;
+              _activeViewRole = fetchedRole;
+            }
           });
         }
       }
@@ -470,6 +495,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
+                                  if (_userRole == UserRole.dev && _activeViewRole != UserRole.dev) ...[
+                                    const SizedBox(height: 6),
+                                    InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _activeViewRole = UserRole.dev;
+                                          _activeMenu = '🛠️ 實體服務診斷';
+                                        });
+                                        CustomToast.show(context, '已退出模擬，返回核心開發者控制台', ToastType.success);
+                                      },
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF6366F1).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.4)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.developer_board_rounded, size: 12, color: Color(0xFF6366F1)),
+                                            const SizedBox(width: 4),
+                                            Flexible(
+                                              child: Text(
+                                                '🛠️ ${_activeViewRole.shortLabel}模式 (切回工程師)',
+                                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF6366F1)),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -480,20 +540,35 @@ class _HomeScreenState extends State<HomeScreen> {
               
               const SizedBox(height: 16),
 
-              // Navigation Items
+              // Navigation Items (Dynamically transformed by _activeViewRole)
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   children: [
-                    _buildSidebarItem(Icons.calendar_today_outlined, '今日行程', isDark, primaryColor),
-                    _buildSidebarItem(Icons.newspaper_outlined, '新聞頭條', isDark, primaryColor),
-                    _buildSidebarItem(Icons.people_outline, '客戶管理', isDark, primaryColor),
-                    _buildSidebarItem(Icons.assignment_outlined, '專案拜訪', isDark, primaryColor),
-                    _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
-                    _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
-                    _buildSidebarItem(Icons.delete_outline, '垃圾桶', isDark, primaryColor),
-                    _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
-                    _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
+                    if (_activeViewRole == UserRole.admin) ...[
+                      _buildSidebarItem(Icons.admin_panel_settings_outlined, '👑 團隊戰情室', isDark, primaryColor),
+                      _buildSidebarItem(Icons.people_outline, '客戶管理', isDark, primaryColor),
+                      _buildSidebarItem(Icons.assignment_outlined, '專案拜訪', isDark, primaryColor),
+                      _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
+                      _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
+                      _buildSidebarItem(Icons.newspaper_outlined, '新聞頭條', isDark, primaryColor),
+                      _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
+                      _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
+                    ] else if (_activeViewRole == UserRole.dev) ...[
+                      _buildSidebarItem(Icons.developer_board_outlined, '🛠️ 實體服務診斷', isDark, primaryColor),
+                      _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
+                      _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
+                    ] else ...[
+                      _buildSidebarItem(Icons.calendar_today_outlined, '今日行程', isDark, primaryColor),
+                      _buildSidebarItem(Icons.people_outline, '客戶管理', isDark, primaryColor),
+                      _buildSidebarItem(Icons.assignment_outlined, '專案拜訪', isDark, primaryColor),
+                      _buildSidebarItem(Icons.hub_outlined, '人脈拓撲', isDark, primaryColor),
+                      _buildSidebarItem(Icons.bar_chart_outlined, '數據戰情', isDark, primaryColor),
+                      _buildSidebarItem(Icons.newspaper_outlined, '新聞頭條', isDark, primaryColor),
+                      _buildSidebarItem(Icons.delete_outline, '垃圾桶', isDark, primaryColor),
+                      _buildSidebarItem(Icons.account_circle_outlined, '個人帳號', isDark, primaryColor),
+                      _buildSidebarItem(Icons.settings_outlined, '系統設定', isDark, primaryColor),
+                    ],
                   ],
                 ),
               ),
@@ -577,29 +652,65 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Wide Screen Header
                     if (isWideScreen) _buildWebHeader(isDark, textColor, subTextColor, borderColor),
                     
-                    // Main Working Area
+                    // Main Working Area (Role-based & Menu-based Routing)
                     Expanded(
-                      child: _activeMenu == '今日行程'
-                          ? _buildScheduleView(isWideScreen, isDark, textColor, subTextColor, borderColor, primaryColor)
-                          : _activeMenu == '新聞頭條'
-                              ? const InsuranceNewsTab()
-                                  : _activeMenu == '客戶管理'
-                                      ? CustomerManagementTab(
-                                          onMenuChanged: (menu) {
-                                            setState(() {
-                                              _activeMenu = menu;
-                                            });
-                                          },
-                                        )
-                                      : _activeMenu == '專案拜訪'
-                                          ? const VisitProjectsTab()
-                                          : _activeMenu == '個人帳號'
-                                              ? ProfileScreen(onProfileUpdated: _loadUserProfile)
-                                              : _activeMenu == '垃圾桶'
-                                                  ? const TrashBinScreen()
-                                              : _activeMenu == '系統設定'
-                                                  ? const SettingsScreen()
-                                                  : _buildFallbackScreen(),
+                      child: _activeMenu == '👑 團隊戰情室'
+                          ? const AdminDashboardTab()
+                          : _activeMenu == '🛠️ 實體服務診斷'
+                              ? DevConsoleScreen(
+                                  activeRole: _activeViewRole,
+                                  onRoleChanged: (newRole) {
+                                    setState(() {
+                                      _activeViewRole = newRole;
+                                      if (newRole == UserRole.admin) {
+                                        _activeMenu = '👑 團隊戰情室';
+                                      } else if (newRole == UserRole.dev) {
+                                        _activeMenu = '🛠️ 實體服務診斷';
+                                      } else {
+                                        _activeMenu = '今日行程';
+                                      }
+                                    });
+                                  },
+                                )
+                              : _activeMenu == '今日行程'
+                                  ? _buildScheduleView(isWideScreen, isDark, textColor, subTextColor, borderColor, primaryColor)
+                                  : _activeMenu == '新聞頭條'
+                                      ? const InsuranceNewsTab()
+                                      : _activeMenu == '客戶管理'
+                                          ? CustomerManagementTab(
+                                              onMenuChanged: (menu) {
+                                                setState(() {
+                                                  _activeMenu = menu;
+                                                });
+                                              },
+                                            )
+                                          : _activeMenu == '專案拜訪'
+                                              ? const VisitProjectsTab()
+                                              : _activeMenu == '人脈拓撲'
+                                                  ? const RelationshipTopologyTab()
+                                                  : _activeMenu == '數據戰情'
+                                                      ? const DataDashboardTab()
+                                                      : _activeMenu == '個人帳號'
+                                                          ? ProfileScreen(
+                                                              onProfileUpdated: _loadUserProfile,
+                                                              onRoleChanged: (newRole) {
+                                                                setState(() {
+                                                                  _activeViewRole = newRole;
+                                                                  if (newRole == UserRole.admin) {
+                                                                    _activeMenu = '👑 團隊戰情室';
+                                                                  } else if (newRole == UserRole.dev) {
+                                                                    _activeMenu = '🛠️ 實體服務診斷';
+                                                                  } else {
+                                                                    _activeMenu = '今日行程';
+                                                                  }
+                                                                });
+                                                              },
+                                                            )
+                                                          : _activeMenu == '垃圾桶'
+                                                              ? const TrashBinScreen()
+                                                              : _activeMenu == '系統設定'
+                                                                  ? const SettingsScreen()
+                                                                  : _buildFallbackScreen(),
                     ),
                   ],
                 ),
@@ -710,6 +821,41 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
+              // Notification Center Bell (Touch target >= 44x44, Minimal Amber Dot)
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.notifications_none_rounded, size: 22),
+                      color: textColor,
+                      tooltip: '訊息通知中心',
+                      onPressed: () => NotificationCenterPopover.show(context),
+                    ),
+                    if (_notifService.unreadCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF59E0B),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color(0xFFF59E0B),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
           )
         ],

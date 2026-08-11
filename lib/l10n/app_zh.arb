@@ -174,5 +174,9 @@
   "passwords_do_not_match": "兩次輸入的密碼不一致",
   "password_reset_success": "密碼重設成功！",
   "change_password_title": "帳號密碼與安全",
-  "change_password_btn": "更換密碼"
+  "change_password_btn": "更換密碼",
+  "role_admin": "👑 系統管理者 (Admin)",
+  "role_dev": "🛠️ 核心開發者 (Dev)",
+  "role_agent": "💼 保險業務員 (Agent)",
+  "role_identity_badge": "帳號身分權限"
 }

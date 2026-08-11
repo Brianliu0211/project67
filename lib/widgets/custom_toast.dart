@@ -99,22 +99,22 @@ class _CustomToastState extends State<CustomToast> with SingleTickerProviderStat
 
     switch (widget.type) {
       case ToastType.success:
-        borderColor = const Color(0xFF00ADB5);
-        glowColor = const Color(0xFF00ADB5).withValues(alpha: 0.2);
-        icon = Icons.check_circle_outline;
-        iconColor = const Color(0xFF00F5FF);
+        borderColor = const Color(0xFF10B981);
+        glowColor = const Color(0xFF10B981).withValues(alpha: 0.25);
+        icon = Icons.check_circle_rounded;
+        iconColor = const Color(0xFF10B981);
         break;
       case ToastType.warning:
-        borderColor = Colors.amber;
-        glowColor = Colors.amber.withValues(alpha: 0.2);
+        borderColor = const Color(0xFFF59E0B);
+        glowColor = const Color(0xFFF59E0B).withValues(alpha: 0.25);
         icon = Icons.warning_amber_rounded;
-        iconColor = Colors.amber;
+        iconColor = const Color(0xFFF59E0B);
         break;
       case ToastType.error:
-        borderColor = Colors.redAccent;
-        glowColor = Colors.redAccent.withValues(alpha: 0.2);
+        borderColor = const Color(0xFFEF4444);
+        glowColor = const Color(0xFFEF4444).withValues(alpha: 0.25);
         icon = Icons.error_outline_rounded;
-        iconColor = Colors.redAccent;
+        iconColor = const Color(0xFFEF4444);
         break;
     }
 

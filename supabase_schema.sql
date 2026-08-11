@@ -21,10 +21,21 @@ CREATE TABLE public.profiles (
     website TEXT,
     address TEXT,
     bio TEXT,
+    role TEXT NOT NULL DEFAULT 'agent' CHECK (role IN ('admin', 'dev', 'agent')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'pending', 'suspended')),
+    team_id UUID DEFAULT 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID,
+    team_name TEXT DEFAULT '國泰台北第一通訊處',
+    is_google_connected BOOLEAN NOT NULL DEFAULT FALSE,
+    connected_providers TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
 COMMENT ON TABLE public.profiles IS 'Stores basic salesperson profile metadata, linked to Supabase Auth users.';
+COMMENT ON COLUMN public.profiles.role IS 'User role for Role-Based Access Control: admin, dev, agent (default)';
+COMMENT ON COLUMN public.profiles.status IS 'Account status: active, pending, suspended';
+COMMENT ON COLUMN public.profiles.team_id IS 'Team / Organization UUID for multi-tenant isolation';
+COMMENT ON COLUMN public.profiles.is_google_connected IS 'Indicates whether the user has authorized Google account connection';
+COMMENT ON COLUMN public.profiles.connected_providers IS 'List of connected third-party OAuth providers (e.g. google)';
 
 -- -------------------------------------------------------------
 -- 2. Customers Table (Sales Reps' Clients)
@@ -92,13 +103,39 @@ CREATE TRIGGER trigger_update_reminders_timestamp
 -- -------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+    initial_provider TEXT;
+    is_google BOOLEAN := FALSE;
+    providers_list TEXT[] := '{}';
 BEGIN
-    INSERT INTO public.profiles (id, email, full_name)
+    initial_provider := COALESCE(NEW.raw_app_meta_data->>'provider', 'email');
+    
+    IF initial_provider = 'google' THEN
+        is_google := TRUE;
+        providers_list := ARRAY['google'];
+    END IF;
+
+    INSERT INTO public.profiles (
+        id, 
+        email, 
+        full_name, 
+        role, 
+        is_google_connected, 
+        connected_providers
+    )
     VALUES (
         NEW.id,
         NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'New Sales Rep')
-    );
+        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'New Sales Rep'),
+        COALESCE(NEW.raw_user_meta_data->>'role', 'agent'),
+        is_google,
+        providers_list
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        role = EXCLUDED.role,
+        is_google_connected = EXCLUDED.is_google_connected,
+        connected_providers = EXCLUDED.connected_providers;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -682,4 +719,42 @@ CREATE POLICY "Allow public read access for insurance_news_articles"
     ON public.insurance_news_articles FOR SELECT
     TO public
     USING (true);
+
+-- -------------------------------------------------------------
+-- 10. Notifications Table (Bidirectional Notification Center)
+-- -------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    sender_name TEXT DEFAULT '系統',
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'system_notice' CHECK (type IN ('customer_reassigned', 'manager_task_note', 'ai_smart_alert', 'system_notice')),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    target_customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_profile_id ON public.notifications(profile_id);
+COMMENT ON TABLE public.notifications IS 'Stores user notifications for assignments, task notes, AI alerts, and system notices';
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view their own notifications') THEN
+        CREATE POLICY "Users can view their own notifications"
+            ON public.notifications FOR SELECT
+            USING (auth.uid() = profile_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update their own notifications') THEN
+        CREATE POLICY "Users can update their own notifications"
+            ON public.notifications FOR UPDATE
+            USING (auth.uid() = profile_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admins can insert notifications') THEN
+        CREATE POLICY "Admins can insert notifications"
+            ON public.notifications FOR INSERT
+            WITH CHECK (true);
+    END IF;
+END $$;
 

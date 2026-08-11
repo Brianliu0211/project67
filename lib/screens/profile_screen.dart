@@ -15,10 +15,12 @@ import 'customer_management_tab.dart'; // To use CustomToast
 import '../widgets/custom_toast.dart';
 import '../widgets/animations.dart';
 import '../widgets/reset_password_dialog.dart';
+import '../models/user_role.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onProfileUpdated;
-  const ProfileScreen({super.key, this.onProfileUpdated});
+  final ValueChanged<UserRole>? onRoleChanged;
+  const ProfileScreen({super.key, this.onProfileUpdated, this.onRoleChanged});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -51,6 +53,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   bool _isImageCleared = false;
   Uint8List? _qrCodeImageBytes;
   String _currentQrCodeUrl = '';
+
+  // RBAC User Role & Connections State
+  UserRole _userRole = UserRole.agent;
+  bool _isGoogleConnected = false;
+  String _teamCode = 'TAIPEI-01';
+  String _teamName = '國泰台北第一通訊處';
+  String _accountStatus = 'active';
 
   // Digital Business Card Customization States
   Set<String> _selectedBadges = {'MDRT 頂尖會員', '人身保險業務員'};
@@ -177,6 +186,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         _userEmail = 'brain2013bb@gmail.com';
         _selectedTheme = prefs.getString('profile_theme') ?? 'system_primary';
         _honorTitle = prefs.getString('profile_honor_title') ?? 'VIP 鑽石顧問';
+        _userRole = UserRole.fromString(prefs.getString('profile_role'));
+        _isGoogleConnected = prefs.getBool('profile_is_google_connected') ?? false;
         final savedBadges = prefs.getStringList('profile_badges');
         if (savedBadges != null && savedBadges.isNotEmpty) {
           _selectedBadges = savedBadges.toSet();
@@ -209,6 +220,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             _addressController.text = data['address'] ?? '';
             _bioController.text = data['bio'] ?? '';
             _currentAvatarUrl = data['avatar_url'] ?? '';
+            _userRole = UserRole.fromString(data['role']);
+            _teamCode = data['team_code'] ?? (user.userMetadata?['team_code'] ?? 'TAIPEI-01');
+            _teamName = data['team_name'] ?? (user.userMetadata?['team_name'] ?? '國泰台北第一通訊處');
+            _accountStatus = data['status'] ?? (user.userMetadata?['status'] ?? 'active');
+            _isGoogleConnected = (data['is_google_connected'] as bool?) ??
+                (user.identities?.any((i) => i.provider == 'google') ?? false);
           });
         }
       }
@@ -285,6 +302,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await prefs.setString('profile_avatar_url', finalAvatarUrl);
         await prefs.setString('profile_theme', _selectedTheme);
         await prefs.setString('profile_honor_title', _honorTitle);
+        await prefs.setString('profile_role', _userRole.value);
+        await prefs.setBool('profile_is_google_connected', _isGoogleConnected);
         await prefs.setStringList('profile_badges', _selectedBadges.toList());
 
         if (mounted) {
@@ -323,6 +342,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         'address': _addressController.text.trim(),
         'bio': _bioController.text.trim(),
         'avatar_url': finalAvatarUrl,
+        'role': _userRole.value,
+        'is_google_connected': _isGoogleConnected,
       }).eq('id', user.id);
 
       if (mounted) {
@@ -550,45 +571,139 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   // --- MASTER NAVIGATION HEADER BAR ---
   Widget _buildMasterHeader(bool isDark, Color primaryColor, Color textColor, Color subTextColor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final bool isApproved = _accountStatus == 'active';
+    return Column(
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.style_outlined, color: primaryColor, size: 24),
+                    const SizedBox(width: 10),
+                    Text(
+                      '個人帳號與名片設定',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+                    ),
+                  ],
+                ),
+              ],
+            ),
             Row(
               children: [
-                Icon(Icons.style_outlined, color: primaryColor, size: 24),
-                const SizedBox(width: 10),
-                Text(
-                  '個人帳號與名片設定',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+                ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    elevation: 2,
+                  ),
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.check_circle_outline, size: 18),
+                  label: Text(_isLoading ? '儲存中...' : '儲存變更', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 ),
               ],
             ),
           ],
         ),
-        Row(
-          children: [
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _saveProfile,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                elevation: 2,
+        const SizedBox(height: 14),
+
+        // Team & Account Role Information Card
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF131A26) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: primaryColor.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.corporate_fare_rounded, color: primaryColor, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              Text('🏢 所屬通訊處：$_teamName', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('邀請碼: $_teamCode', style: TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '帳號身分：${_userRole.labelZh} · 登入帳號：$_userEmail',
+                            style: TextStyle(fontSize: 11, color: subTextColor),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.check_circle_outline, size: 18),
-              label: Text(_isLoading ? '儲存中...' : '儲存變更', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: (isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isApproved ? Icons.verified_user_rounded : Icons.pending_actions_rounded,
+                      size: 14,
+                      color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isApproved ? '🟢 免審核授權開通 (Active)' : '🟡 待主管審核 (Pending)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1696,15 +1811,92 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  // --- TAB 3: SECURITY AND PASSWORD ---
   Widget _buildTab3SecurityAndPassword(bool isDark, Color primaryColor, Color textColor, Color subTextColor) {
     return Column(
       key: const ValueKey(3),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('變更密碼 / 安全設定', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+        Text('帳號身分權限與安全設定', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
         const SizedBox(height: 4),
-        Text('定期更新密碼以確保您的客戶 CRM 與保單資料安全', style: TextStyle(fontSize: 12, color: subTextColor)),
+        Text('管理您的 RBAC 角色身分、第三方連線與個人安全密碼', style: TextStyle(fontSize: 12, color: subTextColor)),
+        const SizedBox(height: 20),
+
+        // Section 1: RBAC Role & Permission Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _userRole.primaryColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _userRole.primaryColor.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _userRole.primaryColor.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(_userRole.badgeIcon, color: _userRole.primaryColor, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text('當前身分：', style: TextStyle(fontSize: 12, color: subTextColor)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: _userRole.primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                _userRole.labelZh,
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _userRole.isAdmin
+                              ? '擁有全系統完整最高管理權限，包含角色配置與數據維運'
+                              : _userRole.isDev
+                                  ? '核心開發者身分，具備測試工具、除錯面板與系統擴充權限'
+                                  : '標準保險業務員身分，專注於 CRM 客戶維護與行程安排',
+                          style: TextStyle(fontSize: 12, color: textColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (_userRole == UserRole.dev && widget.onRoleChanged != null) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    widget.onRoleChanged!(UserRole.dev);
+                  },
+                  icon: const Icon(Icons.developer_board_rounded, size: 16, color: Color(0xFF6366F1)),
+                  label: const Text('🛠️ 返回核心開發者控制台 (Dev Console)', style: TextStyle(fontSize: 12, color: Color(0xFF6366F1))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF6366F1)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+
         const SizedBox(height: 20),
         Container(
           padding: const EdgeInsets.all(20),
@@ -1856,10 +2048,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
       if (image != null) {
         final bytes = await image.readAsBytes();
-        setState(() {
-          _qrCodeImageBytes = bytes;
-        });
-        CustomToast.show(context, '🟢 已成功選擇 QR Code 圖片！', ToastType.success);
+        if (mounted) {
+          setState(() {
+            _qrCodeImageBytes = bytes;
+          });
+          CustomToast.show(context, '🟢 已成功選擇 QR Code 圖片！', ToastType.success);
+        }
       }
     } catch (e) {
       if (mounted) {

@@ -178,7 +178,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
                 _deleteCustomerForever(id);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+                backgroundColor: const Color(0xFFEF4444),
                 foregroundColor: Colors.white,
               ),
               child: Text(context.l10n('trash_bin_delete_forever')),
@@ -507,7 +507,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
                   icon: const Icon(Icons.delete_forever, size: 16),
                   label: Text(context.l10n('trash_bin_delete_forever')),
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.redAccent,
+                    foregroundColor: const Color(0xFFEF4444),
                   ),
                 ),
               ],
