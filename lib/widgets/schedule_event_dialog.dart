@@ -39,7 +39,6 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
 
   double? _selectedLat;
   double? _selectedLng;
-  bool _isMapExpanded = false;
   bool _isSaving = false;
   bool _isDeleting = false;
   bool _isSearchingPlace = false;
@@ -442,7 +441,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
           ),
           const SizedBox(height: 16),
 
-          // Location Input (with interactive map toggle icon)
+          // Location Input (with interactive map modal popup button)
           TextFormField(
             controller: _locationController,
             textInputAction: TextInputAction.next,
@@ -452,17 +451,14 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
               hintText: context.l10n('event_location_hint'),
               prefixIcon: const Icon(Icons.location_on_outlined),
               suffixIcon: Tooltip(
-                message: _isMapExpanded ? '收起地圖' : '展開地圖選點',
+                message: '開啟地圖定位選點',
                 child: IconButton(
-                  icon: Icon(
-                    _isMapExpanded ? Icons.map : Icons.map_outlined,
-                    color: _isMapExpanded ? const Color(0xFF0284C7) : Colors.grey,
+                  icon: const Icon(
+                    Icons.map,
+                    color: Color(0xFF0284C7),
+                    size: 22,
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _isMapExpanded = !_isMapExpanded;
-                    });
-                  },
+                  onPressed: () => _openInteractiveMapModal(context),
                 ),
               ),
               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
@@ -529,22 +525,67 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
       );
     }
 
-    Widget buildMapColumn() {
-      return Container(
-        height: 480,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        width: MediaQuery.of(context).size.width >= 560 ? 480 : MediaQuery.of(context).size.width * 0.92,
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: buildFormColumn(),
+          ),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            // Map Top Search Bar
-            Container(
-              padding: const EdgeInsets.all(8),
-              color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
+      ),
+    );
+  }
+
+  // 🗺️ 彈出頂層互動式地圖 Modal (覆蓋最上方，不擠壓底層行程表單)
+  void _openInteractiveMapModal(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF0F172A) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) {
+          final currentCenter = (_selectedLat != null && _selectedLng != null)
+              ? LatLng(_selectedLat!, _selectedLng!)
+              : _defaultCenter;
+
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            backgroundColor: bgColor,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 800, maxHeight: 650),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
+                  // Top Modal Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.map_rounded, color: Color(0xFF0284C7), size: 22),
+                          const SizedBox(width: 8),
+                          Text(
+                            '🗺️ 地圖定位點選',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Search Bar Row
                   Row(
                     children: [
                       Expanded(
@@ -563,10 +604,16 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                                   )
                                 : IconButton(
                                     icon: const Icon(Icons.search, size: 20),
-                                    onPressed: () => _performSearch(_mapSearchController.text),
+                                    onPressed: () async {
+                                      await _performSearch(_mapSearchController.text);
+                                      setModalState(() {});
+                                    },
                                   ),
                           ),
-                          onSubmitted: (val) => _performSearch(val),
+                          onSubmitted: (val) async {
+                            await _performSearch(val);
+                            setModalState(() {});
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -587,105 +634,121 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                       child: Container(
                         margin: const EdgeInsets.only(top: 6),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
                         ),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _searchResults.length,
-                        itemBuilder: (ctx, idx) {
-                          final item = _searchResults[idx];
-                          return ListTile(
-                            dense: true,
-                            leading: const Icon(Icons.location_on, size: 18, color: Colors.redAccent),
-                            title: Text(item.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-                            onTap: () => _selectSearchResult(item),
-                          );
-                        },
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _searchResults.length,
+                          itemBuilder: (c, idx) {
+                            final item = _searchResults[idx];
+                            return ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.location_on, size: 18, color: Colors.redAccent),
+                              title: Text(item.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                              onTap: () {
+                                _selectSearchResult(item);
+                                setModalState(() {});
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+
+                  // Map Canvas Area
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Stack(
+                        children: [
+                          FlutterMap(
+                            mapController: _mapController,
+                            options: MapOptions(
+                              initialCenter: currentCenter,
+                              initialZoom: 14,
+                              onTap: (tapPos, point) {
+                                _onMapTap(point);
+                                setModalState(() {});
+                              },
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.example.insurance_helper',
+                              ),
+                              if (_selectedLat != null && _selectedLng != null)
+                                MarkerLayer(
+                                  markers: [
+                                    Marker(
+                                      point: LatLng(_selectedLat!, _selectedLng!),
+                                      width: 40,
+                                      height: 40,
+                                      child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                          Positioned(
+                            bottom: 12,
+                            right: 12,
+                            child: FloatingActionButton.small(
+                              heroTag: 'recenter_map_modal',
+                              onPressed: () {
+                                if (_selectedLat != null && _selectedLng != null) {
+                                  _mapController.move(LatLng(_selectedLat!, _selectedLng!), 16);
+                                } else {
+                                  _mapController.move(_defaultCenter, 14);
+                                }
+                              },
+                              child: const Icon(Icons.my_location),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
+                  const SizedBox(height: 12),
 
-            // Map View Area
-            Expanded(
-              child: Stack(
-                children: [
-                  FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: currentCenter,
-                      initialZoom: 14,
-                      onTap: (tapPos, point) => _onMapTap(point),
-                    ),
+                  // Bottom Confirmation Bar
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.insurance_helper',
-                      ),
-                      if (_selectedLat != null && _selectedLng != null)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: LatLng(_selectedLat!, _selectedLng!),
-                              width: 40,
-                              height: 40,
-                              child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
-                            ),
-                          ],
+                      Expanded(
+                        child: Text(
+                          _selectedLat != null
+                              ? '📍 已選地點: ${_locationController.text.isNotEmpty ? _locationController.text : "${_selectedLat!.toStringAsFixed(4)}, ${_selectedLng!.toStringAsFixed(4)}"}'
+                              : '💡 請在地圖上點擊位置或搜尋標註定位點',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {});
+                          Navigator.pop(ctx);
+                        },
+                        icon: const Icon(Icons.check_circle_outline, size: 18),
+                        label: const Text('確認套用此地點', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
                     ],
                   ),
-                  Positioned(
-                    bottom: 12,
-                    right: 12,
-                    child: FloatingActionButton.small(
-                      heroTag: 'recenter_map',
-                      onPressed: () {
-                        if (_selectedLat != null && _selectedLng != null) {
-                          _mapController.move(LatLng(_selectedLat!, _selectedLng!), 16);
-                        } else {
-                          _mapController.move(_defaultCenter, 14);
-                        }
-                      },
-                      child: const Icon(Icons.my_location),
-                    ),
-                  ),
                 ],
               ),
             ),
-          ],
-        ),
-      );
-    }
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        width: _isMapExpanded ? 960 : 480,
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              child: _isMapExpanded
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: buildFormColumn()),
-                        const SizedBox(width: 24),
-                        Expanded(child: buildMapColumn()),
-                      ],
-                    )
-                  : buildFormColumn(),
-            ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

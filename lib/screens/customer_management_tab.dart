@@ -1535,134 +1535,269 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Search & Action Toolbar Row
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: TextField(
-                    controller: _searchController,
-                    style: TextStyle(color: textColor),
-                    decoration: InputDecoration(
-                      hintText: context.l10n('customer_search_hint'),
-                      hintStyle: TextStyle(color: iconColor),
-                      prefixIcon: Icon(Icons.search, color: iconColor),
-                      fillColor: searchBg,
-                      filled: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: searchBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: searchBorder),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: primaryColor, width: 1.5),
+          // Search & Action Toolbar (Responsive for Desktop vs Mobile)
+          isWideScreen
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(color: textColor),
+                          decoration: InputDecoration(
+                            hintText: context.l10n('customer_search_hint'),
+                            hintStyle: TextStyle(color: iconColor),
+                            prefixIcon: Icon(Icons.search, color: iconColor),
+                            fillColor: searchBg,
+                            filled: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide(color: searchBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide(color: searchBorder),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide(color: primaryColor, width: 1.5),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // View Mode Toggle Button
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: searchBg,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: searchBorder),
-                  ),
-                  child: IconButton(
-                    onPressed: () {
-                      final newMode = AppSettings.instance.defaultCustomerViewMode == 'list' ? 'card' : 'list';
-                      AppSettings.instance.setDefaultCustomerViewMode(newMode);
-                    },
-                    icon: Icon(
-                      AppSettings.instance.defaultCustomerViewMode == 'list'
-                          ? Icons.grid_view_outlined
-                          : Icons.view_list_outlined,
-                      color: primaryColor,
-                      size: 20,
+                    const SizedBox(width: 12),
+                    // View Mode Toggle Button
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: searchBg,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: searchBorder),
+                        ),
+                        child: IconButton(
+                          onPressed: () {
+                            final newMode = AppSettings.instance.defaultCustomerViewMode == 'list' ? 'card' : 'list';
+                            AppSettings.instance.setDefaultCustomerViewMode(newMode);
+                          },
+                          icon: Icon(
+                            AppSettings.instance.defaultCustomerViewMode == 'list'
+                                ? Icons.grid_view_outlined
+                                : Icons.view_list_outlined,
+                            color: primaryColor,
+                            size: 20,
+                          ),
+                          tooltip: AppSettings.instance.defaultCustomerViewMode == 'list'
+                              ? context.l10n('view_3d_card')
+                              : context.l10n('view_list_view'),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
                     ),
-                    tooltip: AppSettings.instance.defaultCustomerViewMode == 'list'
-                        ? context.l10n('view_3d_card')
-                        : context.l10n('view_list_view'),
-                    padding: EdgeInsets.zero,
-                  ),
+                    const SizedBox(width: 12),
+                    // Share / Export Button
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: searchBg,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: searchBorder),
+                        ),
+                        child: IconButton(
+                          onPressed: _showShareExportModal,
+                          icon: Icon(Icons.ios_share_outlined, color: primaryColor, size: 20),
+                          tooltip: '匯出與分享選項',
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: _showBatchImportDialog,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: primaryColor,
+                        side: BorderSide(color: primaryColor, width: 1.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                      ),
+                      icon: const Icon(Icons.file_upload_outlined, size: 20),
+                      label: const Text('批次匯入 📥', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _isSelectionMode = !_isSelectionMode;
+                          if (!_isSelectionMode) {
+                            _selectedCustomerIds.clear();
+                          }
+                        });
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _isSelectionMode ? const Color(0xFF38BDF8) : primaryColor,
+                        side: BorderSide(color: _isSelectionMode ? const Color(0xFF0EA5E9) : primaryColor, width: 1.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        backgroundColor: _isSelectionMode ? const Color(0xFF0EA5E9).withOpacity(0.15) : Colors.transparent,
+                      ),
+                      icon: Icon(_isSelectionMode ? Icons.check_box_outlined : Icons.checklist_outlined, size: 20),
+                      label: Text(_isSelectionMode ? '結束多選 ✖' : '批量管理 📋', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => _showCustomerForm(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        elevation: 2,
+                      ),
+                      icon: const Icon(Icons.add, size: 20),
+                      label: Text(context.l10n('customer_add_btn'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: TextField(
+                              controller: _searchController,
+                              style: TextStyle(color: textColor),
+                              decoration: InputDecoration(
+                                hintText: context.l10n('customer_search_hint'),
+                                hintStyle: TextStyle(color: iconColor),
+                                prefixIcon: Icon(Icons.search, color: iconColor),
+                                fillColor: searchBg,
+                                filled: true,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide(color: searchBorder),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide(color: searchBorder),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide(color: primaryColor, width: 1.5),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: searchBg,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: searchBorder),
+                            ),
+                            child: IconButton(
+                              onPressed: () {
+                                final newMode = AppSettings.instance.defaultCustomerViewMode == 'list' ? 'card' : 'list';
+                                AppSettings.instance.setDefaultCustomerViewMode(newMode);
+                              },
+                              icon: Icon(
+                                AppSettings.instance.defaultCustomerViewMode == 'list'
+                                    ? Icons.grid_view_outlined
+                                    : Icons.view_list_outlined,
+                                color: primaryColor,
+                                size: 18,
+                              ),
+                              tooltip: AppSettings.instance.defaultCustomerViewMode == 'list'
+                                  ? context.l10n('view_3d_card')
+                                  : context.l10n('view_list_view'),
+                              padding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: searchBg,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: searchBorder),
+                            ),
+                            child: IconButton(
+                              onPressed: _showShareExportModal,
+                              icon: Icon(Icons.ios_share_outlined, color: primaryColor, size: 18),
+                              tooltip: '匯出與分享選項',
+                              padding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _showBatchImportDialog,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: primaryColor,
+                            side: BorderSide(color: primaryColor, width: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          icon: const Icon(Icons.file_upload_outlined, size: 18),
+                          label: const Text('批次匯入 📥', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _isSelectionMode = !_isSelectionMode;
+                              if (!_isSelectionMode) {
+                                _selectedCustomerIds.clear();
+                              }
+                            });
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _isSelectionMode ? const Color(0xFF38BDF8) : primaryColor,
+                            side: BorderSide(color: _isSelectionMode ? const Color(0xFF0EA5E9) : primaryColor, width: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            backgroundColor: _isSelectionMode ? const Color(0xFF0EA5E9).withOpacity(0.15) : Colors.transparent,
+                          ),
+                          icon: Icon(_isSelectionMode ? Icons.check_box_outlined : Icons.checklist_outlined, size: 18),
+                          label: Text(_isSelectionMode ? '結束多選 ✖' : '批量管理 📋', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () => _showCustomerForm(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            elevation: 2,
+                          ),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: Text(context.l10n('customer_add_btn'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              // Share / Export Button
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: searchBg,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: searchBorder),
-                  ),
-                  child: IconButton(
-                    onPressed: _showShareExportModal,
-                    icon: Icon(Icons.ios_share_outlined, color: primaryColor, size: 20),
-                    tooltip: '匯出與分享選項',
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: _showBatchImportDialog,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: primaryColor,
-                  side: BorderSide(color: primaryColor, width: 1.5),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                ),
-                icon: const Icon(Icons.file_upload_outlined, size: 20),
-                label: const Text('批次匯入 📥', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _isSelectionMode = !_isSelectionMode;
-                    if (!_isSelectionMode) {
-                      _selectedCustomerIds.clear();
-                    }
-                  });
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _isSelectionMode ? const Color(0xFF38BDF8) : primaryColor,
-                  side: BorderSide(color: _isSelectionMode ? const Color(0xFF0EA5E9) : primaryColor, width: 1.5),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  backgroundColor: _isSelectionMode ? const Color(0xFF0EA5E9).withOpacity(0.15) : Colors.transparent,
-                ),
-                icon: Icon(_isSelectionMode ? Icons.check_box_outlined : Icons.checklist_outlined, size: 20),
-                label: Text(_isSelectionMode ? '結束多選 ✖' : '批量管理 📋', style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () => _showCustomerForm(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  elevation: 2,
-                ),
-                icon: const Icon(Icons.add, size: 20),
-                label: Text(context.l10n('customer_add_btn'), style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
           
           const SizedBox(height: 24),
 
@@ -1699,7 +1834,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         childAspectRatio = 1.5;
       }
     } else {
-      childAspectRatio = 1.8;
+      childAspectRatio = 1.65;
     }
 
     return GridView.builder(
@@ -2581,19 +2716,23 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
         final double transformVal = _controller.value * 3.1415926535;
         final bool showFrontSide = transformVal < (3.1415926535 / 2);
 
-        return Transform(
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.001) // perspective
-            ..rotateY(transformVal),
-          alignment: Alignment.center,
-          child: showFrontSide
-              ? _buildFront(name, nickname, displayName, phone, email, tags, avatarUrl, nameInitial)
-              : Transform(
-                  // Counter rotate back side
-                  transform: Matrix4.identity()..rotateY(3.1415926535),
-                  alignment: Alignment.center,
-                  child: _buildBack(name, notes),
-                ),
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _flip,
+          child: Transform(
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.001) // perspective
+              ..rotateY(transformVal),
+            alignment: Alignment.center,
+            child: showFrontSide
+                ? _buildFront(name, nickname, displayName, phone, email, tags, avatarUrl, nameInitial)
+                : Transform(
+                    // Counter rotate back side
+                    transform: Matrix4.identity()..rotateY(3.1415926535),
+                    alignment: Alignment.center,
+                    child: _buildBack(name, notes),
+                  ),
+          ),
         );
       },
     );

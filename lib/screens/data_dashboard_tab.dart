@@ -588,22 +588,32 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Top Header Metrics
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildMetricCard('本月個人拜訪', '$_monthlyVisitCount 次', Icons.event_available_rounded, const Color(0xFF10B981), isDark, cardBg, borderColor, textColor, subTextColor),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildMetricCard('手頭 VIP 客戶', '$_vipCustomerCount 位', Icons.star_rounded, const Color(0xFFF59E0B), isDark, cardBg, borderColor, textColor, subTextColor),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildMetricCard('保單健診完成率', '${(_healthCheckPercent * 100).toInt()}%', Icons.pie_chart_rounded, const Color(0xFF6366F1), isDark, cardBg, borderColor, textColor, subTextColor),
-                            ),
-                          ],
-                        ),
+                        // Top Header Metrics (Responsive for Desktop vs Mobile)
+                        MediaQuery.of(context).size.width >= 600
+                            ? Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildMetricCard('本月個人拜訪', '$_monthlyVisitCount 次', Icons.event_available_rounded, const Color(0xFF10B981), isDark, cardBg, borderColor, textColor, subTextColor),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildMetricCard('手頭 VIP 客戶', '$_vipCustomerCount 位', Icons.star_rounded, const Color(0xFFF59E0B), isDark, cardBg, borderColor, textColor, subTextColor),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildMetricCard('保單健診完成率', '${(_healthCheckPercent * 100).toInt()}%', Icons.pie_chart_rounded, const Color(0xFF6366F1), isDark, cardBg, borderColor, textColor, subTextColor),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  _buildMetricCard('本月個人拜訪', '$_monthlyVisitCount 次', Icons.event_available_rounded, const Color(0xFF10B981), isDark, cardBg, borderColor, textColor, subTextColor),
+                                  const SizedBox(height: 10),
+                                  _buildMetricCard('手頭 VIP 客戶', '$_vipCustomerCount 位', Icons.star_rounded, const Color(0xFFF59E0B), isDark, cardBg, borderColor, textColor, subTextColor),
+                                  const SizedBox(height: 10),
+                                  _buildMetricCard('保單健診完成率', '${(_healthCheckPercent * 100).toInt()}%', Icons.pie_chart_rounded, const Color(0xFF6366F1), isDark, cardBg, borderColor, textColor, subTextColor),
+                                ],
+                              ),
 
                         const SizedBox(height: 20),
 
@@ -853,7 +863,7 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontSize: 11, color: subTextColor)),
+                Text(title, style: TextStyle(fontSize: 12, color: subTextColor, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis, softWrap: false),
                 const SizedBox(height: 4),
                 Text(val, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
               ],

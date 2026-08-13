@@ -218,36 +218,73 @@ class SettingsScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 16),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(context.l10n('customer_view_mode'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 2),
-                                  Text(context.l10n('customer_view_mode_desc'), style: const TextStyle(fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            SizedBox(
-                              width: 260,
-                              child: SegmentedButton<String>(
-                                segments: [
-                                  ButtonSegment(
-                                    value: 'card',
-                                    label: Text(context.l10n('view_3d_card')),
-                                    icon: const Icon(Icons.view_carousel_outlined, size: 16),
-                                  ),
-                                  ButtonSegment(
-                                    value: 'list',
-                                    label: Text(context.l10n('view_list_view')),
-                                    icon: const Icon(Icons.table_rows_outlined, size: 16),
-                                  ),
-                                ],
-                                selected: {settings.defaultCustomerViewMode},
-                                onSelectionChanged: (Set<String> newSelection) {
-                                  settings.setDefaultCustomerViewMode(newSelection.first);
-                                },
-                              ),
+                              child: MediaQuery.of(context).size.width >= 600
+                                  ? Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(context.l10n('customer_view_mode'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                              const SizedBox(height: 2),
+                                              Text(context.l10n('customer_view_mode_desc'), style: const TextStyle(fontSize: 12)),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        SizedBox(
+                                          width: 260,
+                                          child: SegmentedButton<String>(
+                                            segments: [
+                                              ButtonSegment(
+                                                value: 'card',
+                                                label: Text(context.l10n('view_3d_card')),
+                                                icon: const Icon(Icons.view_carousel_outlined, size: 16),
+                                              ),
+                                              ButtonSegment(
+                                                value: 'list',
+                                                label: Text(context.l10n('view_list_view')),
+                                                icon: const Icon(Icons.table_rows_outlined, size: 16),
+                                              ),
+                                            ],
+                                            selected: {settings.defaultCustomerViewMode},
+                                            onSelectionChanged: (Set<String> newSelection) {
+                                              settings.setDefaultCustomerViewMode(newSelection.first);
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(context.l10n('customer_view_mode'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 2),
+                                        Text(context.l10n('customer_view_mode_desc'), style: const TextStyle(fontSize: 12)),
+                                        const SizedBox(height: 10),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: SegmentedButton<String>(
+                                            segments: [
+                                              ButtonSegment(
+                                                value: 'card',
+                                                label: Text(context.l10n('view_3d_card')),
+                                                icon: const Icon(Icons.view_carousel_outlined, size: 16),
+                                              ),
+                                              ButtonSegment(
+                                                value: 'list',
+                                                label: Text(context.l10n('view_list_view')),
+                                                icon: const Icon(Icons.table_rows_outlined, size: 16),
+                                              ),
+                                            ],
+                                            selected: {settings.defaultCustomerViewMode},
+                                            onSelectionChanged: (Set<String> newSelection) {
+                                              settings.setDefaultCustomerViewMode(newSelection.first);
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                             ),
                           ],
                         ),
