@@ -321,7 +321,10 @@ class _InsuranceNewsTabState extends State<InsuranceNewsTab> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Text(
                                 '✨ 今日產業大勢與新聞總覽',
@@ -331,7 +334,6 @@ class _InsuranceNewsTabState extends State<InsuranceNewsTab> {
                                   color: textColor,
                                 ),
                               ),
-                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
@@ -860,11 +862,15 @@ class _InsuranceNewsTabState extends State<InsuranceNewsTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 頁面頂頭選單列 (右上角 ✨ 今日產業大勢與總覽 按鈕)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // 頁面頂頭選單列 (自適應：寬螢幕一字排開，手機版自動換行)
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.newspaper_outlined, size: 26, color: primaryColor),
                     const SizedBox(width: 10),
@@ -879,7 +885,7 @@ class _InsuranceNewsTabState extends State<InsuranceNewsTab> {
                   ],
                 ),
 
-                // 右上角按鈕：✨ 今日產業大勢與總覽 (使用平滑陰影微動畫按鈕)
+                // ✨ 今日產業大勢與總覽 按鈕
                 _SmoothHoverButton(
                   onPressed: () => _showDailyOverviewModal(isDark, primaryColor),
                   icon: const Icon(Icons.auto_awesome, size: 18, color: Colors.white),
@@ -1048,37 +1054,62 @@ class _InsuranceNewsTabState extends State<InsuranceNewsTab> {
           const Divider(),
           const SizedBox(height: 8),
 
-          // 底部：雙按鈕 (採用零延遲順滑陰影按鈕 _SmoothHoverButton)
-          Row(
-            children: [
-              // 按鈕 1: 瀏覽相關媒體報導
-              Expanded(
-                child: _SmoothHoverButton(
-                  onPressed: () => _showAllArticlesModal(topic, isDark, primaryColor),
-                  icon: Icon(Icons.list_alt_rounded, size: 18, color: isDark ? Colors.white70 : Colors.black87),
-                  label: Text('瀏覽相關媒體報導 (${topic.articles.length})'),
-                  backgroundColor: cardBg,
-                  foregroundColor: isDark ? Colors.white70 : Colors.black87,
-                  shadowColor: borderColor,
-                  borderSide: BorderSide(color: borderColor),
+          // 底部：雙按鈕 (自適應：寬螢幕雙欄，手機版上下單欄)
+          MediaQuery.of(context).size.width >= 600
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: _SmoothHoverButton(
+                        onPressed: () => _showAllArticlesModal(topic, isDark, primaryColor),
+                        icon: Icon(Icons.list_alt_rounded, size: 18, color: isDark ? Colors.white70 : Colors.black87),
+                        label: Text('瀏覽相關媒體報導 (${topic.articles.length})'),
+                        backgroundColor: cardBg,
+                        foregroundColor: isDark ? Colors.white70 : Colors.black87,
+                        shadowColor: borderColor,
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _SmoothHoverButton(
+                        onPressed: () => _showAiSummaryModal(topic, isDark, primaryColor),
+                        icon: Icon(Icons.lightbulb_rounded, size: 18, color: primaryColor),
+                        label: const Text('💡 AI 新聞重點摘要'),
+                        backgroundColor: primaryColor.withOpacity(0.12),
+                        foregroundColor: primaryColor,
+                        shadowColor: primaryColor,
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: _SmoothHoverButton(
+                        onPressed: () => _showAllArticlesModal(topic, isDark, primaryColor),
+                        icon: Icon(Icons.list_alt_rounded, size: 18, color: isDark ? Colors.white70 : Colors.black87),
+                        label: Text('瀏覽相關媒體報導 (${topic.articles.length})'),
+                        backgroundColor: cardBg,
+                        foregroundColor: isDark ? Colors.white70 : Colors.black87,
+                        shadowColor: borderColor,
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _SmoothHoverButton(
+                        onPressed: () => _showAiSummaryModal(topic, isDark, primaryColor),
+                        icon: Icon(Icons.lightbulb_rounded, size: 18, color: primaryColor),
+                        label: const Text('💡 AI 新聞重點摘要'),
+                        backgroundColor: primaryColor.withOpacity(0.12),
+                        foregroundColor: primaryColor,
+                        shadowColor: primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-
-              const SizedBox(width: 12),
-
-              // 按鈕 2: 💡 AI 新聞重點摘要
-              Expanded(
-                child: _SmoothHoverButton(
-                  onPressed: () => _showAiSummaryModal(topic, isDark, primaryColor),
-                  icon: Icon(Icons.lightbulb_rounded, size: 18, color: primaryColor),
-                  label: const Text('💡 AI 新聞重點摘要'),
-                  backgroundColor: primaryColor.withOpacity(0.12),
-                  foregroundColor: primaryColor,
-                  shadowColor: primaryColor,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
