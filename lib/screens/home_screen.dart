@@ -609,12 +609,17 @@ class _HomeScreenState extends State<HomeScreen> {
           appBar: isWideScreen
               ? null
               : AppBar(
-                  title: Text(_getLocalizedMenuTitle(_activeMenu)),
+                  title: Text(
+                    _getLocalizedMenuTitle(_activeMenu),
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                  ),
+                  iconTheme: IconThemeData(color: textColor),
                   backgroundColor: sidebarBg,
+                  elevation: 0,
                   actions: [
                     if (isOfflineMode)
                       Container(
-                        margin: const EdgeInsets.only(right: 12),
+                        margin: const EdgeInsets.only(right: 8),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.amber.shade900,
@@ -625,6 +630,37 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.notifications, size: 22, color: textColor),
+                          tooltip: '訊息通知中心',
+                          onPressed: () => NotificationCenterPopover.show(context),
+                        ),
+                        if (_notifService.unreadCount > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF59E0B),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Color(0xFFF59E0B),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
                   ],
                 ),
           body: Row(
