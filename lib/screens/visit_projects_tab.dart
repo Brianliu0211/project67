@@ -7,6 +7,9 @@ import '../services/app_settings.dart';
 import '../services/app_localizations.dart';
 import '../services/tag_categorizer.dart';
 
+import '../widgets/schedule_event_dialog.dart';
+import '../widgets/custom_toast.dart';
+
 class VisitProjectsTab extends StatefulWidget {
   const VisitProjectsTab({super.key});
 
@@ -428,6 +431,21 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
                         ),
                       ),
                       
+                      // Schedule Action
+                      IconButton(
+                        icon: const Icon(Icons.calendar_month, color: Color(0xFF0369A1), size: 20),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => ScheduleEventDialog(
+                              initialDate: DateTime.now(),
+                              initialTitle: '拜訪: ${project['title']}',
+                              initialEventType: 'visit',
+                            ),
+                          );
+                        },
+                        tooltip: '排入行程',
+                      ),
                       // Delete Action
                       IconButton(
                         icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),

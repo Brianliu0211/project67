@@ -13,6 +13,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
   int _viewModeIndex = 0; // 0: 🌳 樹狀卡片, 1: 🕸️ 網狀拓撲
   bool _isLoading = true;
   String? _selectedNodeName;
+  List<Map<String, dynamic>> _allCustomers = [];
 
   List<Map<String, dynamic>> _referralTrees = [
     {
@@ -50,6 +51,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
 
       if (data != null && (data as List).isNotEmpty) {
         final List<Map<String, dynamic>> allCust = List<Map<String, dynamic>>.from(data);
+        _allCustomers = allCust;
         
         // Find top VIP referrers (customers whose ID is referenced in referral_source_id of others)
         final referrerIds = allCust.map((c) => c['referral_source_id']).where((id) => id != null).toSet();
@@ -265,8 +267,11 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
     CustomToast.show(context, '🎯 視覺中心已成功重置復位至原點 (0,0)', ToastType.success);
   }
 
-  void _showEditRelationshipDialog(String customerName) {
-    String selectedSource = '張大明 (VIP 核心人脈)';
+  void _showEditRelationshipDialog(String customerName, String? currentReferralId, String customerId) {
+    String? selectedSourceId = currentReferralId;
+
+    // Filter out self
+    final List<Map<String, dynamic>> availableSources = _allCustomers.where((c) => c['id'] != customerId).toList();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -284,14 +289,16 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
             const Text('指定該客戶之轉介紹人 (referral_source_id)：', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: selectedSource,
-              items: const [
-                DropdownMenuItem(value: '張大明 (VIP 核心人脈)', child: Text('張大明 (VIP 核心人脈)')),
-                DropdownMenuItem(value: '王大同 (高資產客戶)', child: Text('王大同 (高資產客戶)')),
-                DropdownMenuItem(value: '無 (自開發客戶)', child: Text('無 (自開發客戶)')),
+              value: availableSources.any((c) => c['id'] == selectedSourceId) ? selectedSourceId : null,
+              items: [
+                const DropdownMenuItem(value: null, child: Text('無 (自開發客戶)')),
+                ...availableSources.map((c) => DropdownMenuItem(
+                      value: c['id'].toString(),
+                      child: Text(c['name']?.toString() ?? '未知客戶'),
+                    )),
               ],
               onChanged: (val) {
-                if (val != null) selectedSource = val;
+                selectedSourceId = val;
               },
               decoration: InputDecoration(
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -305,15 +312,27 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
             child: const Text('取消'),
           ),
           ElevatedButton.icon(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              setState(() {
-                _selectedNodeName = '$customerName (轉介紹自 $selectedSource)';
-              });
-              CustomToast.show(context, '✅ 已保存 $customerName 之人脈轉介紹關聯！拓撲畫布已實時重繪。', ToastType.success);
+              
+              if (selectedSourceId != currentReferralId && !isOfflineMode) {
+                try {
+                  await Supabase.instance.client
+                      .from('customers')
+                      .update({'referral_source_id': selectedSourceId})
+                      .eq('id', customerId);
+                  
+                  _loadTopologyFromSupabase();
+                  if (mounted) {
+                    CustomToast.show(context, '✅ 已保存 $customerName 之人脈轉介紹關聯！', ToastType.success);
+                  }
+                } catch (e) {
+                  if (mounted) CustomToast.show(context, '儲存失敗：$e', ToastType.error);
+                }
+              }
             },
             icon: const Icon(Icons.save_rounded, size: 16),
-            label: const Text('保存關聯並重繪拓撲'),
+            label: const Text('保存關聯'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF10B981),
               foregroundColor: Colors.white,
@@ -378,7 +397,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
                       left: x - (isCenter ? 36 : 28),
                       top: y - (isCenter ? 36 : 28),
                       child: GestureDetector(
-                        onTap: () => _showEditRelationshipDialog(name),
+                        onTap: () => _showEditRelationshipDialog(name, null, n['id']),
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,

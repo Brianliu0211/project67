@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/pending_approval_screen.dart';
 import 'widgets/reset_password_dialog.dart';
 import 'services/app_settings.dart';
 import 'services/app_localizations.dart';
@@ -140,6 +141,11 @@ class MyApp extends StatelessWidget {
           locale: AppSettings.instance.language == 'zh_TW'
               ? const Locale('zh', 'TW')
               : const Locale('en', 'US'),
+          localeResolutionCallback: (locale, supportedLocales) {
+            return AppSettings.instance.language == 'zh_TW'
+                ? const Locale('zh', 'TW')
+                : const Locale('en', 'US');
+          },
           home: const AuthGateway(),
         );
       },
@@ -209,7 +215,37 @@ class _AuthGatewayState extends State<AuthGateway> {
 
         final session = snapshot.data?.session ?? Supabase.instance.client.auth.currentSession;
         if (session != null) {
-          return const HomeScreen();
+          // Check profile status from Supabase to enforce pending approval gate
+          return FutureBuilder<Map<String, dynamic>?>(
+            future: Supabase.instance.client
+                .from('profiles')
+                .select('status, role')
+                .eq('id', session.user.id)
+                .maybeSingle(),
+            builder: (context, profileSnap) {
+              if (profileSnap.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(
+                    child: CircularProgressIndicator(color: Color(0xFF00ADB5)),
+                  ),
+                );
+              }
+              final profileData = profileSnap.data;
+              final status = profileData?['status'] as String? ?? 'active';
+              final role = profileData?['role'] as String? ?? 'agent';
+
+              // If status is pending and user is not dev, block access and route to PendingApprovalScreen
+              if (status == 'pending' && role != 'dev') {
+                return PendingApprovalScreen(
+                  userEmail: session.user.email ?? '',
+                  onRefreshStatus: () {
+                    if (mounted) setState(() {});
+                  },
+                );
+              }
+              return const HomeScreen();
+            },
+          );
         } else {
           return const LoginScreen();
         }

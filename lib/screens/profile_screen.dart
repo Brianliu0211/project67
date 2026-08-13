@@ -16,6 +16,7 @@ import '../widgets/custom_toast.dart';
 import '../widgets/animations.dart';
 import '../widgets/reset_password_dialog.dart';
 import '../models/user_role.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onProfileUpdated;
@@ -342,7 +343,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         'address': _addressController.text.trim(),
         'bio': _bioController.text.trim(),
         'avatar_url': finalAvatarUrl,
-        'role': _userRole.value,
         'is_google_connected': _isGoogleConnected,
       }).eq('id', user.id);
 
@@ -657,7 +657,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                   color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: Text('邀請碼: $_teamCode', style: TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.bold)),
+                                child: Text('通訊處代碼: $_teamCode', style: TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.bold)),
                               ),
                             ],
                           ),
@@ -675,31 +675,56 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: (isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isApproved ? Icons.verified_user_rounded : Icons.pending_actions_rounded,
-                      size: 14,
-                      color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isApproved ? '🟢 免審核授權開通 (Active)' : '🟡 待主管審核 (Pending)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+              InkWell(
+                onTap: _userRole == UserRole.dev || _userRole == UserRole.admin
+                    ? () async {
+                        final newStatus = isApproved ? 'pending' : 'active';
+                        try {
+                          final supabase = Supabase.instance.client;
+                          final user = supabase.auth.currentUser;
+                          if (user != null) {
+                            await supabase.from('profiles').update({'status': newStatus}).eq('id', user.id);
+                            setState(() {
+                              _accountStatus = newStatus;
+                            });
+                            if (mounted) {
+                              CustomToast.show(context, '工程師測試：已將您的帳號狀態實體切換為 $newStatus', ToastType.success);
+                            }
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            CustomToast.show(context, '狀態切換失敗: $e', ToastType.error);
+                          }
+                        }
+                      }
+                    : null,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: (isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B)).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isApproved ? Icons.verified_user_rounded : Icons.pending_actions_rounded,
+                        size: 14,
                         color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        isApproved ? '🟢 帳號已開通 (Active)' : '🟡 待主管審核 (Pending)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -1939,7 +1964,167 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ],
           ),
         ),
+
+        const SizedBox(height: 24),
+
+        // Danger Zone: Account Deletion Card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.redAccent.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.delete_forever_rounded, size: 36, color: Colors.redAccent),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('危險區域：註銷並永久刪除帳號', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent, fontSize: 14)),
+                    const SizedBox(height: 2),
+                    Text('此操作不可逆！您的個人檔案、客戶資產與所有行程數據將從實體資料庫徹底抹除。', style: TextStyle(color: subTextColor, fontSize: 11)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: _showDeleteAccountDialog,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.warning_amber_rounded, size: 16),
+                label: const Text('註銷帳號', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  Future<void> _showDeleteAccountDialog() async {
+    final confirmController = TextEditingController();
+    bool isDeleting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final isConfirmed = confirmController.text.trim() == '刪除帳號';
+
+          return AlertDialog(
+            backgroundColor: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF1E293B)
+                : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                SizedBox(width: 8),
+                Text('⚠️ 註銷並永久刪除帳號', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '此操作【不可逆】！\n'
+                  '註銷帳號後，您的個人檔案、客戶資產、行程記錄與所有個人數據將從 Supabase 資料庫中【永久徹底刪除】且無法恢復。',
+                  style: TextStyle(fontSize: 13, height: 1.5, color: Colors.redAccent),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '請在下方輸入框手動輸入「刪除帳號」以進行二次安全確認：',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: confirmController,
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: InputDecoration(
+                    hintText: '刪除帳號',
+                    hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.redAccent, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isDeleting ? null : () => Navigator.pop(ctx),
+                child: const Text('取消'),
+              ),
+              ElevatedButton(
+                onPressed: (isConfirmed && !isDeleting)
+                    ? () async {
+                        setDialogState(() => isDeleting = true);
+                        try {
+                          if (isOfflineMode) {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.clear();
+                          } else {
+                            final supabase = Supabase.instance.client;
+                            final user = supabase.auth.currentUser;
+                            if (user != null) {
+                              // Cascade delete user data from tables
+                              try {
+                                await supabase.from('customers').delete().eq('profile_id', user.id);
+                              } catch (_) {}
+                              try {
+                                await supabase.from('schedule_events').delete().eq('profile_id', user.id);
+                              } catch (_) {}
+                              try {
+                                await supabase.from('visit_logs').delete().eq('profile_id', user.id);
+                              } catch (_) {}
+                              try {
+                                await supabase.from('profiles').delete().eq('id', user.id);
+                              } catch (_) {}
+                              await supabase.auth.signOut();
+                            }
+                          }
+                          if (mounted) {
+                            Navigator.pop(ctx);
+                            CustomToast.show(
+                              context,
+                              '👋 您的帳號與所有個人資料已成功註銷並永久刪除。',
+                              ToastType.warning,
+                            );
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(builder: (context) => LoginScreen()),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            CustomToast.show(context, '註銷失敗: $e', ToastType.error);
+                          }
+                        } finally {
+                          if (mounted) setDialogState(() => isDeleting = false);
+                        }
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                ),
+                child: isDeleting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('確認永久註銷', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 

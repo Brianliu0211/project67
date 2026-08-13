@@ -107,21 +107,36 @@ class _LoginScreenState extends State<LoginScreen> {
           emailRedirectTo: redirectTo,
           data: {
             'full_name': _nameController.text.trim(),
-            'role': _selectedRole.value,
+            'role': UserRole.agent.value, // Public registration is strictly locked to 'agent'
             'team_code': _teamCodeController.text.trim(),
             'team_name': '國泰台北第一通訊處',
             'status': status,
           },
         );
 
-        // Ensure profiles table has explicit profile record
+        // Precise check: Supabase returns user with empty identities list if email is already registered
+        if (response.user != null && (response.user!.identities?.isEmpty ?? false)) {
+          if (mounted) {
+            CustomToast.show(
+              context,
+              '⚠️ 此 Email (${_emailController.text.trim()}) 已經被註冊過囉！已為您帶入帳號並切換至登入模式。',
+              ToastType.warning,
+            );
+            setState(() {
+              _isSignUp = false;
+            });
+          }
+          return;
+        }
+
+        // Ensure profiles table has explicit profile record for new user
         if (response.user != null) {
           try {
             await supabase.from('profiles').upsert({
               'id': response.user!.id,
               'email': _emailController.text.trim(),
               'full_name': _nameController.text.trim(),
-              'role': _selectedRole.value,
+              'role': UserRole.agent.value,
               'status': status,
               'team_name': '國泰台北第一通訊處',
             });
@@ -137,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 content: Text(
                   '您的帳號已成功註冊！\n'
                   '申請通訊處：國泰台北第一通訊處 (${_teamCodeController.text.trim()})\n'
-                  '申請身分：${_selectedRole.labelZh}\n\n'
+                  '申請身分：${UserRole.agent.labelZh}\n\n'
                   '目前為企業嚴格模式，需等待同通訊處團隊主管審核開通後方可登入使用。',
                 ),
                 actions: [
