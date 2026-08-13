@@ -36,7 +36,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       // 1. Fetch profiles for team members
       final profilesRes = await supabase
           .from('profiles')
-          .select('id, full_name, email, role, created_at');
+          .select('id, full_name, email, role, status, created_at');
 
       final List<Map<String, dynamic>> roster = [];
       if (profilesRes != null) {
@@ -46,7 +46,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
             'name': p['full_name'] ?? '未命名成員',
             'email': p['email'] ?? '',
             'role': p['role'] ?? 'agent',
-            'status': p['role'] == 'pending' ? 'pending' : 'active',
+            'status': p['status'] ?? 'active',
             'visits': 12, // Aggregate count
           });
         }
@@ -405,11 +405,21 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
           ),
           if (isPending)
             ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  member['status'] = 'active';
-                });
-                CustomToast.show(context, '已成功審核開通成員：${member['name']}', ToastType.success);
+              onPressed: () async {
+                try {
+                  final supabase = Supabase.instance.client;
+                  await supabase.from('profiles').update({'status': 'active'}).eq('id', member['id']);
+                  setState(() {
+                    member['status'] = 'active';
+                  });
+                  if (mounted) {
+                    CustomToast.show(context, '已成功審核開通成員：${member['name']}', ToastType.success);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    CustomToast.show(context, '開通失敗: $e', ToastType.error);
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B981),

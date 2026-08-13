@@ -37,42 +37,6 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
   bool _isSelectionMode = false;
   Set<String> _selectedCustomerIds = {};
 
-  // Initial Mock Data for Offline Mode
-  final List<Map<String, dynamic>> _mockCustomers = [
-    {
-      'id': 'mock-1',
-      'name': '林君雅',
-      'nickname': '君雅',
-      'avatar_url': 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120',
-      'phone': '0912-345678',
-      'email': 'chunya.lin@gmail.com',
-      'tags': ['高意願', '醫療險', '定期壽險'],
-      'notes': '對家庭防護極有興趣，育有二子。預計下月發薪後再行拜訪談細節。',
-      'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
-    },
-    {
-      'id': 'mock-2',
-      'name': '王小明',
-      'nickname': '小明',
-      'avatar_url': '',
-      'phone': '0923-456789',
-      'email': 'xiaoming.wang@gmail.com',
-      'tags': ['已簽單', '汽車責任險'],
-      'notes': '新購進口休旅車，已完成汽車責任險與甲式車體險簽單，保單寄送中。',
-      'created_at': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
-    },
-    {
-      'id': 'mock-3',
-      'name': '陳美玲',
-      'nickname': '美玲姐',
-      'avatar_url': 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=120',
-      'phone': '0934-567890',
-      'email': 'meiling.chen@yahoo.com',
-      'tags': ['年金險', '理財規劃', '待跟進'],
-      'notes': '即將於三年後退休，著重尋找穩定配息的年金險，目前對儲蓄型保單仍在評估中。',
-      'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-    },
-  ];
 
   @override
   void initState() {
@@ -97,15 +61,14 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     await Future.delayed(const Duration(milliseconds: 500));
 
     if (isOfflineMode) {
-      // Offline fallback: load from shared OfflineDataStore or initial mock list
-      if (OfflineDataStore.customers.isEmpty) {
-        OfflineDataStore.customers = List<Map<String, dynamic>>.from(_mockCustomers);
+      if (mounted) {
+        CustomToast.show(context, '目前為離線預覽模式，無法讀取真實客戶資料。', ToastType.warning);
       }
-      _allCustomers = OfflineDataStore.customers;
-      _filterCustomers();
       setState(() {
+        _allCustomers = [];
         _isLoading = false;
       });
+      _filterCustomers();
       return;
     }
 
@@ -137,16 +100,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       _filterCustomers();
     } catch (e) {
       if (mounted) {
-        CustomToast.show(
-          context,
-          '讀取資料庫失敗: $e\n自動啟用離線列表。',
-          ToastType.warning,
-        );
+        CustomToast.show(context, '讀取資料庫失敗: $e', ToastType.error);
       }
-      // Fail-safe to mock data
-      if (_allCustomers.isEmpty) {
-        _allCustomers = List.from(_mockCustomers);
-      }
+      setState(() {
+        _allCustomers = [];
+      });
       _filterCustomers();
     } finally {
       setState(() {
@@ -192,6 +150,13 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     String? imageName,
     required bool isImageCleared,
   }) async {
+    if (isOfflineMode) {
+      if (mounted) {
+        CustomToast.show(context, '目前為離線預覽模式，無法新增客戶資料。', ToastType.warning);
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -200,9 +165,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     if (isImageCleared) {
       finalAvatarUrl = '';
     } else if (imageBytes != null && imageName != null) {
-      if (isOfflineMode) {
-        finalAvatarUrl = 'data:image/jpeg;base64,${base64Encode(imageBytes)}';
-      } else {
+      if (!isOfflineMode) {
         try {
           final supabase = Supabase.instance.client;
           final user = supabase.auth.currentUser;
@@ -230,29 +193,6 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           return;
         }
       }
-    }
-
-    if (isOfflineMode) {
-      final newCustomer = {
-        'id': 'mock-${DateTime.now().millisecondsSinceEpoch}',
-        'name': name,
-        'nickname': nickname,
-        'avatar_url': finalAvatarUrl,
-        'phone': phone,
-        'email': email,
-        'tags': tags,
-        'notes': notes,
-        'created_at': DateTime.now().toIso8601String(),
-      };
-      setState(() {
-        _allCustomers.insert(0, newCustomer);
-        _isLoading = false;
-      });
-      _filterCustomers();
-      if (mounted) {
-        CustomToast.show(context, '成功新增客戶 $name 檔案 (離線暫存)', ToastType.success);
-      }
-      return;
     }
 
     try {
@@ -299,6 +239,13 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     String? imageName,
     required bool isImageCleared,
   }) async {
+    if (isOfflineMode) {
+      if (mounted) {
+        CustomToast.show(context, '目前為離線預覽模式，無法修改客戶資料。', ToastType.warning);
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -307,9 +254,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     if (isImageCleared) {
       finalAvatarUrl = '';
     } else if (imageBytes != null && imageName != null) {
-      if (isOfflineMode) {
-        finalAvatarUrl = 'data:image/jpeg;base64,${base64Encode(imageBytes)}';
-      } else {
+      if (!isOfflineMode) {
         try {
           final supabase = Supabase.instance.client;
           final user = supabase.auth.currentUser;
@@ -337,31 +282,6 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
           return;
         }
       }
-    }
-
-    if (isOfflineMode) {
-      setState(() {
-        final index = _allCustomers.indexWhere((c) => c['id'] == id);
-        if (index != -1) {
-          _allCustomers[index] = {
-            ..._allCustomers[index],
-            'name': name,
-            'nickname': nickname,
-            'avatar_url': finalAvatarUrl,
-            'phone': phone,
-            'email': email,
-            'tags': tags,
-            'notes': notes,
-            'updated_at': DateTime.now().toIso8601String(),
-          };
-        }
-        _isLoading = false;
-      });
-      _filterCustomers();
-      if (mounted) {
-        CustomToast.show(context, '成功修改客戶 $name 檔案 (離線暫存)', ToastType.success);
-      }
-      return;
     }
 
     try {
@@ -392,37 +312,18 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
 
   // Delete Customer logic (Soft Delete)
   Future<void> _deleteCustomer(String id) async {
+    if (isOfflineMode) {
+      if (mounted) {
+        CustomToast.show(context, '目前為離線預覽模式，無法刪除客戶資料。', ToastType.warning);
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
-    if (isOfflineMode) {
-      setState(() {
-        final index = _allCustomers.indexWhere((c) => c['id'] == id);
-        if (index != -1) {
-          _allCustomers[index] = {
-            ..._allCustomers[index],
-            'deleted_at': DateTime.now().toUtc().toIso8601String(),
-          };
-        }
-        _isLoading = false;
-      });
-      _filterCustomers();
-      if (mounted) {
-        CustomToast.show(
-          context,
-          '${context.l10n('trash_bin_soft_delete_success')} (離線暫存)',
-          ToastType.success,
-          actionLabel: context.l10n('trash_bin_goto'),
-          onActionPressed: () {
-            if (widget.onMenuChanged != null) {
-              widget.onMenuChanged!('垃圾桶');
-            }
-          },
-        );
-      }
-      return;
-    }
+
 
     try {
       final supabase = Supabase.instance.client;
@@ -1186,7 +1087,18 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
         return AlertDialog(
           backgroundColor: dialogBg,
           title: Text(context.l10n('customer_delete_title'), style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-          content: Text(context.l10n('customer_delete_confirm_p1') + name + context.l10n('customer_delete_confirm_p2'), style: TextStyle(color: textColor)),
+          content: RichText(
+            text: TextSpan(
+              style: TextStyle(color: textColor, fontSize: 14),
+              children: [
+                TextSpan(text: context.l10n('customer_delete_confirm_p1') + name + context.l10n('customer_delete_confirm_p2') + '\n\n'),
+                TextSpan(
+                  text: '⚠️ 警告：這將連帶隱藏與該客戶相關的專案拜訪與行程紀錄！',
+                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),

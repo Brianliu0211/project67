@@ -15,7 +15,7 @@ class RelationshipTopologyTab extends StatefulWidget {
 class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
   int _viewModeIndex = 0; // 0: 🌳 樹狀卡片, 1: 🕸️ 網狀拓撲
   bool _isLoading = true;
-
+  String? _selectedNodeName;
   List<Map<String, dynamic>> _allCustomers = [];
   List<Map<String, dynamic>> _relationships = [];
   List<Map<String, dynamic>> _referralTrees = [];
@@ -789,6 +789,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
     );
   }
 
+
   Widget _buildInteractiveNetworkCanvas(bool isDark, Color cardBg, Color borderColor, Color textColor, Color subTextColor) {
     return Container(
       width: double.infinity,
@@ -869,7 +870,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
                           ),
                         ),
                       );
-                    }),
+                    }).toList(),
                   ],
                 ),
               ),

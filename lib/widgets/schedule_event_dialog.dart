@@ -13,11 +13,15 @@ import 'categorized_tag_accordion_selector.dart';
 class ScheduleEventDialog extends StatefulWidget {
   final DateTime initialDate;
   final ScheduleEvent? eventToEdit;
+  final String? initialTitle;
+  final String? initialEventType;
 
   const ScheduleEventDialog({
     super.key,
     required this.initialDate,
     this.eventToEdit,
+    this.initialTitle,
+    this.initialEventType,
   });
 
   @override
@@ -65,7 +69,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
       _selectedLat = event.latitude;
       _selectedLng = event.longitude;
     } else {
-      _titleController = TextEditingController();
+      _titleController = TextEditingController(text: widget.initialTitle ?? '');
       _locationController = TextEditingController();
       _tagController = TextEditingController();
       
@@ -191,7 +195,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
         'latitude': _selectedLat,
         'longitude': _selectedLng,
         'tag': _tagController.text.trim().isEmpty ? null : _tagController.text.trim(),
-        'event_type': 'personal',
+        'event_type': widget.eventToEdit?.eventType ?? widget.initialEventType ?? 'personal',
       };
 
       if (!isOfflineMode && user != null) {

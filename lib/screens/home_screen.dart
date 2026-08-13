@@ -97,26 +97,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchEventsForSelectedDate({bool silent = false}) async {
     if (isOfflineMode) {
+      if (!silent && mounted) {
+        CustomToast.show(context, '目前為離線預覽模式，無法讀取真實行程資料。', ToastType.warning);
+      }
       setState(() {
-        _events = [
-          ScheduleEvent(
-            id: 'demo-1',
-            profileId: 'offline',
-            title: '穿黑色衣服 (範例)',
-            startAt: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 9, 0),
-            endAt: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 10, 0),
-            eventType: 'personal',
-          ),
-          ScheduleEvent(
-            id: 'demo-2',
-            profileId: 'offline',
-            title: '服學 正式活動 (範例)',
-            startAt: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 14, 30),
-            endAt: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 17, 30),
-            location: '台大第一學生活動中心',
-            eventType: 'visit',
-          ),
-        ];
+        _events = [];
       });
       return;
     }
