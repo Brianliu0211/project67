@@ -8,6 +8,7 @@ import '../widgets/forgot_password_dialog.dart';
 import '../widgets/google_sign_in_button.dart';
 import '../widgets/custom_toast.dart';
 import 'home_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -25,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   UserRole _selectedRole = UserRole.agent;
   bool _isLoading = false;
   bool _isSignUp = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -97,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         final prefs = await SharedPreferences.getInstance();
-        final bool enableAutoApproval = prefs.getBool('enable_auto_approval') ?? true;
+        final bool enableAutoApproval = prefs.getBool('enable_auto_approval') ?? false;
         // Default to active during development so users do not get blocked by approval dialogs
         final String status = enableAutoApproval ? 'active' : 'pending';
 
@@ -187,6 +189,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                     child: const Text('返回登入'),
                   ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00ADB5),
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final url = Uri.parse('https://mail.google.com/');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url);
+                      }
+                    },
+                    icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                    label: const Text('開啟信箱'),
+                  ),
                 ],
               ),
             );
@@ -216,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
         } else if (msg.contains('Password should be at least')) {
           msg = '密碼長度不足，請輸入至少 6 位字元。';
         } else if (msg.contains('Invalid login credentials')) {
-          msg = '帳號或密碼錯誤，請重新確認。';
+          msg = '帳號尚未註冊或密碼錯誤，請重新確認。';
         } else if (msg.contains('Email not confirmed')) {
           CustomToast.show(
             context,
@@ -552,17 +568,28 @@ class _LoginScreenState extends State<LoginScreen> {
                               // Password Input
                               TextFormField(
                                 controller: _passwordController,
-                                obscureText: true,
+                                obscureText: _obscurePassword,
                                 textInputAction: TextInputAction.done,
                                 onFieldSubmitted: (_) {
                                   if (!_isLoading) {
                                     _handleSubmit();
                                   }
                                 },
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: '密碼',
-                                  prefixIcon: Icon(Icons.lock_outline),
-                                  border: OutlineInputBorder(),
+                                  prefixIcon: const Icon(Icons.lock_outline),
+                                  border: const OutlineInputBorder(),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                      color: Colors.white54,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      });
+                                    },
+                                  ),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -662,9 +689,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       if (_teamCodeController.text.trim().isEmpty) {
                                         _teamCodeController.text = 'TAIPEI-01';
                                       }
-                                      if (_nameController.text.trim().isEmpty && _emailController.text.contains('@')) {
-                                        _nameController.text = _emailController.text.split('@')[0];
-                                      }
+                                      // Removed auto-name filling from email prefix
                                     }
                                   });
                                 },

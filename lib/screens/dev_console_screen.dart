@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_role.dart';
 import '../services/policy_crawler_service.dart';
@@ -20,6 +21,40 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
   void initState() {
     super.initState();
     _loadAutoApprovalSetting();
+    _fetchDeletedUsers();
+  }
+
+  Future<void> _fetchDeletedUsers() async {
+    setState(() => _isLoadingDeletedUsers = true);
+    try {
+      final data = await Supabase.instance.client
+          .from('profiles')
+          .select('id, full_name, email, role')
+          .eq('status', 'deleted');
+      if (mounted) {
+        setState(() {
+          _deletedUsers = List<Map<String, dynamic>>.from(data);
+        });
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      if (mounted) setState(() => _isLoadingDeletedUsers = false);
+    }
+  }
+
+  Future<void> _hardDeleteUser(String id, String name) async {
+    try {
+      await Supabase.instance.client.from('profiles').delete().eq('id', id);
+      if (mounted) {
+        CustomToast.show(context, '✅ 已永久刪除用戶: $name', ToastType.success);
+        _fetchDeletedUsers();
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomToast.show(context, '❌ 刪除失敗: $e', ToastType.error);
+      }
+    }
   }
 
   Future<void> _loadAutoApprovalSetting() async {
@@ -39,6 +74,9 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
   bool _isTestingNewsRss = false;
   bool _isTestingVoiceApi = false;
   bool _isTestingSafeCheckAi = false;
+  
+  List<Map<String, dynamic>> _deletedUsers = [];
+  bool _isLoadingDeletedUsers = false;
   
   // Real Crawler Runtime States & Red/Yellow/Green Indicator
   int _crawlerHttpCode = 200;
@@ -555,6 +593,67 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                       ),
                     ],
                   ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // 5. User Account Cleanup (實體資料清理)
+            Row(
+              children: [
+                const Icon(Icons.person_remove_outlined, color: Colors.redAccent, size: 18),
+                const SizedBox(width: 6),
+                Text('用戶資料清理與實體刪除 (Hard Delete)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4), width: 1.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('列出已被標記為軟刪除 (status = deleted) 的使用者，開發者可在此進行最終實體資料清理。', style: TextStyle(fontSize: 12, color: subTextColor)),
+                  const SizedBox(height: 16),
+                  if (_isLoadingDeletedUsers)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_deletedUsers.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text('✅ 目前沒有待清理的軟刪除用戶', style: TextStyle(color: subTextColor)),
+                      ),
+                    )
+                  else
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _deletedUsers.length,
+                      separatorBuilder: (ctx, idx) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final u = _deletedUsers[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(u['full_name'] ?? '未知用戶', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          subtitle: Text(u['email'] ?? '', style: TextStyle(fontSize: 11, color: subTextColor)),
+                          trailing: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent.withOpacity(0.1),
+                              foregroundColor: Colors.redAccent,
+                              elevation: 0,
+                            ),
+                            onPressed: () => _hardDeleteUser(u['id'], u['full_name'] ?? '未知用戶'),
+                            icon: const Icon(Icons.delete_forever, size: 16),
+                            label: const Text('徹底刪除', style: TextStyle(fontSize: 12)),
+                          ),
+                        );
+                      },
+                    ),
                 ],
               ),
             ),

@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/pending_approval_screen.dart';
-import 'widgets/reset_password_dialog.dart';
+import 'screens/reset_password_screen.dart';
 import 'services/app_settings.dart';
 import 'services/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -161,7 +161,7 @@ class AuthGateway extends StatefulWidget {
 }
 
 class _AuthGatewayState extends State<AuthGateway> {
-  bool _isShowingResetDialog = false;
+  bool _isPasswordRecovery = false;
 
   @override
   Widget build(BuildContext context) {
@@ -184,33 +184,21 @@ class _AuthGatewayState extends State<AuthGateway> {
         }
 
         final event = snapshot.data?.event;
-        if (event == AuthChangeEvent.passwordRecovery && !_isShowingResetDialog) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && !_isShowingResetDialog) {
-              setState(() {
-                _isShowingResetDialog = true;
-              });
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (context) => ResetPasswordDialog(
-                  onSuccess: () {
-                    if (mounted) {
-                      setState(() {
-                        _isShowingResetDialog = false;
-                      });
-                    }
-                  },
-                ),
-              ).then((_) {
-                if (mounted) {
-                  setState(() {
-                    _isShowingResetDialog = false;
-                  });
-                }
-              });
-            }
-          });
+        if (event == AuthChangeEvent.passwordRecovery) {
+          _isPasswordRecovery = true;
+        }
+
+        // Full-screen dedicated reset password screen (Isolated & Non-bypassable)
+        if (_isPasswordRecovery) {
+          return ResetPasswordScreen(
+            onCompleted: () {
+              if (mounted) {
+                setState(() {
+                  _isPasswordRecovery = false;
+                });
+              }
+            },
+          );
         }
 
         final session = snapshot.data?.session ?? Supabase.instance.client.auth.currentSession;
