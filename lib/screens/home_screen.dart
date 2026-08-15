@@ -69,8 +69,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingEvents = false;
   String _calendarViewMode = 'timeline'; // 'timeline' (日時間軸) 或 'month_grid' (月網格)
 
-  UserRole _userRole = UserRole.dev;
-  UserRole _activeViewRole = UserRole.dev;
+  UserRole _userRole = UserRole.agent;
+  UserRole _activeViewRole = UserRole.agent;
   final NotificationService _notifService = NotificationService();
 
   @override
@@ -262,6 +262,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _userName = prefs.getString('profile_name') ?? '王大同 業務代表';
         _userEmail = 'offline@insurance.helper';
         _userAvatarUrl = prefs.getString('profile_avatar_url') ?? '';
+        _userRole = UserRole.agent;
+        _activeViewRole = UserRole.agent;
       });
       return;
     }

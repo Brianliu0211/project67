@@ -550,6 +550,48 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
 
+                  // Section 5: Delete Account
+                  _buildSectionHeader(context, Icons.person_remove_outlined, '刪除帳號', Colors.redAccent),
+                  const SizedBox(height: 12),
+                  _buildCardContainer(
+                    context,
+                    isDark,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '刪除您的帳號資料',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '提出刪除申請後，您的帳號將會被自動登出，並交由管理員進行實體資料清理。',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent.withOpacity(0.1),
+                            foregroundColor: Colors.redAccent,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: const BorderSide(color: Colors.redAccent),
+                            ),
+                          ),
+                          onPressed: () => _confirmDeleteAccountDialog(context, primaryColor),
+                          icon: const Icon(Icons.delete_forever, size: 18),
+                          label: const Text('刪除帳號'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
                   // Reset Defaults Button
                   Center(
                     child: OutlinedButton.icon(
@@ -748,6 +790,62 @@ class SettingsScreen extends StatelessWidget {
                 }
               },
               child: Text(context.l10n('confirm')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Delete Account Confirmation Dialog
+  void _confirmDeleteAccountDialog(BuildContext context, Color primaryColor) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+              SizedBox(width: 8),
+              Text('刪除帳號'),
+            ],
+          ),
+          content: const Text('確定要刪除您的帳號嗎？您的帳號將會被標記為刪除並登出系統，等待管理員進行實體清除。此操作無法復原！'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(context.l10n('cancel')),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  final user = Supabase.instance.client.auth.currentUser;
+                  if (user != null) {
+                    await Supabase.instance.client
+                        .from('profiles')
+                        .update({'status': 'deleted'})
+                        .eq('id', user.id);
+                  }
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已送出刪除申請，系統將於稍後完成清理。')),
+                    );
+                    await Supabase.instance.client.auth.signOut();
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('申請失敗: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('確認刪除'),
             ),
           ],
         );
