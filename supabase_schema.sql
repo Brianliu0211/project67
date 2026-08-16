@@ -757,10 +757,60 @@ DO $$ BEGIN
             ON public.notifications FOR UPDATE
             USING (auth.uid() = profile_id);
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admins can insert notifications') THEN
-        CREATE POLICY "Admins can insert notifications"
-            ON public.notifications FOR INSERT
-            WITH CHECK (true);
-    END IF;
-END $$;
+-- -------------------------------------------------------------
+-- 11. Phase 1 Database Hardening (Integrity & Performance Indexes)
+-- -------------------------------------------------------------
+
+-- Constraints & Integrity Checks
+ALTER TABLE public.insurance_news_articles DROP CONSTRAINT IF EXISTS unique_insurance_news_articles_source_url;
+ALTER TABLE public.insurance_news_articles ADD CONSTRAINT unique_insurance_news_articles_source_url UNIQUE (source_url);
+
+ALTER TABLE public.policy_clauses DROP CONSTRAINT IF EXISTS unique_product_name;
+ALTER TABLE public.policy_clauses DROP CONSTRAINT IF EXISTS unique_policy_clauses_company_product;
+ALTER TABLE public.policy_clauses ADD CONSTRAINT unique_policy_clauses_company_product UNIQUE (company_name, product_name);
+
+ALTER TABLE public.schedule_events DROP CONSTRAINT IF EXISTS chk_schedule_events_time_order;
+ALTER TABLE public.schedule_events ADD CONSTRAINT chk_schedule_events_time_order CHECK (end_at >= start_at);
+
+ALTER TABLE public.schedule_events DROP CONSTRAINT IF EXISTS chk_schedule_events_event_type;
+ALTER TABLE public.schedule_events ADD CONSTRAINT chk_schedule_events_event_type 
+    CHECK (event_type IN ('personal', 'customer_visit', 'meeting', 'follow_up', 'general'));
+
+ALTER TABLE public.customer_relationships DROP CONSTRAINT IF EXISTS unique_customer_relationship;
+ALTER TABLE public.customer_relationships ADD CONSTRAINT unique_customer_relationship 
+    UNIQUE (user_id, source_customer_id, target_customer_id, relationship_type);
+
+ALTER TABLE public.visit_project_customers DROP CONSTRAINT IF EXISTS unique_visit_project_customer;
+ALTER TABLE public.visit_project_customers ADD CONSTRAINT unique_visit_project_customer 
+    UNIQUE (visit_project_id, customer_id);
+
+-- Performance Indexes
+CREATE INDEX IF NOT EXISTS idx_customers_deleted_at ON public.customers(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_customers_referral_source_id ON public.customers(referral_source_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_deleted_at ON public.reminders(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON public.reminders(remind_at);
+CREATE INDEX IF NOT EXISTS idx_schedule_events_start_at ON public.schedule_events(start_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_events_google_sync 
+    ON public.schedule_events(profile_id, google_calendar_id, google_event_id) 
+    WHERE google_event_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_cr_user_id ON public.customer_relationships(user_id);
+CREATE INDEX IF NOT EXISTS idx_cr_source ON public.customer_relationships(source_customer_id);
+CREATE INDEX IF NOT EXISTS idx_cr_target ON public.customer_relationships(target_customer_id);
+
+CREATE INDEX IF NOT EXISTS idx_customer_tags_tag_id ON public.customer_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_tags_category_id ON public.tags(category_id);
+CREATE INDEX IF NOT EXISTS idx_policy_clauses_category ON public.policy_clauses(category);
+
+-- RBAC Admin Helper Function
+CREATE OR REPLACE FUNCTION public.is_admin_or_dev()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid() AND role IN ('admin', 'dev')
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
 
