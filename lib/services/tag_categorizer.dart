@@ -13,11 +13,42 @@ class TagStyle {
 }
 
 class TagCategorizer {
+  /// 全域自訂標籤色碼快取 (Tag Name -> Custom HEX)
+  static final Map<String, String> customTagColors = {};
+
+  /// 註冊或更新自訂標籤色碼
+  static void registerCustomColor(String tagName, String hex) {
+    if (tagName.trim().isNotEmpty && hex.trim().isNotEmpty) {
+      customTagColors[tagName.trim().toLowerCase()] = hex.trim();
+    }
+  }
+
   /// Classifies a tag name and returns the background and text color based on the current theme brightness.
-  static TagStyle getStyle(String tagName, bool isDark) {
+  static TagStyle getStyle(String tagName, bool isDark, {String? customHex}) {
     final name = tagName.trim().toLowerCase();
 
-    // 1. 已購險種 (Policies Purchased) - Soft Green/Emerald
+    // 1. 優先檢查自訂色碼 (Custom HEX from caller or registry)
+    final hex = customHex ?? customTagColors[name];
+    if (hex != null && hex.isNotEmpty) {
+      try {
+        final clean = hex.replaceAll('#', '');
+        if (clean.length == 6) {
+          final colorInt = int.parse('FF$clean', radix: 16);
+          final baseColor = Color(colorInt);
+          return TagStyle(
+            backgroundColor: isDark
+                ? baseColor.withValues(alpha: 0.28)
+                : baseColor.withValues(alpha: 0.14),
+            textColor: isDark
+                ? Color.lerp(baseColor, Colors.white, 0.45) ?? baseColor
+                : baseColor,
+            categoryName: '自訂標籤',
+          );
+        }
+      } catch (_) {}
+    }
+
+    // 2. 已購險種 (Policies Purchased) - Soft Green/Emerald
     if (name.contains('險') || 
         name.contains('保單') || 
         name.contains('規劃') || 
@@ -31,7 +62,16 @@ class TagCategorizer {
       );
     } 
     
-    // 2. 跟進狀態 (Follow-up Status) - Soft Purple/Indigo
+    // 3. 保障缺口 (Coverage Gap) - Bright Amber/Red
+    if (name.contains('缺') || name.contains('未保') || name.contains('不足') || name.contains('缺口')) {
+      return TagStyle(
+        backgroundColor: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2),
+        textColor: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+        categoryName: '保障缺口',
+      );
+    }
+
+    // 4. 跟進狀態 (Follow-up Status) - Soft Purple/Indigo
     if (name.contains('意願') || 
         name.contains('跟進') || 
         name.contains('聯絡') || 
@@ -48,7 +88,7 @@ class TagCategorizer {
       );
     } 
     
-    // 3. 健康與體況 (Health Status) - Soft Red/Rose
+    // 5. 健康與體況 (Health Status) - Soft Red/Rose
     if (name.contains('體況') || 
         name.contains('病') || 
         name.contains('血壓') || 
@@ -63,7 +103,7 @@ class TagCategorizer {
       );
     } 
     
-    // 4. 生活興趣 (Interests/Lifestyle) - Soft Orange/Amber
+    // 6. 生活興趣 (Interests/Lifestyle) - Soft Orange/Amber
     if (name.contains('愛') || 
         name.contains('喜') ||
         name.contains('興趣') ||
@@ -82,8 +122,7 @@ class TagCategorizer {
       );
     } 
 
-    // 5. 客戶身分 (Client Status) - Soft Blue (Default category for unclassified tags)
-    // VIP, 新客戶, 舊客戶, 轉介紹, etc.
+    // 7. 客戶身分 (Client Status) - Soft Blue (Default category for unclassified tags)
     return TagStyle(
       backgroundColor: isDark ? const Color(0xFF0C4A6E) : const Color(0xFFE0F2FE),
       textColor: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0369A1),
