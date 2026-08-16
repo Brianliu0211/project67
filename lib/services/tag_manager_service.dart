@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'tag_categorizer.dart';
 
 class TagCategoryModel {
   final String id;
@@ -188,6 +189,13 @@ class TagManagerService {
       result = List.from(defaultTags);
     }
 
+    // 註冊所有自訂色碼至 TagCategorizer 快取
+    for (var t in result) {
+      if (t.colorHex != null && t.colorHex!.isNotEmpty) {
+        TagCategorizer.registerCustomColor(t.name, t.colorHex!);
+      }
+    }
+
     return result;
   }
 
@@ -196,6 +204,12 @@ class TagManagerService {
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(tags.map((e) => e.toJson()).toList());
     await prefs.setString(_prefTagsKey, encoded);
+
+    for (var t in tags) {
+      if (t.colorHex != null && t.colorHex!.isNotEmpty) {
+        TagCategorizer.registerCustomColor(t.name, t.colorHex!);
+      }
+    }
   }
 
   /// Checks if tag name exists (case-insensitive)

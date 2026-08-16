@@ -42,7 +42,8 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
 
       final data = await supabase
           .from('customers')
-          .select('id, name, nickname, phone, tags, referral_source_id');
+          .select('id, name, nickname, phone, tags, referral_source_id')
+          .isFilter('deleted_at', null);
 
       if (data != null && (data as List).isNotEmpty) {
         loadedCust = List<Map<String, dynamic>>.from(data);
@@ -197,24 +198,31 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
 
     final List<Map<String, dynamic>> nodes = [];
 
-    // Slots for secondary islands around canvas
+    // Slots for secondary islands around canvas (1200x800 canvas)
     final List<Offset> islandSlots = [
-      const Offset(130.0, 110.0), // Top-Left
-      const Offset(670.0, 110.0), // Top-Right
-      const Offset(670.0, 370.0), // Bottom-Right
-      const Offset(130.0, 370.0), // Bottom-Left
+      const Offset(220.0, 180.0), // Top-Left
+      const Offset(980.0, 180.0), // Top-Right
+      const Offset(980.0, 620.0), // Bottom-Right
+      const Offset(220.0, 620.0), // Bottom-Left
     ];
 
     int islandSlotIdx = 0;
-    int isolatedCount = 0;
+    final List<String> isolatedCustIds = [];
+
+    // Collect all isolated single-node components first
+    for (var comp in components) {
+      if (comp.length == 1) {
+        isolatedCustIds.add(comp[0]);
+      }
+    }
 
     for (int compIdx = 0; compIdx < components.length; compIdx++) {
       final comp = components[compIdx];
 
-      if (compIdx == 0) {
-        // Main Island: Center placed at (380, 240)
-        final double centerX = 380.0;
-        final double centerY = 240.0;
+      if (compIdx == 0 && comp.length > 1) {
+        // Main Island: Center placed at (600, 400)
+        final double centerX = 600.0;
+        final double centerY = 400.0;
 
         // Find hub node with max degrees in main component
         comp.sort((a, b) => (adjMap[b]?.length ?? 0).compareTo(adjMap[a]?.length ?? 0));
@@ -257,7 +265,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
             y = centerY;
           } else {
             final angle = (i - 1) * (2 * math.pi / math.max(1, compLen - 1));
-            final radius = (compLen > 6 && i > 6) ? 300.0 : 210.0;
+            final radius = (compLen > 6 && i > 6) ? 260.0 : 180.0;
             x = centerX + radius * math.cos(angle);
             y = centerY + radius * math.sin(angle);
           }
@@ -291,7 +299,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
           final degree = adjMap[id]?.length ?? 0;
 
           final angle = i * (2 * math.pi / compLen);
-          final radius = 70.0;
+          final radius = 65.0;
           final x = islandCenter.dx + radius * math.cos(angle);
           final y = islandCenter.dy + radius * math.sin(angle);
 
@@ -306,25 +314,33 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
             'color': const Color(0xFFF59E0B),
           });
         }
-      } else {
-        // Completely Isolated Single Customer
-        final double startAngle = math.pi / 2;
-        final double radius = 350.0;
-        final angle = startAngle + isolatedCount * (math.pi / 8);
-        isolatedCount++;
+      }
+    }
 
-        final x = 380.0 + radius * math.cos(angle);
-        final y = 240.0 + radius * math.sin(angle);
+    // Evenly place all isolated customers around a clean outer orbit
+    if (isolatedCustIds.isNotEmpty) {
+      final double centerX = 600.0;
+      final double centerY = 400.0;
+      final int totalIso = isolatedCustIds.length;
+      final double orbitRadius = components.any((c) => c.length > 1) ? 280.0 : 180.0;
+
+      for (int i = 0; i < totalIso; i++) {
+        final id = isolatedCustIds[i];
+        final cust = custMap[id] ?? {};
+        final name = cust['name']?.toString() ?? '未知';
+        final angle = (i * (2 * math.pi / totalIso)) - (math.pi / 2);
+        final x = centerX + orbitRadius * math.cos(angle);
+        final y = centerY + orbitRadius * math.sin(angle);
 
         nodes.add({
-          'id': comp[0],
-          'name': custMap[comp[0]]?['name']?.toString() ?? '未知',
-          'customer': custMap[comp[0]] ?? {},
+          'id': id,
+          'name': name,
+          'customer': cust,
           'x': x,
           'y': y,
           'isCenter': false,
           'degree': 0,
-          'color': const Color(0xFF6B7280),
+          'color': const Color(0xFF0EA5E9),
         });
       }
     }
@@ -803,13 +819,13 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
         children: [
           InteractiveViewer(
             transformationController: _transformationController,
-            boundaryMargin: const EdgeInsets.all(400),
-            minScale: 0.5,
+            boundaryMargin: const EdgeInsets.all(500),
+            minScale: 0.3,
             maxScale: 3.0,
             child: Center(
               child: SizedBox(
-                width: 800,
-                height: 480,
+                width: 1200,
+                height: 800,
                 child: Stack(
                   children: [
                     CustomPaint(

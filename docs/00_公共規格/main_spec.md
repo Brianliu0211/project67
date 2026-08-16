@@ -77,6 +77,10 @@
   - `insurance_news_articles`: `id`, `topic_id`, `article_title`, `source_name`, `article_url`, `article_summary`
 - **RLS 策略**: `public` 唯讀，僅由 `service_role` Edge Function 進行定時寫入與更新。
 
+### 9. 客戶已投保單關聯表 (`public.customer_policies`)
+- **用途**: 記錄客戶所投保之真實保單條款清單，供 0 成本精算引擎進行 5 大給付計算與自費缺口分析。
+- **關鍵欄位**: `id` (UUID), `customer_id` (UUID), `policy_clause_id` (UUID), `product_name`, `company_name`, `category`, `room_limit`, `surgery_limit`, `misc_limit`, `benefits_json`, `enrolled_at`。
+
 ---
 
 ## 🧱 專案五大核心功能模組 (5 Core Modules Architecture)
@@ -84,14 +88,20 @@
 主系統功能劃分為五大模組，所有開發人員與 AI 助理於撰寫新程式碼時，**必須依此邊界維護與對齊**：
 
 ### 1. 模組一：身分驗證、帳號連線與安全管理 (Auth, Accounts & Security)
-- **範圍**: Supabase Auth 登入/註冊、Email 轉址驗證修復 (`emailRedirectTo: redirectTo`)、忘記密碼、個人檔案管理、開發者 RBAC 角色 (`admin` / `dev` / `agent`)、第三方連線 (Google OAuth 授權與日曆同步；`[Deprecated / 已廢棄]`: LINE Login 連線登入需求已全面廢除清掃)。
-- ** UI 排版**: 側邊欄最新佈局為「數據戰情 $\rightarrow$ 垃圾桶 🗑️ $\rightarrow$ 個人帳號 👤 $\rightarrow$ 系統設定 ⚙️」。
-- **🎮 遊戲化登入成就與新手指引**:
-  - 於用戶『首次註冊登入成功』與『完成新手教學』雙階段，觸發全螢幕解鎖成就卡片：包含兩側 `confetti` 彩帶噴發與 360 度 3D 徽章旋轉彈出。
-  - 自動讀取/寫入 `is_first_login` 標記，老用戶登入時自動順暢跳過直接進入系統首頁。
+- **範圍**: Supabase Auth 登入/註冊、Email 轉址驗證修復 (`emailRedirectTo: redirectTo`)、忘記密碼全螢幕獨立頁面 (`ResetPasswordScreen`)、個人檔案管理 (`ProfileScreen` 動態公司/職稱連動)、開發者 RBAC 角色 (`admin` / `dev` / `agent`)、第三方連線 (Google OAuth 授權與日曆同步)。
+- **UI 排版**: 側邊欄最新佈局為「數據戰情 $\rightarrow$ 垃圾桶 🗑️ $\rightarrow$ 個人帳號 👤 $\rightarrow$ 系統設定 ⚙️」。
+- **一站式開發者戰情儀表板 (`DevConsoleScreen`)**：
+  - 46 家保險公司即時分佈觀測台 (人壽 20 家 + 產險通路 26 家)。
+  - 保單條款全量爬蟲觀測台 (全文 Debounce 搜尋列 + 多維度組合選單 + 11,722 筆即時篩選統計)。
+  - 差量增量校對引擎 (Delta Sync, API 延遲監測與結構化異動報告)。
 
 ### 2. 模組二：客戶資產與名片庫 (Customers & CRM)
-- **範圍**: 客戶 3D 翻轉卡片、綽號與照片上傳、詳情檢視彈窗、拜訪專案 Checklist、客戶批次匯入/匯出 (vCard/.vcf) 與數位名片 Master Studio。
+- **範圍**: 客戶全景沉浸式側邊抽屜 (`CustomerDetailSideSheet` 讀寫合一：基本資料、保單健檢、拜訪歷程內嵌錄音、草稿一鍵轉正)、3D 翻轉卡片、綽號與照片上傳、專案拜訪 Checklist、客戶批次匯入/匯出 (vCard/.vcf)、標籤自訂色碼 (`TagCategorizer`)、待補齊草稿收件匣與數位名片 Master Studio。
+- **📊 100% 本地 0 成本精算引擎 (CustomerPolicyService)**：
+  - 借鑑 insure80 邏輯，0 AI Token 消耗、完全不課金，純本地 Dart 演算法即時加總 5 大理賠桶給付與紅字缺口警示。
+  - 跨公司商品 PK 條款陷阱比對 (健保 2-2-7 手術限制、概括式全賠 vs 列舉式、正副本收據)。
+- **🗑️ 垃圾桶多維可擴展分類 (TrashBinScreen)**：
+  - 建立 `TrashCategory` 擴展架構：`[ 全部 ]` `[ 👥 正式客戶 ]` `[ 🟡 語音草稿 ]` `[ 📅 行程與日曆 ]`，支援獨立還原與永久銷毀。
 - **💳 實體化名片 Master Studio (Luxury Printed Card & License Registration)**:
   - 比照真實印刷高級名片風格，包含「保險業務員登錄字號 (`profile_license_no`)」與質感視覺設計。
   - **快捷連線工具列**：獨立下移至名片預覽舞台正下方 (`[撥打電話]`、`[加 LINE]`、`[發送 Email]`)。

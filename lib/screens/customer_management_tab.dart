@@ -16,6 +16,7 @@ import '../widgets/voice_recorder_widget.dart';
 import '../widgets/color_palette_picker.dart';
 import '../widgets/categorized_tag_accordion_selector.dart';
 import '../widgets/batch_import_customers_dialog.dart';
+import '../widgets/customer_detail_side_sheet.dart';
 import '../services/customer_relationship_service.dart';
 
 
@@ -27,20 +28,24 @@ class CustomerManagementTab extends StatefulWidget {
   State<CustomerManagementTab> createState() => _CustomerManagementTabState();
 }
 
-class _CustomerManagementTabState extends State<CustomerManagementTab> {
+class _CustomerManagementTabState extends State<CustomerManagementTab> with AutomaticKeepAliveClientMixin {
   List<Map<String, dynamic>> _allCustomers = [];
   List<Map<String, dynamic>> _filteredCustomers = [];
   final _searchController = TextEditingController();
   bool _isLoading = false;
+  late String _viewMode;
 
   // Batch Selection State
   bool _isSelectionMode = false;
   Set<String> _selectedCustomerIds = {};
 
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
+    _viewMode = AppSettings.instance.defaultCustomerViewMode;
     _searchController.addListener(_filterCustomers);
     _fetchCustomers();
   }
@@ -57,9 +62,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
       _isLoading = true;
     });
 
-    // Simulate 500ms network delay to make the shimmer skeleton clearly visible during debug preview
-    await Future.delayed(const Duration(milliseconds: 500));
-
+    // 快速讀取真實資料 (零人工延遲)
     if (isOfflineMode) {
       if (mounted) {
         CustomToast.show(context, '目前為離線預覽模式，無法讀取真實客戶資料。', ToastType.warning);
@@ -89,6 +92,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
             'avatar_url': data['avatar_url'] ?? '',
             'phone': data['phone'],
             'email': data['email'],
+            'status': data['status'] ?? 'active',
             // Convert postgres array text[] to List<String> safely
             'tags': List<String>.from(data['tags'] ?? []),
             'notes': data['notes'],
@@ -1434,6 +1438,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isWideScreen = screenWidth >= 768;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1495,17 +1500,18 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                         ),
                         child: IconButton(
                           onPressed: () {
-                            final newMode = AppSettings.instance.defaultCustomerViewMode == 'list' ? 'card' : 'list';
-                            AppSettings.instance.setDefaultCustomerViewMode(newMode);
+                            setState(() {
+                              _viewMode = _viewMode == 'list' ? 'card' : 'list';
+                            });
                           },
                           icon: Icon(
-                            AppSettings.instance.defaultCustomerViewMode == 'list'
+                            _viewMode == 'list'
                                 ? Icons.grid_view_outlined
                                 : Icons.view_list_outlined,
                             color: primaryColor,
                             size: 20,
                           ),
-                          tooltip: AppSettings.instance.defaultCustomerViewMode == 'list'
+                          tooltip: _viewMode == 'list'
                               ? context.l10n('view_3d_card')
                               : context.l10n('view_list_view'),
                           padding: EdgeInsets.zero,
@@ -1624,17 +1630,18 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                             ),
                             child: IconButton(
                               onPressed: () {
-                                final newMode = AppSettings.instance.defaultCustomerViewMode == 'list' ? 'card' : 'list';
-                                AppSettings.instance.setDefaultCustomerViewMode(newMode);
+                                setState(() {
+                                  _viewMode = _viewMode == 'list' ? 'card' : 'list';
+                                });
                               },
                               icon: Icon(
-                                AppSettings.instance.defaultCustomerViewMode == 'list'
+                                _viewMode == 'list'
                                     ? Icons.grid_view_outlined
                                     : Icons.view_list_outlined,
                                 color: primaryColor,
                                 size: 18,
                               ),
-                              tooltip: AppSettings.instance.defaultCustomerViewMode == 'list'
+                              tooltip: _viewMode == 'list'
                                   ? context.l10n('view_3d_card')
                                   : context.l10n('view_list_view'),
                               padding: EdgeInsets.zero,
@@ -1713,21 +1720,88 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
                   ],
                 ),
           
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+
+          // 🟡 待補齊名片 / 語音草稿收件匣
+          _buildDraftCustomersInbox(isDark),
 
           if (_isSelectionMode) _buildBatchSelectionBar(context),
           
           // Customer Grid/List Area
           Expanded(
             child: _isLoading
-                ? (AppSettings.instance.defaultCustomerViewMode == 'list'
+                ? (_viewMode == 'list'
                     ? _buildShimmerList(isWideScreen, screenWidth)
                     : _buildShimmerGrid(isWideScreen, screenWidth))
                 : _filteredCustomers.isEmpty
                     ? _buildEmptyState(isDark, primaryColor)
-                    : (AppSettings.instance.defaultCustomerViewMode == 'list'
+                    : (_viewMode == 'list'
                         ? _buildCustomerList(isWideScreen, screenWidth)
                         : _buildCustomerGrid(isWideScreen, screenWidth)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🟡 待補齊草稿名片收件匣 (嚴格只篩選 status == 'draft')
+  Widget _buildDraftCustomersInbox(bool isDark) {
+    final draftCustomers = _allCustomers.where((c) => c['status'] == 'draft').toList();
+
+    if (draftCustomers.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.contact_mail_rounded, color: Color(0xFFF59E0B), size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text('🟡 待補齊名片 / 語音草稿收件匣', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(color: const Color(0xFFF59E0B), borderRadius: BorderRadius.circular(10)),
+                      child: Text('${draftCustomers.length} 位待確認', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text('語音助理在外速記產生之草稿檔案，點擊 1 秒補齊電話與標籤轉為正式客戶。', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            onPressed: () {
+              if (draftCustomers.isNotEmpty) {
+                _showCustomerZoomDetails(draftCustomers.first);
+              }
+            },
+            icon: const Icon(Icons.edit_note_rounded, size: 16),
+            label: const Text('立即補齊轉正', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -2248,243 +2322,19 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> {
     );
   }
 
-  // Zoom Dialog
+  // 讀寫合一全景側邊抽屜 (Side Sheet)
   void _showCustomerZoomDetails(Map<String, dynamic> customer) {
-    final String name = customer['name'] ?? '';
-    final String nickname = customer['nickname'] ?? '';
-    final String phone = customer['phone'] ?? context.l10n('customer_card_not_filled');
-    final String email = customer['email'] ?? context.l10n('customer_card_not_filled');
-    final List tags = customer['tags'] ?? [];
-    final String notes = customer['notes'] ?? '';
-    final String avatarUrl = customer['avatar_url'] ?? '';
-
-    final String displayName = nickname.isNotEmpty ? '$name ($nickname)' : name;
-    final String nameInitial = name.isNotEmpty ? name.substring(0, 1) : '?';
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = AppSettings.instance.primaryColor;
-    final Color dialogBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final Color borderColor = isDark ? const Color(0xFF21262D) : Colors.grey.shade300;
-    final Color textColor = isDark ? Colors.white : Colors.black87;
-    final Color subTextColor = isDark ? Colors.white54 : Colors.black54;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: dialogBg,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: borderColor, width: 1.5),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 680, maxHeight: 500),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final bool isWide = constraints.maxWidth > 500;
-                
-                final Widget profileSection = Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Large Avatar
-                    CircleAvatar(
-                      backgroundColor: primaryColor.withOpacity(0.12),
-                      radius: 48,
-                      backgroundImage: _getAvatarProvider(avatarUrl),
-                      child: avatarUrl.isEmpty
-                          ? Text(
-                              nameInitial,
-                              style: TextStyle(
-                                color: primaryColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 36,
-                              ),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      displayName,
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (nickname.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '${context.l10n('customer_real_name')}：$name',
-                        style: TextStyle(color: subTextColor, fontSize: 12),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    // Action Buttons Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildActionButton(
-                          icon: Icons.phone,
-                          label: context.l10n('customer_action_call'),
-                          color: primaryColor,
-                          onPressed: () {
-                            if (phone != context.l10n('customer_card_not_filled')) {
-                              Clipboard.setData(ClipboardData(text: phone));
-                              CustomToast.show(context, '${context.l10n('customer_phone_copied')}: $phone', ToastType.success);
-                            } else {
-                              CustomToast.show(context, context.l10n('customer_phone_empty'), ToastType.warning);
-                            }
-                          },
-                        ),
-                        const SizedBox(width: 12),
-                        _buildActionButton(
-                          icon: Icons.email,
-                          label: context.l10n('customer_action_email'),
-                          color: primaryColor,
-                          onPressed: () {
-                            if (email != context.l10n('customer_card_not_filled')) {
-                              Clipboard.setData(ClipboardData(text: email));
-                              CustomToast.show(context, '${context.l10n('customer_email_copied')}: $email', ToastType.success);
-                            } else {
-                              CustomToast.show(context, context.l10n('customer_email_empty'), ToastType.warning);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-
-                final Widget detailsSection = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildInfoRow(Icons.phone_iphone_rounded, context.l10n('customer_phone_title'), phone),
-                    const SizedBox(height: 12),
-                    _buildInfoRow(Icons.mail_outline_rounded, 'Email', email),
-                    const SizedBox(height: 16),
-                    Text(
-                      context.l10n('customer_tags_classification'),
-                      style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    if (tags.isNotEmpty)
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: tags.map((tag) {
-                          final style = TagCategorizer.getStyle(tag.toString(), isDark);
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: style.backgroundColor,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              tag.toString(),
-                              style: TextStyle(
-                                color: style.textColor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      )
-                    else
-                      Text(context.l10n('customer_card_no_tags'), style: TextStyle(color: subTextColor, fontSize: 12)),
-                    const SizedBox(height: 16),
-                    Text(
-                      context.l10n('customer_card_notes_detail_title'),
-                      style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Flexible(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF0D1117) : Colors.grey.shade100,
-                          border: Border.all(color: borderColor, width: 1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: SingleChildScrollView(
-                          child: Text(
-                            notes.isNotEmpty ? notes : context.l10n('customer_card_no_notes'),
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 12,
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-
-                return Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Header with close button
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '客戶詳細資訊',
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.close, color: subTextColor, size: 20),
-                            onPressed: () => Navigator.of(context).pop(),
-                            constraints: const BoxConstraints(),
-                            padding: EdgeInsets.zero,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (isWide)
-                        Flexible(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                width: 220,
-                                child: profileSection,
-                              ),
-                              VerticalDivider(color: borderColor, width: 32),
-                              Expanded(
-                                child: detailsSection,
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        Flexible(
-                          child: SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                profileSection,
-                                const SizedBox(height: 24),
-                                detailsSection,
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        );
+    CustomerDetailSideSheet.show(
+      context,
+      customer: customer,
+      onCustomerUpdated: (updated) {
+        final idx = _allCustomers.indexWhere((c) => c['id'] == updated['id']);
+        if (idx != -1) {
+          setState(() {
+            _allCustomers[idx] = updated;
+          });
+          _filterCustomers();
+        }
       },
     );
   }

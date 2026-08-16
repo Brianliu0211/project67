@@ -635,40 +635,53 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.12),
+                        color: primaryColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(Icons.corporate_fare_rounded, color: primaryColor, size: 20),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 8,
-                            runSpacing: 4,
+                      child: AnimatedBuilder(
+                        animation: _controllersListenable,
+                        builder: (context, _) {
+                          final company = _companyController.text.trim();
+                          final jobTitle = _jobTitleController.text.trim();
+                          final hasCompany = company.isNotEmpty;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('🏢 所屬通訊處：$_teamName', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text('通訊處代碼: $_teamCode', style: TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.bold)),
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  Text(
+                                    hasCompany ? '🏢 所屬機構：$company' : '🏢 尚未設定所屬機構 (請於下方商務資訊填寫)',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                                  ),
+                                  if (jobTitle.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(jobTitle, style: TextStyle(fontSize: 11, color: primaryColor, fontWeight: FontWeight.bold)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '帳號身分：${_userRole.labelZh} · 登入帳號：$_userEmail',
+                                style: TextStyle(fontSize: 11, color: subTextColor),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '帳號身分：${_userRole.labelZh} · 登入帳號：$_userEmail',
-                            style: TextStyle(fontSize: 11, color: subTextColor),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   ],

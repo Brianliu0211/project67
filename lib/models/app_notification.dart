@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 enum NotificationType {
   customerReassigned('customer_reassigned', '過戶通知', Icons.assignment_ind_rounded, Color(0xFF6366F1)),
   managerTaskNote('manager_task_note', '主管交辦', Icons.mark_chat_read_rounded, Color(0xFFF59E0B)),
+  draftCustomer('draft_customer', '待補齊草稿', Icons.contact_mail_rounded, Color(0xFFF59E0B)),
   aiSmartAlert('ai_smart_alert', 'AI 提醒', Icons.auto_awesome_rounded, Color(0xFF10B981)),
   systemNotice('system_notice', '系統公告', Icons.campaign_rounded, Color(0xFF3B82F6));
 

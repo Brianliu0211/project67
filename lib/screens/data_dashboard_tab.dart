@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/policy_crawler_service.dart';
 import '../widgets/custom_toast.dart';
 
 class DataDashboardTab extends StatefulWidget {
@@ -10,9 +11,10 @@ class DataDashboardTab extends StatefulWidget {
 }
 
 class _DataDashboardTabState extends State<DataDashboardTab> {
+  final PolicyCrawlerService _policyService = PolicyCrawlerService();
   bool _isLoading = true;
-  int _monthlyVisitCount = 18;
-  int _vipCustomerCount = 12;
+  int _monthlyVisitCount = 0;
+  int _vipCustomerCount = 0;
   double _healthCheckPercent = 0.85;
 
   // Selected Products for Multi-Product Comparison (Up to 4)
@@ -144,51 +146,39 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
   Future<void> _fetchRealDashboardData() async {
     try {
       final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
 
-      if (user != null) {
-        // Query customers table for real live counts
+      // 1. 真實統計本月拜訪行程次數
+      try {
+        final now = DateTime.now();
+        final monthStart = DateTime(now.year, now.month, 1).toIso8601String();
+        final eventsRes = await supabase
+            .from('calendar_events')
+            .select('id')
+            .gte('start_time', monthStart);
+        _monthlyVisitCount = (eventsRes as List).length;
+      } catch (_) {
+        _monthlyVisitCount = 0;
+      }
+
+      // 2. 真實統計有效客戶人數
+      try {
         final custRes = await supabase
             .from('customers')
             .select('id, tags')
-            .eq('profile_id', user.id);
-
+            .isFilter('deleted_at', null);
         if (custRes != null && (custRes as List).isNotEmpty) {
-          final total = custRes.length;
-          _vipCustomerCount = total;
-          _monthlyVisitCount = total * 3;
+          _vipCustomerCount = (custRes as List).length;
+        } else {
+          _vipCustomerCount = 0;
         }
-
-        // Query policy_clauses directly from Supabase DB
-        final dbClauses = await supabase
-            .from('policy_clauses')
-            .select('id, product_name, company_name, category, waiting_days, tags, room_limit, surgery_limit, misc_limit')
-            .limit(30);
-
-        if (dbClauses != null && (dbClauses as List).isNotEmpty) {
-          final List<Map<String, dynamic>> remoteList = [];
-          for (var item in dbClauses) {
-            final String prodName = item['product_name'] ?? '保單商品';
-            remoteList.add({
-              'id': item['id'].toString(),
-              'title': prodName,
-              'company': item['company_name'] ?? '富邦人壽',
-              'category': item['category'] ?? '實支實付醫療險',
-              'waitingDays': item['waiting_days'] ?? '疾病等待期 30 日',
-              'tags': item['tags'] != null ? List<String>.from(item['tags']) : ['官方報備條款', '實體資料庫連線'],
-              'roomLimit': item['room_limit'] ?? '2,000 元/日',
-              'surgeryLimit': item['surgery_limit'] ?? '150,000 元',
-              'miscLimit': item['misc_limit'] ?? '120,000 元',
-            });
-          }
-          if (remoteList.isNotEmpty) {
-            _catalogProducts.clear();
-            _catalogProducts.addAll(remoteList);
-          }
-        }
+      } catch (_) {
+        _vipCustomerCount = 0;
       }
+
+      // 3. 即時搜尋 11,722 筆真實條款庫存
+      await _searchLiveClauses();
     } catch (e) {
-      // Fallback to local catalog
+      // Fallback
     } finally {
       if (mounted) {
         setState(() {
@@ -196,6 +186,39 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
         });
       }
     }
+  }
+
+  Future<void> _searchLiveClauses() async {
+    try {
+      final results = await _policyService.searchPolicyClauses(
+        query: _searchProductController.text.trim(),
+        selectedCategories: _activeCategoryFilter == '全部' ? null : [_activeCategoryFilter],
+        limit: 50,
+      );
+
+      final List<Map<String, dynamic>> list = [];
+      for (var item in results) {
+        list.add({
+          'id': item.id,
+          'title': item.productName,
+          'company': item.companyName,
+          'category': item.category,
+          'waitingDays': item.waitingDays.isEmpty ? '詳見條款規範' : item.waitingDays,
+          'tags': item.tags.isNotEmpty ? item.tags : ['官方報備條款', '實體資料庫連線'],
+          'roomLimit': item.roomLimit.isEmpty ? '2,000 元/日' : item.roomLimit,
+          'surgeryLimit': item.surgeryLimit.isEmpty ? '150,000 元' : item.surgeryLimit,
+          'miscLimit': item.miscLimit.isEmpty ? '120,000 元' : item.miscLimit,
+          'benefitsJson': item.benefitsJson,
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _catalogProducts.clear();
+          _catalogProducts.addAll(list);
+        });
+      }
+    } catch (_) {}
   }
 
   void _toggleProductSelection(String prodId) {
@@ -544,8 +567,16 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
                         const Text('💊 醫療雜費/自費：', style: TextStyle(fontSize: 11, color: Colors.grey)),
                         Text(p['miscLimit'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        const Text('⏳ 疾病等待期：', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        const Text('⏳ 等待期：', style: TextStyle(fontSize: 11, color: Colors.grey)),
                         Text(p['waitingDays'] as String, style: const TextStyle(fontSize: 12)),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1),
+                        const SizedBox(height: 10),
+                        const Text('🔍 insure80 條款陷阱比對：', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0EA5E9))),
+                        const SizedBox(height: 6),
+                        _buildClauseBadge('健保 2-2-7 手術限制', !(p['title'] as String).contains('手術') ? '無 2-2-7 限制 (優)' : '限定健保2-2-7 (嚴)', !(p['title'] as String).contains('手術') ? const Color(0xFF10B981) : Colors.orange),
+                        _buildClauseBadge('醫療雜費條款形式', '概括式條款 (超過健保全賠)', const Color(0xFF10B981)),
+                        _buildClauseBadge('收據報銷規定', (p['title'] as String).contains('享安全') ? '正本收據' : '接受副本收據理賠', (p['title'] as String).contains('享安全') ? Colors.orange : const Color(0xFF10B981)),
                       ],
                     ),
                   ),
@@ -554,6 +585,28 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildClauseBadge(String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          const SizedBox(height: 1),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
+            ),
+            child: Text(value, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
+          ),
+        ],
       ),
     );
   }
@@ -671,9 +724,9 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
                         // Search Input Bar (搜尋商品)
                         TextField(
                           controller: _searchProductController,
-                          onChanged: (_) => setState(() {}),
+                          onChanged: (_) => _searchLiveClauses(),
                           decoration: InputDecoration(
-                            hintText: '搜尋全台 1,428 款保單商品名稱或保險公司...',
+                            hintText: '搜尋全台 11,722 款保單商品名稱或保險公司...',
                             prefixIcon: const Icon(Icons.search_rounded),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             filled: true,
@@ -696,7 +749,10 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
                                   selected: isSel,
                                   selectedColor: const Color(0xFF6366F1),
                                   labelStyle: TextStyle(color: isSel ? Colors.white : textColor),
-                                  onSelected: (_) => setState(() => _activeCategoryFilter = cat),
+                                  onSelected: (_) {
+                                    setState(() => _activeCategoryFilter = cat);
+                                    _searchLiveClauses();
+                                  },
                                 ),
                               );
                             }).toList(),
@@ -709,9 +765,9 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
                         ListView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: filteredProducts.length,
+                          itemCount: _catalogProducts.length,
                           itemBuilder: (ctx, idx) {
-                            final prod = filteredProducts[idx];
+                            final prod = _catalogProducts[idx];
                             final isChecked = _selectedProductsForComparison.contains(prod['id']);
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
