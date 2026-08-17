@@ -700,6 +700,22 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: const Color(0xFF00ADB5).withOpacity(0.4)),
+                                  foregroundColor: const Color(0xFF00ADB5),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                ),
+                                onPressed: () {
+                                  Navigator.of(context).pushReplacement(
+                                    MaterialPageRoute(builder: (context) => const HomeScreen()),
+                                  );
+                                },
+                                icon: const Icon(Icons.speed_rounded, size: 16),
+                                label: const Text('🚀 快速進入系統預覽與測試模式', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
                             ],
                           ),
                         ),

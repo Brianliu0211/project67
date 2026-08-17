@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -60,6 +61,21 @@ class PolicyClauseItem {
       crawledAt: json['crawled_at'] != null ? DateTime.tryParse(json['crawled_at']) : null,
     );
   }
+}
+
+class PolicySearchResult {
+  final List<PolicyClauseItem> items;
+  final int totalCount;
+  final int page;
+  final int pageSize;
+  final int totalPages;
+
+  PolicySearchResult({
+    required this.items,
+    required this.totalCount,
+    required this.page,
+    required this.pageSize,
+  }) : totalPages = totalCount > 0 ? (totalCount / pageSize).ceil() : 1;
 }
 
 class PolicyCrawlerService {
@@ -163,39 +179,77 @@ class PolicyCrawlerService {
     bool? isDiscontinued,
     int limit = 30,
   }) async {
-    try {
-      var queryBuilder = _supabase.from('policy_clauses').select();
+    final result = await searchPolicyClausesPaged(
+      query: query,
+      companyType: companyType,
+      selectedCompany: selectedCompany,
+      selectedCategories: selectedCategories,
+      isDiscontinued: isDiscontinued,
+      page: 1,
+      pageSize: limit,
+    );
+    return result.items;
+  }
 
-      if (query.trim().isNotEmpty) {
-        final q = query.trim();
-        queryBuilder = queryBuilder.or('product_name.ilike.%$q%,company_name.ilike.%$q%,category.ilike.%$q%');
+  /// 支援多關鍵字分詞交集與動態條件分頁搜尋
+  Future<PolicySearchResult> searchPolicyClausesPaged({
+    String query = '',
+    String? companyType,
+    String? selectedCompany,
+    List<String>? selectedCategories,
+    bool? isDiscontinued,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      final tokens = query
+          .trim()
+          .split(RegExp(r'[\s_,\+\-]+'))
+          .where((t) => t.isNotEmpty)
+          .toList();
+
+      var dataBuilder = _supabase.from('policy_clauses').select();
+
+      for (var token in tokens) {
+        final filter = 'product_name.ilike.%$token%,company_name.ilike.%$token%,category.ilike.%$token%';
+        dataBuilder = dataBuilder.or(filter);
       }
 
       if (selectedCompany != null && selectedCompany.isNotEmpty && selectedCompany != '全部') {
-        queryBuilder = queryBuilder.eq('company_name', selectedCompany);
+        dataBuilder = dataBuilder.eq('company_name', selectedCompany);
       }
 
       if (selectedCategories != null && selectedCategories.isNotEmpty) {
-        queryBuilder = queryBuilder.inFilter('category', selectedCategories);
+        dataBuilder = dataBuilder.inFilter('category', selectedCategories);
       }
 
-      final res = await queryBuilder.order('crawled_at', ascending: false).limit(limit);
+      final res = await dataBuilder.order('product_name');
+      final List allRaw = res as List;
 
-      List<PolicyClauseItem> items = (res as List)
+      var items = allRaw
           .map((e) => PolicyClauseItem.fromJson(e as Map<String, dynamic>))
           .toList();
 
-      // Filter by companyType in memory if specified
       if (companyType == '人壽保險') {
         items = items.where((i) => lifeCompanies.contains(i.companyName)).toList();
       } else if (companyType == '產物保險/通路') {
         items = items.where((i) => pcCompanies.contains(i.companyName)).toList();
       }
 
-      return items;
+      final int totalCount = items.length;
+      final int from = (page - 1) * pageSize;
+      final int to = math.min(from + pageSize, totalCount);
+      final pagedItems = (from < totalCount) ? items.sublist(from, to) : <PolicyClauseItem>[];
+
+      return PolicySearchResult(
+        items: pagedItems,
+        totalCount: totalCount,
+        page: page,
+        pageSize: pageSize,
+      );
     } catch (e) {
-      if (kDebugMode) print('Error searching policy clauses: $e');
-      return [];
+      if (kDebugMode) print('Error searching policy clauses paged: $e');
+      return PolicySearchResult(items: [], totalCount: 0, page: page, pageSize: pageSize);
     }
   }
 

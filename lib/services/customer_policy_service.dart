@@ -131,7 +131,7 @@ class CustomerPolicyService {
   factory CustomerPolicyService() => _instance;
   CustomerPolicyService._internal();
 
-  final _supabase = Supabase.instance.client;
+  SupabaseClient get _supabase => Supabase.instance.client;
 
   // In-memory policy cache for instant offline responsiveness
   final Map<String, List<CustomerEnrolledPolicy>> _clientPoliciesCache = {};
@@ -154,27 +154,8 @@ class CustomerPolicyService {
       return list;
     } catch (e) {
       if (kDebugMode) print('Error fetching customer policies: $e');
-      // Return mock list if table not yet created
-      final mock = [
-        CustomerEnrolledPolicy(
-          id: 'CP-01',
-          customerId: customerId,
-          policyClauseId: 'PC-CAT-01',
-          productName: '國泰人壽 真安心醫療終身保險 (CAT-2026)',
-          companyName: '國泰人壽',
-          category: '實支實付醫療險',
-          roomLimit: '2,000 元/日',
-          surgeryLimit: '150,000 元',
-          miscLimit: '120,000 元',
-          roomDailyValue: 2000,
-          surgeryMaxValue: 150000,
-          miscMaxValue: 120000,
-          rawPdfUrl: 'https://www.ibdb.org.tw/',
-          enrolledAt: DateTime.now().subtract(const Duration(days: 120)),
-        ),
-      ];
-      _clientPoliciesCache[customerId] = mock;
-      return mock;
+      _clientPoliciesCache[customerId] = [];
+      return [];
     }
   }
 
@@ -260,7 +241,7 @@ class CustomerPolicyService {
       totalSurgery += p.surgeryMaxValue;
       totalMisc += p.miscMaxValue;
 
-      if (p.category.contains('癌症') || p.category.contains('重大傷病')) {
+      if (p.category.contains('癌') || p.category.contains('重疾') || p.category.contains('重大')) {
         totalCancer += (p.surgeryMaxValue > 500000 ? p.surgeryMaxValue : 1000000);
       }
       if (p.category.contains('車險') || p.category.contains('超額') || p.category.contains('責任')) {
@@ -283,6 +264,7 @@ class CustomerPolicyService {
 
     final List<String> detectedGaps = [];
     if (miscGap > 0) detectedGaps.add('自費醫療雜費缺口 ${miscGap ~/ 10000} 萬元 (標靶耗材自負額高)');
+    if (surgeryGap > 0) detectedGaps.add('微創/達文西手術給付缺口 ${surgeryGap ~/ 10000} 萬元');
     if (liabilityGap > 0) detectedGaps.add('車險超額責任險缺口 1,000 萬元 (防禦性駕駛必備)');
     if (cancerGap > 0) detectedGaps.add('癌症與重疾一次金缺口 ${cancerGap ~/ 10000} 萬元');
     if (roomGap > 0) detectedGaps.add('單人病房差額每日缺口 $roomGap 元');
