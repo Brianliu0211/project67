@@ -15,13 +15,15 @@ class RelationshipTopologyTab extends StatefulWidget {
 class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
   int _viewModeIndex = 0; // 0: 🌳 樹狀卡片, 1: 🕸️ 網狀拓撲
   bool _isLoading = true;
-  String? _selectedNodeName;
+  String? _selectedNodeId;
   List<Map<String, dynamic>> _allCustomers = [];
   List<Map<String, dynamic>> _relationships = [];
   List<Map<String, dynamic>> _referralTrees = [];
 
   List<Map<String, dynamic>> _computedNodes = [];
   List<Map<String, dynamic>> _computedEdges = [];
+  final Map<String, Offset> _nodePositionCache = {};
+  Size _lastCanvasContainerSize = const Size(1200, 800);
 
   final TransformationController _transformationController = TransformationController();
 
@@ -89,7 +91,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
       _referralTrees = builtTrees;
 
       // 2. Build Cluster Island Graph Topology for View Mode 1
-      _calculateClusterIslandTopology();
+      _calculateClusterIslandTopology(_allCustomers, _relationships);
 
     } catch (e) {
       // Fallback
@@ -98,87 +100,120 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
         setState(() {
           _isLoading = false;
         });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _resetCanvasCenter();
+        });
       }
     }
   }
 
-  /// Connected Component Cluster Island Layout Algorithm with Greedy Adjacent Angular Sorting
-  void _calculateClusterIslandTopology() {
-    if (_allCustomers.isEmpty) {
+  void _calculateClusterIslandTopology(List<Map<String, dynamic>> customers, List<Map<String, dynamic>> rels) {
+    if (customers.isEmpty) {
       _computedNodes = [];
       _computedEdges = [];
       return;
     }
 
-    final Map<String, Set<String>> adjMap = {};
-    for (var c in _allCustomers) {
-      adjMap[c['id'].toString()] = {};
-    }
+    final Map<String, Map<String, dynamic>> custMap = {
+      for (var c in customers) c['id'].toString(): c,
+    };
 
-    // Build edges list first
+    final Map<String, Set<String>> adjMap = {
+      for (var c in customers) c['id'].toString(): <String>{},
+    };
+
     final List<Map<String, dynamic>> edges = [];
+    final Set<String> activeCustIds = {};
 
-    // Edges - Dimension 1: Referral
-    for (var c in _allCustomers) {
-      final targetId = c['id'].toString();
-      final sourceId = c['referral_source_id']?.toString();
-      if (sourceId != null && sourceId.isNotEmpty && adjMap.containsKey(sourceId)) {
-        adjMap[sourceId]!.add(targetId);
-        adjMap[targetId]!.add(sourceId);
+    for (var r in rels) {
+      final from = r['source_customer_id']?.toString() ?? '';
+      final to = r['target_customer_id']?.toString() ?? '';
+      final type = r['relationship_type']?.toString() ?? 'other';
+      final note = r['notes']?.toString() ?? '';
+
+      if (from.isNotEmpty && to.isNotEmpty && custMap.containsKey(from) && custMap.containsKey(to)) {
+        adjMap[from]?.add(to);
+        adjMap[to]?.add(from);
+        activeCustIds.add(from);
+        activeCustIds.add(to);
+
+        Color edgeColor = const Color(0xFF6366F1);
+        String label = '關聯';
+
+        switch (type) {
+          case 'referral':
+            edgeColor = const Color(0xFF10B981);
+            label = '轉介紹';
+            break;
+          case 'family':
+            edgeColor = const Color(0xFF0EA5E9);
+            label = note.isNotEmpty ? note : '親眷';
+            break;
+          case 'colleague':
+            edgeColor = const Color(0xFFF59E0B);
+            label = note.isNotEmpty ? note : '同事';
+            break;
+          case 'social':
+            edgeColor = const Color(0xFF8B5CF6);
+            label = note.isNotEmpty ? note : '社友';
+            break;
+          default:
+            edgeColor = const Color(0xFF94A3B8);
+            label = note.isNotEmpty ? note : '朋友';
+        }
 
         edges.add({
-          'from': sourceId,
-          'to': targetId,
-          'type': 'referral',
-          'label': '轉介紹',
-          'color': const Color(0xFF10B981),
-        });
-      }
-    }
-
-    // Edges - Dimension 2: Social Relationships
-    for (var r in _relationships) {
-      final s = r['source_customer_id']?.toString();
-      final t = r['target_customer_id']?.toString();
-      final typeStr = r['relationship_type']?.toString() ?? 'family';
-      final detailStr = r['relationship_detail']?.toString() ?? '';
-
-      if (s != null && t != null && adjMap.containsKey(s) && adjMap.containsKey(t)) {
-        adjMap[s]!.add(t);
-        adjMap[t]!.add(s);
-
-        Color edgeColor = const Color(0xFF0EA5E9);
-        String defaultLabel = '關聯';
-        if (typeStr == 'family') { edgeColor = const Color(0xFF06B6D4); defaultLabel = '親眷'; }
-        else if (typeStr == 'workplace') { edgeColor = const Color(0xFFF59E0B); defaultLabel = '同事'; }
-        else if (typeStr == 'social') { edgeColor = const Color(0xFF8B5CF6); defaultLabel = '社友'; }
-        else { edgeColor = const Color(0xFF6B7280); defaultLabel = '朋友'; }
-
-        edges.add({
-          'from': s,
-          'to': t,
-          'type': typeStr,
-          'label': detailStr.isNotEmpty ? detailStr : defaultLabel,
+          'id': r['id']?.toString() ?? '',
+          'from': from,
+          'to': to,
+          'type': type,
+          'label': label,
           'color': edgeColor,
         });
       }
     }
 
-    // Graph Connected Component Decomposition (BFS)
+    for (var c in customers) {
+      final refId = c['referral_source_id']?.toString();
+      final myId = c['id'].toString();
+      if (refId != null && refId.isNotEmpty && refId != 'null' && custMap.containsKey(refId)) {
+        adjMap[refId]?.add(myId);
+        adjMap[myId]?.add(refId);
+        activeCustIds.add(refId);
+        activeCustIds.add(myId);
+
+        final alreadyExists = edges.any((e) =>
+          (e['from'] == refId && e['to'] == myId) ||
+          (e['from'] == myId && e['to'] == refId)
+        );
+
+        if (!alreadyExists) {
+          edges.add({
+            'id': 'ref_$refId\_$myId',
+            'from': refId,
+            'to': myId,
+            'type': 'referral',
+            'label': '轉介紹',
+            'color': const Color(0xFF10B981),
+          });
+        }
+      }
+    }
+
     final Set<String> visited = {};
     final List<List<String>> components = [];
 
-    for (var c in _allCustomers) {
-      final id = c['id'].toString();
-      if (!visited.contains(id)) {
+    for (var custId in activeCustIds) {
+      if (!visited.contains(custId)) {
         final List<String> comp = [];
-        final List<String> queue = [id];
-        visited.add(id);
+        final List<String> queue = [custId];
+        visited.add(custId);
 
         while (queue.isNotEmpty) {
           final curr = queue.removeAt(0);
           comp.add(curr);
-          for (var neighbor in adjMap[curr] ?? {}) {
+
+          for (var neighbor in (adjMap[curr] ?? <String>{})) {
             if (!visited.contains(neighbor)) {
               visited.add(neighbor);
               queue.add(neighbor);
@@ -189,64 +224,58 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
       }
     }
 
-    // Sort components by size descending (largest component is Main Island)
     components.sort((a, b) => b.length.compareTo(a.length));
 
-    final Map<String, Map<String, dynamic>> custMap = {
-      for (var c in _allCustomers) c['id'].toString(): c
-    };
-
     final List<Map<String, dynamic>> nodes = [];
+    final Set<String> placedIds = {};
+    final List<String> isolatedCustIds = customers
+        .map((c) => c['id'].toString())
+        .where((id) => !activeCustIds.contains(id))
+        .toList();
 
-    // Slots for secondary islands around canvas (1200x800 canvas)
+    const double centerX = 800.0;
+    const double centerY = 500.0;
+
     final List<Offset> islandSlots = [
-      const Offset(220.0, 180.0), // Top-Left
-      const Offset(980.0, 180.0), // Top-Right
-      const Offset(980.0, 620.0), // Bottom-Right
-      const Offset(220.0, 620.0), // Bottom-Left
+      const Offset(450, 280),
+      const Offset(1150, 280),
+      const Offset(450, 720),
+      const Offset(1150, 720),
+      const Offset(800, 200),
+      const Offset(800, 800),
     ];
-
     int islandSlotIdx = 0;
-    final List<String> isolatedCustIds = [];
 
-    // Collect all isolated single-node components first
-    for (var comp in components) {
-      if (comp.length == 1) {
-        isolatedCustIds.add(comp[0]);
-      }
-    }
+    for (int cIdx = 0; cIdx < components.length; cIdx++) {
+      final comp = components[cIdx];
+      if (comp.isEmpty) continue;
 
-    for (int compIdx = 0; compIdx < components.length; compIdx++) {
-      final comp = components[compIdx];
+      if (cIdx == 0) {
+        String hubId = comp[0];
+        int maxDeg = -1;
+        for (var id in comp) {
+          final deg = adjMap[id]?.length ?? 0;
+          if (deg > maxDeg) {
+            maxDeg = deg;
+            hubId = id;
+          }
+        }
 
-      if (compIdx == 0 && comp.length > 1) {
-        // Main Island: Center placed at (600, 400)
-        final double centerX = 600.0;
-        final double centerY = 400.0;
-
-        // Find hub node with max degrees in main component
-        comp.sort((a, b) => (adjMap[b]?.length ?? 0).compareTo(adjMap[a]?.length ?? 0));
-        final String hubId = comp.first;
-
-        // Sort outer ring nodes by adjacency to minimize edge crossings
-        final List<String> outerNodes = comp.sublist(1);
+        final List<String> outerNodes = comp.where((id) => id != hubId).toList();
         final List<String> orderedOuter = [];
-        final Set<String> placedOuter = {};
+        final Set<String> outerVisited = {};
 
-        while (placedOuter.length < outerNodes.length) {
-          final unplaced = outerNodes.where((id) => !placedOuter.contains(id)).toList();
-          if (unplaced.isEmpty) break;
-
-          unplaced.sort((a, b) {
-            final aConn = adjMap[a]!.intersection(placedOuter).length;
-            final bConn = adjMap[b]!.intersection(placedOuter).length;
-            if (aConn != bConn) return bConn.compareTo(aConn);
-            return (adjMap[b]?.length ?? 0).compareTo(adjMap[a]?.length ?? 0);
-          });
-
-          final nextNode = unplaced.first;
-          orderedOuter.add(nextNode);
-          placedOuter.add(nextNode);
+        for (var outId in outerNodes) {
+          if (!outerVisited.contains(outId)) {
+            orderedOuter.add(outId);
+            outerVisited.add(outId);
+            for (var neighbor in (adjMap[outId] ?? <String>{})) {
+              if (outerNodes.contains(neighbor) && !outerVisited.contains(neighbor)) {
+                orderedOuter.add(neighbor);
+                outerVisited.add(neighbor);
+              }
+            }
+          }
         }
 
         final List<String> sortedComp = [hubId, ...orderedOuter];
@@ -260,34 +289,51 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
           final bool isCenter = (i == 0);
 
           double x, y;
-          if (i == 0) {
-            x = centerX;
-            y = centerY;
+          if (_nodePositionCache.containsKey(id)) {
+            x = _nodePositionCache[id]!.dx;
+            y = _nodePositionCache[id]!.dy;
           } else {
-            final angle = (i - 1) * (2 * math.pi / math.max(1, compLen - 1));
-            final radius = (compLen > 6 && i > 6) ? 260.0 : 180.0;
-            x = centerX + radius * math.cos(angle);
-            y = centerY + radius * math.sin(angle);
+            if (i == 0) {
+              x = centerX;
+              y = centerY;
+            } else if (compLen == 2) {
+              const double radius = 320.0;
+              x = centerX + radius * math.cos(math.pi / 4);
+              y = centerY + radius * math.sin(math.pi / 4);
+            } else if (compLen == 3) {
+              final double angle = (i == 1) ? -math.pi / 3 : math.pi / 3;
+              const double radius = 320.0;
+              x = centerX + radius * math.cos(angle);
+              y = centerY + radius * math.sin(angle);
+            } else {
+              final double angle = (2 * math.pi / (compLen - 1)) * (i - 1) - math.pi / 2;
+              final double radius = 280.0 + (compLen > 6 ? 60.0 : 0.0);
+              x = centerX + radius * math.cos(angle);
+              y = centerY + radius * math.sin(angle);
+            }
+            _nodePositionCache[id] = Offset(x, y);
           }
 
-          Color nodeColor = const Color(0xFF0EA5E9);
-          if (isCenter) nodeColor = const Color(0xFF6366F1);
-          else if (degree > 1) nodeColor = const Color(0xFF10B981);
-          else if (degree == 1) nodeColor = const Color(0xFFF59E0B);
+          Color nodeColor = const Color(0xFF6366F1);
+          if (degree >= 3) {
+            nodeColor = const Color(0xFF10B981);
+          } else if (degree == 2) {
+            nodeColor = const Color(0xFF3B82F6);
+          } else if (degree == 1) {
+            nodeColor = const Color(0xFF8B5CF6);
+          }
 
           nodes.add({
             'id': id,
             'name': name,
-            'customer': cust,
             'x': x,
             'y': y,
-            'isCenter': isCenter,
-            'degree': degree,
             'color': nodeColor,
+            'isCenter': isCenter,
+            'customer': cust,
           });
         }
-      } else if (comp.length > 1) {
-        // Independent Connected Sub-Islands (e.g. 5-6 pair)
+      } else {
         final Offset islandCenter = islandSlots[islandSlotIdx % islandSlots.length];
         islandSlotIdx++;
 
@@ -297,50 +343,73 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
           final cust = custMap[id] ?? {};
           final name = cust['name']?.toString() ?? '未知';
           final degree = adjMap[id]?.length ?? 0;
+          final bool isCenter = (i == 0);
 
-          final angle = i * (2 * math.pi / compLen);
-          final radius = 65.0;
-          final x = islandCenter.dx + radius * math.cos(angle);
-          final y = islandCenter.dy + radius * math.sin(angle);
+          double x, y;
+          if (_nodePositionCache.containsKey(id)) {
+            x = _nodePositionCache[id]!.dx;
+            y = _nodePositionCache[id]!.dy;
+          } else {
+            if (i == 0) {
+              x = islandCenter.dx;
+              y = islandCenter.dy;
+            } else {
+              final double angle = (2 * math.pi / (compLen - 1)) * (i - 1);
+              const double radius = 180.0;
+              x = islandCenter.dx + radius * math.cos(angle);
+              y = islandCenter.dy + radius * math.sin(angle);
+            }
+            _nodePositionCache[id] = Offset(x, y);
+          }
+
+          Color nodeColor = const Color(0xFF6366F1);
+          if (degree >= 3) {
+            nodeColor = const Color(0xFF10B981);
+          } else if (degree == 2) {
+            nodeColor = const Color(0xFF3B82F6);
+          }
 
           nodes.add({
             'id': id,
             'name': name,
-            'customer': cust,
             'x': x,
             'y': y,
-            'isCenter': false,
-            'degree': degree,
-            'color': const Color(0xFFF59E0B),
+            'color': nodeColor,
+            'isCenter': isCenter,
+            'customer': cust,
           });
         }
       }
     }
 
-    // Evenly place all isolated customers around a clean outer orbit
     if (isolatedCustIds.isNotEmpty) {
-      final double centerX = 600.0;
-      final double centerY = 400.0;
       final int totalIso = isolatedCustIds.length;
-      final double orbitRadius = components.any((c) => c.length > 1) ? 280.0 : 180.0;
+      final double ringRadius = 450.0;
 
       for (int i = 0; i < totalIso; i++) {
         final id = isolatedCustIds[i];
         final cust = custMap[id] ?? {};
         final name = cust['name']?.toString() ?? '未知';
-        final angle = (i * (2 * math.pi / totalIso)) - (math.pi / 2);
-        final x = centerX + orbitRadius * math.cos(angle);
-        final y = centerY + orbitRadius * math.sin(angle);
+
+        double x, y;
+        if (_nodePositionCache.containsKey(id)) {
+          x = _nodePositionCache[id]!.dx;
+          y = _nodePositionCache[id]!.dy;
+        } else {
+          final double angle = (2 * math.pi / totalIso) * i;
+          x = centerX + ringRadius * math.cos(angle);
+          y = centerY + ringRadius * math.sin(angle);
+          _nodePositionCache[id] = Offset(x, y);
+        }
 
         nodes.add({
           'id': id,
           'name': name,
-          'customer': cust,
           'x': x,
           'y': y,
+          'color': const Color(0xFF64748B),
           'isCenter': false,
-          'degree': 0,
-          'color': const Color(0xFF0EA5E9),
+          'customer': cust,
         });
       }
     }
@@ -351,9 +420,32 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
 
   void _resetCanvasCenter() {
     setState(() {
-      _transformationController.value = Matrix4.identity();
+      _selectedNodeId = null;
+      if (_computedNodes.isEmpty) {
+        _transformationController.value = Matrix4.identity();
+        return;
+      }
+
+      double minX = double.infinity, maxX = -double.infinity;
+      double minY = double.infinity, maxY = -double.infinity;
+      for (var n in _computedNodes) {
+        final x = (n['x'] as num).toDouble();
+        final y = (n['y'] as num).toDouble();
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+
+      final double graphCenterX = (minX + maxX) / 2;
+      final double graphCenterY = (minY + maxY) / 2;
+      final double containerW = _lastCanvasContainerSize.width;
+      final double containerH = _lastCanvasContainerSize.height;
+      final double tx = (containerW / 2) - graphCenterX;
+      final double ty = (containerH / 2) - graphCenterY;
+      _transformationController.value = Matrix4.identity()..translate(tx, ty);
     });
-    CustomToast.show(context, '🎯 視野中心已成功重置復位', ToastType.success);
+    CustomToast.show(context, '🎯 全景視野已自適應置中復位', ToastType.success);
   }
 
   void _showEditRelationshipDialog(Map<String, dynamic> customer) async {
@@ -731,6 +823,30 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
     );
   }
 
+  void _focusOnNode(String nodeId) {
+    setState(() {
+      _viewModeIndex = 1;
+      _selectedNodeId = nodeId;
+    });
+
+    final node = _computedNodes.firstWhere(
+      (n) => n['id'].toString() == nodeId,
+      orElse: () => {},
+    );
+
+    if (node.isNotEmpty) {
+      final double nx = node['x'] as double;
+      final double ny = node['y'] as double;
+      final matrix = Matrix4.identity()
+        ..scale(1.15)
+        ..translate(-(nx - 600) * 0.75, -(ny - 400) * 0.75);
+      setState(() {
+        _transformationController.value = matrix;
+      });
+      CustomToast.show(context, '🎯 已在拓撲中聚焦客戶：${node['name']}', ToastType.success);
+    }
+  }
+
   Widget _buildReferralTreeCard(Map<String, dynamic> tree, bool isDark, Color cardBg, Color borderColor, Color textColor, Color subTextColor) {
     final members = tree['members'] as List<dynamic>;
 
@@ -764,13 +880,25 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+              InkWell(
+                onTap: () => _focusOnNode(tree['vipId'].toString()),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.hub_rounded, size: 12, color: Color(0xFF6366F1)),
+                      SizedBox(width: 4),
+                      Text('在拓撲中聚焦', style: TextStyle(fontSize: 11, color: Color(0xFF6366F1), fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
-                child: const Text('黃金轉介紹人', style: TextStyle(fontSize: 11, color: Color(0xFF6366F1), fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -796,6 +924,12 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
                     ),
                     child: Text(m['status'] as String, style: TextStyle(fontSize: 10, color: subTextColor)),
                   ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.location_searching_rounded, size: 14, color: Color(0xFF6366F1)),
+                    tooltip: '在拓撲中定位',
+                    onPressed: () => _focusOnNode(m['id'].toString()),
+                  ),
                 ],
               ),
             );
@@ -805,82 +939,126 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
     );
   }
 
-
   Widget _buildInteractiveNetworkCanvas(bool isDark, Color cardBg, Color borderColor, Color textColor, Color subTextColor) {
-    return Container(
-      width: double.infinity,
-      height: 480,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
-      child: Stack(
-        children: [
-          InteractiveViewer(
-            transformationController: _transformationController,
-            boundaryMargin: const EdgeInsets.all(500),
-            minScale: 0.3,
-            maxScale: 3.0,
-            child: Center(
-              child: SizedBox(
-                width: 1200,
-                height: 800,
-                child: Stack(
-                  children: [
-                    CustomPaint(
-                      size: Size.infinite,
-                      painter: DynamicTopologyPainter(
-                        nodes: _computedNodes,
-                        edges: _computedEdges,
-                        isDark: isDark,
-                      ),
-                    ),
-                    ..._computedNodes.map((n) {
-                      final double x = n['x'] as double;
-                      final double y = n['y'] as double;
-                      final bool isCenter = n['isCenter'] as bool;
-                      final Color color = n['color'] as Color;
-                      final String name = n['name'] as String;
-                      final Map<String, dynamic> cust = n['customer'] as Map<String, dynamic>;
+    // Determine 1st-degree connected node IDs if _selectedNodeId != null
+    final Set<String> focusNodeIds = {};
+    if (_selectedNodeId != null) {
+      focusNodeIds.add(_selectedNodeId!);
+      for (var e in _computedEdges) {
+        if (e['from'].toString() == _selectedNodeId) {
+          focusNodeIds.add(e['to'].toString());
+        }
+        if (e['to'].toString() == _selectedNodeId) {
+          focusNodeIds.add(e['from'].toString());
+        }
+      }
+    }
 
-                      return Positioned(
-                        left: x - (isCenter ? 36 : 28),
-                        top: y - (isCenter ? 36 : 28),
-                        child: GestureDetector(
-                          onTap: () => _showEditRelationshipDialog(cust),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: color.withOpacity(0.4),
-                                  blurRadius: isCenter ? 14 : 8,
-                                  spreadRadius: isCenter ? 3 : 1,
-                                ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: isCenter ? 36 : 28,
-                              backgroundColor: color,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    isCenter ? Icons.star_rounded : Icons.person_rounded,
-                                    size: isCenter ? 18 : 14,
-                                    color: Colors.white,
-                                  ),
-                                  Text(
-                                    name.length > 4 ? name.substring(0, 4) : name,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: isCenter ? 10 : 9,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _lastCanvasContainerSize = Size(constraints.maxWidth, constraints.maxHeight);
+
+        return Container(
+          width: double.infinity,
+          height: 520,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor),
+          ),
+          child: Stack(
+            children: [
+              InteractiveViewer(
+                transformationController: _transformationController,
+                boundaryMargin: const EdgeInsets.all(800),
+                minScale: 0.2,
+                maxScale: 4.0,
+                child: SizedBox(
+                  width: 1600,
+                  height: 1000,
+                  child: Stack(
+                      children: [
+                        CustomPaint(
+                          size: Size.infinite,
+                          painter: DynamicTopologyPainter(
+                            nodes: _computedNodes,
+                            edges: _computedEdges,
+                            selectedNodeId: _selectedNodeId,
+                            isDark: isDark,
+                          ),
+                        ),
+                        ..._computedNodes.map((n) {
+                          final double x = n['x'] as double;
+                          final double y = n['y'] as double;
+                          final bool isCenter = n['isCenter'] as bool;
+                          final Color color = n['color'] as Color;
+                          final String name = n['name'] as String;
+                          final String id = n['id'].toString();
+                          final Map<String, dynamic> cust = n['customer'] as Map<String, dynamic>;
+
+                          final bool isDimmed = _selectedNodeId != null && !focusNodeIds.contains(id);
+                          final bool isFocused = _selectedNodeId == id;
+
+                          return Positioned(
+                            left: x - (isCenter ? 36 : 28),
+                            top: y - (isCenter ? 36 : 28),
+                            child: GestureDetector(
+                              onPanUpdate: (details) {
+                                setState(() {
+                                  final double newX = (n['x'] as double) + details.delta.dx;
+                                  final double newY = (n['y'] as double) + details.delta.dy;
+                                  n['x'] = newX;
+                                  n['y'] = newY;
+                                  _nodePositionCache[id] = Offset(newX, newY);
+                                });
+                              },
+                              onTap: () {
+                                setState(() {
+                                  _selectedNodeId = (_selectedNodeId == id) ? null : id;
+                                });
+                              },
+                          onDoubleTap: () => _showEditRelationshipDialog(cust),
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 200),
+                            opacity: isDimmed ? 0.25 : 1.0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: isFocused
+                                    ? Border.all(color: Colors.amberAccent, width: 3.5)
+                                    : null,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: isFocused
+                                        ? Colors.amberAccent.withOpacity(0.6)
+                                        : color.withOpacity(0.4),
+                                    blurRadius: isFocused ? 18 : (isCenter ? 14 : 8),
+                                    spreadRadius: isFocused ? 4 : (isCenter ? 3 : 1),
                                   ),
                                 ],
+                              ),
+                              child: CircleAvatar(
+                                radius: isCenter ? 36 : 28,
+                                backgroundColor: color,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      isCenter ? Icons.star_rounded : Icons.person_rounded,
+                                      size: isCenter ? 18 : 14,
+                                      color: Colors.white,
+                                    ),
+                                    Text(
+                                      name.length > 4 ? name.substring(0, 4) : name,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: isCenter ? 10 : 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -891,26 +1069,45 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
                 ),
               ),
             ),
-          ),
 
-          // Floating Reset Center Button (🎯 復位)
+          // Floating Reset Center Button & Hint
           Positioned(
             top: 16,
             right: 16,
-            child: ElevatedButton.icon(
-              onPressed: _resetCanvasCenter,
-              icon: const Icon(Icons.my_location_rounded, size: 16),
-              label: const Text('🎯 重置視野中心 (復位)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366F1),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_selectedNodeId != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ElevatedButton.icon(
+                      onPressed: () => setState(() => _selectedNodeId = null),
+                      icon: const Icon(Icons.clear_all_rounded, size: 14),
+                      label: const Text('解除聚焦', style: TextStyle(fontSize: 11)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ElevatedButton.icon(
+                  onPressed: _resetCanvasCenter,
+                  icon: const Icon(Icons.my_location_rounded, size: 16),
+                  label: const Text('🎯 視野置中復位', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          // Bottom Info Bar
+          // Bottom Info Bar with Drag & Tap Guides
           Positioned(
             bottom: 16,
             left: 16,
@@ -929,7 +1126,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('🕸️ 黑曜石 (Obsidian) 群島動態拓撲圖：相鄰角度聚類 + 雙向對稱避讓畫布', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+                        Text('🕸️ 黑曜石 (Obsidian) 動態圖譜：可按住節點自由拖曳 | 點擊節點聚焦一度人脈 | 雙擊管理關係', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
                         const SizedBox(height: 2),
                         Text('• 🟢 轉介紹帶單向箭頭 ➔ | 🔷 藍線: 親眷 | 🟧 橘線: 職場/同事 | 🟣 紫線: 社團/朋友', style: TextStyle(fontSize: 10, color: subTextColor)),
                       ],
@@ -942,16 +1139,24 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
         ],
       ),
     );
+      },
+    );
   }
 }
 
-/// Advanced Dynamic Topology Painter with Canonical Orientation & Absolute Symmetric Multi-Edge Splitting
+/// Advanced Dynamic Topology Painter with Canonical Orientation & Multi-Edge Curved Splitting
 class DynamicTopologyPainter extends CustomPainter {
   final List<Map<String, dynamic>> nodes;
   final List<Map<String, dynamic>> edges;
+  final String? selectedNodeId;
   final bool isDark;
 
-  DynamicTopologyPainter({required this.nodes, required this.edges, required this.isDark});
+  DynamicTopologyPainter({
+    required this.nodes,
+    required this.edges,
+    this.selectedNodeId,
+    required this.isDark,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1021,23 +1226,40 @@ class DynamicTopologyPainter extends CustomPainter {
         final double r1 = (node1['isCenter'] as bool? ?? false) ? 36.0 : 28.0;
         final double r2 = (node2['isCenter'] as bool? ?? false) ? 36.0 : 28.0;
 
+        final bool isEdgeFocused = selectedNodeId == null ||
+            (fromId == selectedNodeId || toId == selectedNodeId);
+        final double edgeOpacity = isEdgeFocused ? 0.9 : 0.15;
+
         double curveMagnitude = 0.0;
         double curveSign = 1.0;
         double tLabel = 0.5;
 
         if (groupCount == 1) {
-          curveMagnitude = dist > 220 ? 30.0 : 18.0;
+          curveMagnitude = 28.0;
           curveSign = 1.0;
-          tLabel = 0.5;
+          tLabel = 0.50;
+        } else if (groupCount == 2) {
+          curveMagnitude = 65.0;
+          curveSign = (groupIdx == 0) ? 1.0 : -1.0;
+          tLabel = (groupIdx == 0) ? 0.36 : 0.64;
+        } else if (groupCount == 3) {
+          if (groupIdx == 0) {
+            curveMagnitude = 85.0;
+            curveSign = 1.0;
+            tLabel = 0.30;
+          } else if (groupIdx == 1) {
+            curveMagnitude = 0.0;
+            curveSign = 0.0;
+            tLabel = 0.50;
+          } else {
+            curveMagnitude = 85.0;
+            curveSign = -1.0;
+            tLabel = 0.70;
+          }
         } else {
-          // Absolute symmetric opposing curves relative to canonical pA -> pB vector!
           curveSign = (groupIdx % 2 == 0) ? 1.0 : -1.0;
-          curveMagnitude = 36.0 + (groupIdx ~/ 2) * 28.0;
-
-          if (groupIdx == 0) tLabel = 0.38;
-          else if (groupIdx == 1) tLabel = 0.62;
-          else if (groupIdx == 2) tLabel = 0.28;
-          else tLabel = 0.72;
+          curveMagnitude = 55.0 + (groupIdx ~/ 2) * 50.0;
+          tLabel = 0.22 + (groupIdx * 0.56 / (groupCount - 1));
         }
 
         final double controlX = midX + nx * curveMagnitude * curveSign;
@@ -1048,39 +1270,26 @@ class DynamicTopologyPainter extends CustomPainter {
           ..quadraticBezierTo(controlX, controlY, p2.dx, p2.dy);
 
         final linePaint = Paint()
-          ..color = strokeColor.withOpacity(0.85)
-          ..strokeWidth = 2.4
+          ..color = strokeColor.withOpacity(edgeOpacity)
+          ..strokeWidth = isEdgeFocused ? 2.4 : 1.2
           ..style = PaintingStyle.stroke;
 
         canvas.drawPath(path, linePaint);
 
         // If Referral edge (type == 'referral'), draw a Directional Arrow pointing towards target p2
         if (typeStr == 'referral') {
-          _drawDirectionalArrow(canvas, controlX, controlY, p2, r2, strokeColor);
+          _drawDirectionalArrow(canvas, controlX, controlY, p2, r2, strokeColor.withOpacity(edgeOpacity));
         }
 
         // Evaluate point on Bezier curve at t = tLabel
         final double labelX = (1 - tLabel) * (1 - tLabel) * p1.dx + 2 * (1 - tLabel) * tLabel * controlX + tLabel * tLabel * p2.dx;
         final double labelY = (1 - tLabel) * (1 - tLabel) * p1.dy + 2 * (1 - tLabel) * tLabel * controlY + tLabel * tLabel * p2.dy;
-        Offset labelPos = Offset(labelX, labelY);
+        final Offset labelPos = Offset(labelX, labelY);
 
-        // Calculate clearance from P1 and P2 node centers
-        final double distP1 = (labelPos - p1).distance;
-        final double distP2 = (labelPos - p2).distance;
-        final double minClearance1 = r1 + 55.0;
-        final double minClearance2 = r2 + 55.0;
-
-        if (distP1 < minClearance1 && distP1 > 0) {
-          final Offset dir1 = (labelPos - p1) / distP1;
-          labelPos = p1 + dir1 * minClearance1;
+        // Draw Edge Label Pill at staggered & safe labelPos with focus opacity
+        if (isEdgeFocused) {
+          _drawEdgeLabelPill(canvas, labelPos, labelStr, strokeColor, isDark);
         }
-        if (distP2 < minClearance2 && distP2 > 0) {
-          final Offset dir2 = (labelPos - p2) / distP2;
-          labelPos = p2 + dir2 * minClearance2;
-        }
-
-        // Draw Edge Label Pill at staggered & safe labelPos
-        _drawEdgeLabelPill(canvas, labelPos, labelStr, strokeColor, isDark);
       }
     }
   }

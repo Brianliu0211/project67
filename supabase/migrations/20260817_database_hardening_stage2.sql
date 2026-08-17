@@ -133,7 +133,7 @@ DROP POLICY IF EXISTS "Profiles are readable by authenticated users" ON public.p
 CREATE POLICY "Profiles are readable by authenticated users"
     ON public.profiles FOR SELECT
     TO authenticated
-    USING (id = (select auth.uid()) OR public.is_admin_or_dev());
+    USING (true);
 
 DROP POLICY IF EXISTS "Users can update own profile or admin/dev" ON public.profiles;
 CREATE POLICY "Users can update own profile or admin/dev"
@@ -185,11 +185,13 @@ BEGIN
             ON public.visit_logs FOR ALL
             TO authenticated
             USING (
-                user_id = (select auth.uid())
+                user_id = auth.uid() 
+                OR (EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'visit_logs' AND column_name = 'profile_id') AND profile_id = auth.uid())
                 OR public.is_admin_or_dev()
             )
             WITH CHECK (
-                user_id = (select auth.uid())
+                user_id = auth.uid() 
+                OR (EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'visit_logs' AND column_name = 'profile_id') AND profile_id = auth.uid())
                 OR public.is_admin_or_dev()
             );
     END IF;
