@@ -2098,7 +2098,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 await supabase.from('schedule_events').delete().eq('profile_id', user.id);
                               } catch (_) {}
                               try {
-                                await supabase.from('visit_logs').delete().eq('profile_id', user.id);
+                                await supabase.from('visit_logs').delete().eq('user_id', user.id);
                               } catch (_) {}
                               try {
                                 await supabase.from('profiles').delete().eq('id', user.id);

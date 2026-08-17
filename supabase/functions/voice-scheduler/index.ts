@@ -133,6 +133,25 @@ serve(async (req: Request) => {
   }
 
   try {
+    // Authenticate before accepting audio or spending any third-party AI quota.
+    const authHeader = req.headers.get('Authorization');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    if (!authHeader || !supabaseUrl || !supabaseAnonKey) {
+      return new Response(JSON.stringify({ error: '未授權請求' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: '未授權請求' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     const { audioBase64, mimeType, localTime } = await req.json();
 
     if (!audioBase64) {
@@ -185,31 +204,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // 步驟 3：資料庫比對與寫入 (JWT 使用者認證)
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: '缺少 Authorization Header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: `使用者驗證失敗: ${userError?.message || '未登入'}` }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // 匹配客戶 id (如果有提及客戶名稱)
+    // 步驟 3：資料庫比對與寫入
     let matchedCustomerId: string | null = null;
     let matchedCustomerName: string | null = null;
 

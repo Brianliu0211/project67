@@ -7,20 +7,33 @@ on:
   workflow_dispatch: # Allows manual 1-click trigger from GitHub Actions UI anytime
 
 jobs:
-  crawl_and_sync:
+  trigger_crawler:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository Code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.13 Environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Execute Automated Insurance Products Crawler Engine
+      - name: 🚀 Trigger Supabase Crawler Edge Function
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://algufuoxkeizxwkofmmp.supabase.co' }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'sb_publishable_hEIRyFKMgmbB2qVOVioGBQ_61oJxceL' }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          CRAWLER_CRON_SECRET: ${{ secrets.CRAWLER_CRON_SECRET }}
         run: |
-          python scripts/crawl_massive_insurance_products.py
+          echo "Triggering crawl-insurance-products Edge Function..."
+          if [ -z "$SUPABASE_URL" ] || [ -z "$CRAWLER_CRON_SECRET" ]; then
+            echo "❌ Error: SUPABASE_URL or CRAWLER_CRON_SECRET is not set in GitHub Secrets!"
+            exit 1
+          fi
+          
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${SUPABASE_URL}/functions/v1/crawl-insurance-products" \
+            -H "Content-Type: application/json" \
+            -H "x-crawler-secret: ${CRAWLER_CRON_SECRET}")
+          
+          http_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "HTTP Response Code: $http_code"
+          echo "Response Body: $body"
+          
+          if [ "$http_code" -ne 200 ]; then
+            echo "❌ Crawler failed with HTTP $http_code"
+            exit 1
+          fi
+          echo "✅ Crawler executed successfully!"
