@@ -298,6 +298,31 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
             ),
           ),
 
+          // 👑 建檔業務員資訊欄 (Live Data from profiles table)
+          if (widget.customer['agent_name'] != null && widget.customer['agent_name'].toString().isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+                border: Border(bottom: BorderSide(color: const Color(0xFF6366F1).withValues(alpha: 0.25))),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.badge_outlined, size: 16, color: Color(0xFF6366F1)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '👤 建檔業務員: ${widget.customer['agent_name']} (${widget.customer['agent_email'] ?? '無信箱'}) • 團隊: ${widget.customer['agent_team'] ?? 'TAIPEI-01'}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6366F1)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Tab Bar
           Container(
             decoration: BoxDecoration(color: bgColor, border: Border(bottom: BorderSide(color: borderColor))),

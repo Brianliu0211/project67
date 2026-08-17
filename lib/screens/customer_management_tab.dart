@@ -39,6 +39,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
   bool _isSelectionMode = false;
   Set<String> _selectedCustomerIds = {};
 
+  // Dev View Scope Filter State
+  bool _isDevUser = false;
+  bool _devFilterOnlyMine = true;
+  String? _currentUserId;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -47,7 +52,29 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
     super.initState();
     _viewMode = AppSettings.instance.defaultCustomerViewMode;
     _searchController.addListener(_filterCustomers);
+    _checkDevRole();
     _fetchCustomers();
+  }
+
+  Future<void> _checkDevRole() async {
+    if (isOfflineMode) return;
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        _currentUserId = user.id;
+        final profile = await Supabase.instance.client
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+        if (profile != null && profile['role'] == 'dev' && mounted) {
+          setState(() {
+            _isDevUser = true;
+          });
+          _filterCustomers();
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -79,16 +106,29 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
 
     try {
       final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user != null) _currentUserId = user.id;
+
       final response = await supabase
           .from('customers')
-          .select()
+          .select('*, profiles:profile_id(id, full_name, email, role, team_name)')
           .isFilter('deleted_at', null)
           .order('created_at', ascending: false);
 
       setState(() {
         _allCustomers = List<Map<String, dynamic>>.from(response.map((data) {
+          final profile = data['profiles'] as Map<String, dynamic>?;
+          final String agentFullName = profile?['full_name'] as String? ?? '';
+          final String agentEmail = profile?['email'] as String? ?? '';
+          final String agentTeam = profile?['team_name'] as String? ?? 'TAIPEI-01';
+          final String displayAgent = agentFullName.isNotEmpty ? agentFullName : (agentEmail.isNotEmpty ? agentEmail : '未知業務員');
+
           return {
             'id': data['id'],
+            'profile_id': data['profile_id']?.toString() ?? '',
+            'agent_name': displayAgent,
+            'agent_email': agentEmail,
+            'agent_team': agentTeam,
             'name': data['name'],
             'nickname': data['nickname'] ?? '',
             'avatar_url': data['avatar_url'] ?? '',
@@ -119,25 +159,33 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
     }
   }
 
-  // Filter customers locally by search controller text
+  // Filter customers locally by search controller text and dev scope
   void _filterCustomers() {
     final query = _searchController.text.trim().toLowerCase();
     setState(() {
-      final activeCustomers = _allCustomers.where((c) => c['deleted_at'] == null).toList();
+      var activeCustomers = _allCustomers.where((c) => c['deleted_at'] == null).toList();
       
+      // Dev Scope Filter: If dev user and _devFilterOnlyMine is true, only show my own customers
+      if (_isDevUser && _devFilterOnlyMine && _currentUserId != null) {
+        activeCustomers = activeCustomers.where((c) => c['profile_id'] == _currentUserId).toList();
+      }
+
       if (query.isEmpty) {
         _filteredCustomers = List.from(activeCustomers);
       } else {
         _filteredCustomers = activeCustomers.where((customer) {
           final name = (customer['name'] ?? '').toString().toLowerCase();
+          final nickname = (customer['nickname'] ?? '').toString().toLowerCase();
           final notes = (customer['notes'] ?? '').toString().toLowerCase();
+          final agentName = (customer['agent_name'] ?? '').toString().toLowerCase();
           final List tags = customer['tags'] ?? [];
           
-          final matchesName = name.contains(query);
+          final matchesName = name.contains(query) || nickname.contains(query);
           final matchesNotes = notes.contains(query);
+          final matchesAgent = agentName.contains(query);
           final matchesTags = tags.any((tag) => tag.toString().toLowerCase().contains(query));
 
-          return matchesName || matchesNotes || matchesTags;
+          return matchesName || matchesNotes || matchesTags || matchesAgent;
         }).toList();
       }
     });
@@ -1540,6 +1588,10 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
                       ),
                     ),
                     const SizedBox(width: 12),
+                    if (_isDevUser) ...[
+                      _buildDevScopeSwitcher(isDark),
+                      const SizedBox(width: 12),
+                    ],
                     OutlinedButton.icon(
                       onPressed: _showBatchImportDialog,
                       style: OutlinedButton.styleFrom(
@@ -1719,6 +1771,10 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
                         ),
                       ],
                     ),
+                    if (_isDevUser) ...[
+                      const SizedBox(height: 10),
+                      _buildDevScopeSwitcher(isDark),
+                    ],
                   ],
                 ),
           
@@ -1740,6 +1796,89 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
                     : (_viewMode == 'list'
                         ? _buildCustomerList(isWideScreen, screenWidth)
                         : _buildCustomerGrid(isWideScreen, screenWidth)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDevScopeSwitcher(bool isDark) {
+    if (!_isDevUser) return const SizedBox.shrink();
+
+    final Color activeBg = const Color(0xFF6366F1);
+    final Color inactiveText = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: () {
+              if (!_devFilterOnlyMine) {
+                setState(() => _devFilterOnlyMine = true);
+                _filterCustomers();
+              }
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _devFilterOnlyMine ? activeBg : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.person_rounded, size: 14, color: _devFilterOnlyMine ? Colors.white : inactiveText),
+                  const SizedBox(width: 4),
+                  Text(
+                    '👤 僅我建立的',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _devFilterOnlyMine ? Colors.white : inactiveText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () {
+              if (_devFilterOnlyMine) {
+                setState(() => _devFilterOnlyMine = false);
+                _filterCustomers();
+              }
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: !_devFilterOnlyMine ? activeBg : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.public_rounded, size: 14, color: !_devFilterOnlyMine ? Colors.white : inactiveText),
+                  const SizedBox(width: 4),
+                  Text(
+                    '🌐 全系統客戶 (Dev)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: !_devFilterOnlyMine ? Colors.white : inactiveText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -2070,14 +2209,32 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    displayName,
-                    style: TextStyle(
-                      color: nameColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        displayName,
+                        style: TextStyle(
+                          color: nameColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (customer['agent_name'] != null && customer['agent_name'].toString().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '👤 業務員: ${customer['agent_name']}',
+                          style: const TextStyle(
+                            color: Color(0xFF6366F1),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -2865,6 +3022,22 @@ class _FlippingCustomerCardState extends State<FlippingCustomerCard> with Single
                             ),
                           ],
                         ),
+                        if (widget.customer['agent_name'] != null && widget.customer['agent_name'].toString().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.badge_outlined, size: 12, color: Color(0xFF6366F1)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  '👤 業務員: ${widget.customer['agent_name']}',
+                                  style: const TextStyle(color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

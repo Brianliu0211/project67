@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/voice_transcription_service.dart';
 import '../models/user_role.dart';
@@ -19,6 +20,9 @@ class DevConsoleScreen extends StatefulWidget {
 class _DevConsoleScreenState extends State<DevConsoleScreen> {
   final PolicyCrawlerService _policyService = PolicyCrawlerService();
   final NewsRssService _rssService = NewsRssService();
+
+  // Demo Login Fast Channel State
+  bool _showFastDemoLogin = true;
 
   // Real DB Stats
   int _totalPolicyCount = 11722;
@@ -85,12 +89,15 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
       final total = await _policyService.fetchTotalPolicyCount();
       final stats = await _policyService.fetchCompanyBreakdown();
       final rssList = await _rssService.getRssSources();
+      final prefs = await SharedPreferences.getInstance();
+      final showFastDemo = prefs.getBool('dev_show_fast_demo_login') ?? true;
 
       if (mounted) {
         setState(() {
           _totalPolicyCount = total;
           _companyStats = stats;
           _rssSources = rssList;
+          _showFastDemoLogin = showFastDemo;
           _isLoadingStats = false;
           _isLoadingRss = false;
         });
@@ -1016,6 +1023,93 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                               : const Icon(Icons.bug_report_outlined, size: 14),
                           label: Text(_isTestingVoiceApi ? '真實檢測中...' : '真實連線與硬體檢測', style: const TextStyle(fontSize: 11)),
                           style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF6366F1), side: const BorderSide(color: Color(0xFF6366F1))),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // 4. 登入頁 Demo 快速通道開關 (Login Screen Demo Access Control)
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF00ADB5).withValues(alpha: 0.4), width: 1.5),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF00ADB5).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.rocket_launch_rounded, color: Color(0xFF00ADB5), size: 22),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Text(
+                                          '登入頁 Demo 快速通道開關',
+                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: _showFastDemoLogin 
+                                                ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                                : Colors.grey.withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            _showFastDemoLogin ? 'DEMO 模式 (ON)' : '正式商業模式 (OFF)',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: _showFastDemoLogin ? const Color(0xFF10B981) : Colors.grey,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '開啟時，未登入畫面將顯示『🚀 快速進入系統預覽』按鈕，便於專題現場免帳密演示；關閉時完全隱藏，呈現乾淨商業登入頁。',
+                                      style: TextStyle(fontSize: 12, color: subTextColor),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Switch(
+                          value: _showFastDemoLogin,
+                          activeTrackColor: const Color(0xFF00ADB5),
+                          onChanged: (val) async {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool('dev_show_fast_demo_login', val);
+                            setState(() => _showFastDemoLogin = val);
+                            if (mounted) {
+                              CustomToast.show(
+                                context,
+                                val ? '🚀 已啟用「登入頁 Demo 快速通道」' : '🔒 已關閉「登入頁 Demo 快速通道」（切換為正式商業模式）',
+                                ToastType.success,
+                              );
+                            }
+                          },
                         ),
                       ],
                     ),

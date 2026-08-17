@@ -28,12 +28,26 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isSignUp = false;
   bool _obscurePassword = true;
 
+  bool _showFastDemoLogin = true;
+  int _secretTapCount = 0;
+  DateTime? _lastSecretTap;
+
   @override
   void initState() {
     super.initState();
+    _loadFastDemoSetting();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUrlErrors();
     });
+  }
+
+  Future<void> _loadFastDemoSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _showFastDemoLogin = prefs.getBool('dev_show_fast_demo_login') ?? true;
+      });
+    }
   }
 
   void _checkUrlErrors() {
@@ -378,11 +392,42 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // App Icon or Logo Placeholder
-                      const Icon(
-                        Icons.shield_outlined,
-                        size: 64,
-                        color: Color(0xFF00ADB5),
+                      // App Icon or Logo Placeholder with Secret 5-Tap Dev Toggle
+                      GestureDetector(
+                        onTap: () async {
+                          final now = DateTime.now();
+                          if (_lastSecretTap == null || now.difference(_lastSecretTap!) > const Duration(seconds: 2)) {
+                            _secretTapCount = 1;
+                          } else {
+                            _secretTapCount++;
+                          }
+                          _lastSecretTap = now;
+
+                          if (_secretTapCount >= 5) {
+                            _secretTapCount = 0;
+                            final prefs = await SharedPreferences.getInstance();
+                            final newVal = !_showFastDemoLogin;
+                            await prefs.setBool('dev_show_fast_demo_login', newVal);
+                            if (mounted) {
+                              setState(() => _showFastDemoLogin = newVal);
+                              CustomToast.show(
+                                context,
+                                newVal 
+                                    ? '🛠️ [開發者手勢] 已解鎖並開啟 Demo 快速通道' 
+                                    : '🔒 [開發者手勢] 已關閉 Demo 快速通道（切換為純淨商業模式）',
+                                ToastType.success,
+                              );
+                            }
+                          }
+                        },
+                        child: const MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: Icon(
+                            Icons.shield_outlined,
+                            size: 64,
+                            color: Color(0xFF00ADB5),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       
@@ -700,22 +745,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: const Color(0xFF00ADB5).withOpacity(0.4)),
-                                  foregroundColor: const Color(0xFF00ADB5),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              if (_showFastDemoLogin || isOfflineMode) ...[
+                                const SizedBox(height: 8),
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: const Color(0xFF00ADB5).withValues(alpha: 0.4)),
+                                    foregroundColor: const Color(0xFF00ADB5),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  ),
+                                  onPressed: () {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (context) => const HomeScreen()),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.speed_rounded, size: 16),
+                                  label: const Text('🚀 快速進入系統預覽與測試模式', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 ),
-                                onPressed: () {
-                                  Navigator.of(context).pushReplacement(
-                                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                                  );
-                                },
-                                icon: const Icon(Icons.speed_rounded, size: 16),
-                                label: const Text('🚀 快速進入系統預覽與測試模式', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ),
+                              ],
                             ],
                           ),
                         ),
