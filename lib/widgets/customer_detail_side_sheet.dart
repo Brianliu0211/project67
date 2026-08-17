@@ -104,6 +104,9 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
   List<PolicyClauseItem> _catalogSearchResults = [];
   bool _isSearchingCatalog = false;
   bool _showEnrollSearchBox = false;
+  int _catalogCurrentPage = 1;
+  int _catalogTotalPages = 1;
+  int _catalogTotalCount = 0;
 
   @override
   void initState() {
@@ -135,8 +138,9 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
   }
 
   Future<void> _loadCustomerPolicies() async {
-    setState(() => _isLoadingPolicies = true);
     final custId = widget.customer['id']?.toString() ?? '';
+    if (custId.isEmpty) return;
+
     final list = await _policyService.getCustomerPolicies(custId);
     final summary = _policyService.calculateCustomerBenefitSummary(list);
 
@@ -149,16 +153,23 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
     }
   }
 
-  Future<void> _searchCatalog(String query) async {
-    if (query.trim().isEmpty) {
-      setState(() => _catalogSearchResults = []);
-      return;
-    }
-    setState(() => _isSearchingCatalog = true);
-    final results = await _crawlerService.searchPolicyClauses(query: query, limit: 50);
+  Future<void> _searchCatalog(String query, {int page = 1}) async {
+    setState(() {
+      _isSearchingCatalog = true;
+      _catalogCurrentPage = page;
+    });
+
+    final result = await _crawlerService.searchPolicyClausesPaged(
+      query: query,
+      page: page,
+      pageSize: 8,
+    );
+
     if (mounted) {
       setState(() {
-        _catalogSearchResults = results;
+        _catalogSearchResults = result.items;
+        _catalogTotalCount = result.totalCount;
+        _catalogTotalPages = result.totalPages;
         _isSearchingCatalog = false;
       });
     }
@@ -509,7 +520,14 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
             children: [
               Text('已投保保單清單 (${_enrolledPolicies.length} 張)：', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
               OutlinedButton.icon(
-                onPressed: () => setState(() => _showEnrollSearchBox = !_showEnrollSearchBox),
+                onPressed: () {
+                  setState(() {
+                    _showEnrollSearchBox = !_showEnrollSearchBox;
+                    if (_showEnrollSearchBox && _catalogSearchResults.isEmpty) {
+                      _searchCatalog(_searchCatalogController.text);
+                    }
+                  });
+                },
                 icon: Icon(_showEnrollSearchBox ? Icons.close_rounded : Icons.add_rounded, size: 16),
                 label: Text(_showEnrollSearchBox ? '收合搜尋' : '+ 搜尋 1.1萬+ 條款加入', style: const TextStyle(fontSize: 11)),
                 style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF0EA5E9), side: const BorderSide(color: Color(0xFF0EA5E9))),
@@ -519,53 +537,183 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
 
           const SizedBox(height: 10),
 
-          // Search catalog box
+          // Search catalog box & Paginated Results
           if (_showEnrollSearchBox) ...[
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: borderColor),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextField(
                     controller: _searchCatalogController,
-                    onChanged: _searchCatalog,
-                    decoration: const InputDecoration(
-                      hintText: '輸入保單名稱快速搜尋 (如: 國泰真安心、富邦超額責任)...',
-                      hintStyle: TextStyle(fontSize: 12),
+                    onChanged: (val) => _searchCatalog(val, page: 1),
+                    decoration: InputDecoration(
+                      hintText: '輸入關鍵字多詞搜尋 (如: 國泰 醫療、富邦 癌症一次金)...',
+                      hintStyle: TextStyle(fontSize: 12, color: subTextColor),
                       isDense: true,
-                      border: OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                      suffixIcon: _searchCatalogController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 16),
+                              onPressed: () {
+                                _searchCatalogController.clear();
+                                _searchCatalog('', page: 1);
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
+                  const SizedBox(height: 10),
+
                   if (_isSearchingCatalog)
-                    const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2))
-                  else if (_catalogSearchResults.isNotEmpty)
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _catalogSearchResults.length,
-                      itemBuilder: (ctx, i) {
-                        final item = _catalogSearchResults[i];
-                        return ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(item.productName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          subtitle: Text('${item.companyName} • ${item.category}', style: TextStyle(fontSize: 10, color: subTextColor)),
-                          trailing: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
-                            onPressed: () => _enrollPolicy(item),
-                            child: const Text('加入', style: TextStyle(fontSize: 11)),
-                          ),
-                        );
-                      },
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4),
+                      child: LinearProgressIndicator(minHeight: 2, backgroundColor: Colors.transparent),
+                    )
+                  else
+                    const SizedBox(height: 6),
+
+                  if (_catalogSearchResults.isEmpty && !_isSearchingCatalog)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text('查無符合「${_searchCatalogController.text}」的條款，請嘗試更換關鍵字。', style: TextStyle(fontSize: 11, color: subTextColor)),
+                      ),
+                    )
+                  else ...[
+                    // Compact Policy Items List with Opacity during page flip
+                    AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      opacity: _isSearchingCatalog ? 0.4 : 1.0,
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _catalogSearchResults.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (ctx, i) {
+                          final item = _catalogSearchResults[i];
+                          return Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: cardBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(item.companyName, style: const TextStyle(fontSize: 10, color: Color(0xFF6366F1), fontWeight: FontWeight.bold)),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(item.category, style: TextStyle(fontSize: 10, color: subTextColor)),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        item.productName,
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        '病房: ${item.roomLimit} | 手術: ${item.surgeryLimit} | 雜費: ${item.miscLimit}',
+                                        style: TextStyle(fontSize: 10, color: const Color(0xFF10B981)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF10B981),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => _enrollPolicy(item),
+                                  child: const Text('+ 加入', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
+
+                    const SizedBox(height: 12),
+
+                    // Dynamic Pagination Toolbar
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.chevron_left_rounded, size: 18),
+                            label: const Text('上一頁', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: _catalogCurrentPage > 1
+                                ? () => _searchCatalog(_searchCatalogController.text, page: _catalogCurrentPage - 1)
+                                : null,
+                          ),
+                          Text(
+                            '第 $_catalogCurrentPage 頁 / 共 $_catalogTotalPages 頁\n(符合共 $_catalogTotalCount 筆)',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                          ),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                            label: const Text('下一頁', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: _catalogCurrentPage < _catalogTotalPages
+                                ? () => _searchCatalog(_searchCatalogController.text, page: _catalogCurrentPage + 1)
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
           ],
 
           // Policy list cards

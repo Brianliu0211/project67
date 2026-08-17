@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/voice_transcription_service.dart';
 import '../models/user_role.dart';
 import '../services/policy_crawler_service.dart';
 import '../services/news_rss_service.dart';
@@ -967,16 +969,52 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                               ? null
                               : () async {
                                   setState(() => _isTestingVoiceApi = true);
-                                  await Future.delayed(const Duration(milliseconds: 600));
-                                  if (mounted) {
-                                    setState(() => _isTestingVoiceApi = false);
-                                    CustomToast.show(context, '🎙️ [Voice Edge API] 脈動連線測試正常 (24ms, HTTP 200)', ToastType.success);
+                                  final stopwatch = Stopwatch()..start();
+                                  try {
+                                    final supabase = Supabase.instance.client;
+                                    // 1. 檢查麥克風權限
+                                    final voiceService = VoiceTranscriptionService();
+                                    final hasMicPerm = await voiceService.hasPermission();
+                                    
+                                    // 2. 真實探測 Edge Function
+                                    final response = await supabase.functions.invoke(
+                                      'voice-scheduler',
+                                      body: {'healthCheck': true, 'timestamp': DateTime.now().toIso8601String()},
+                                    );
+                                    stopwatch.stop();
+                                    
+                                    if (mounted) {
+                                      setState(() => _isTestingVoiceApi = false);
+                                      if (response.status == 200) {
+                                        CustomToast.show(
+                                          context,
+                                          '🎙️ [Voice Edge API] 連線成功 (${stopwatch.elapsedMilliseconds}ms, HTTP 200) | 麥克風權限: ${hasMicPerm ? "✅ 已授權" : "⚠️ 尚未授權"}',
+                                          ToastType.success,
+                                        );
+                                      } else {
+                                        CustomToast.show(
+                                          context,
+                                          '⚠️ [Voice Edge API] 狀態異常 (HTTP ${response.status}) | 耗時: ${stopwatch.elapsedMilliseconds}ms',
+                                          ToastType.warning,
+                                        );
+                                      }
+                                    }
+                                  } catch (e) {
+                                    stopwatch.stop();
+                                    if (mounted) {
+                                      setState(() => _isTestingVoiceApi = false);
+                                      CustomToast.show(
+                                        context,
+                                        '❌ [Voice Edge API] 連線失敗 (${stopwatch.elapsedMilliseconds}ms): $e',
+                                        ToastType.error,
+                                      );
+                                    }
                                   }
                                 },
                           icon: _isTestingVoiceApi
                               ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.bug_report_outlined, size: 14),
-                          label: Text(_isTestingVoiceApi ? '測試中...' : '脈動連線測試', style: const TextStyle(fontSize: 11)),
+                          label: Text(_isTestingVoiceApi ? '真實檢測中...' : '真實連線與硬體檢測', style: const TextStyle(fontSize: 11)),
                           style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF6366F1), side: const BorderSide(color: Color(0xFF6366F1))),
                         ),
                       ],
