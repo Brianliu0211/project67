@@ -746,6 +746,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         Expanded(
                           child: Text(
                             '⚠️ 離線預覽模式已啟用 ($offlineReason)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -753,6 +755,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         TextButton(
                           style: TextButton.styleFrom(
                             backgroundColor: Colors.white,

@@ -24,7 +24,6 @@ class VoiceSchedulerOverlay extends StatefulWidget {
 class _VoiceSchedulerOverlayState extends State<VoiceSchedulerOverlay> {
   final VoiceTranscriptionService _service = VoiceTranscriptionService();
   RecordingState _state = RecordingState.recording;
-  bool _hasPermission = false;
   String? _errorMessage;
   int _seconds = 0;
   Timer? _timer;
@@ -44,7 +43,6 @@ class _VoiceSchedulerOverlayState extends State<VoiceSchedulerOverlay> {
       final hasPerm = await _service.hasPermission();
       if (hasPerm) {
         setState(() {
-          _hasPermission = true;
           _state = RecordingState.recording;
           _eventResult = null;
           _warningMessages = [];

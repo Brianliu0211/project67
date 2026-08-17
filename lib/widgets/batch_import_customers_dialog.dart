@@ -8,8 +8,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'custom_toast.dart';
 import '../services/app_settings.dart';
 
-// Conditionally handle web download without breaking desktop/mobile analysis
-import 'dart:html' as html if (dart.library.io) 'dart:io';
+import '../utils/platform_file_helper.dart';
 
 class BatchImportCustomersDialog extends StatefulWidget {
   final List<Map<String, dynamic>> existingCustomers;
@@ -950,27 +949,18 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
 
     try {
       if (kIsWeb) {
-        // Native Web File Upload Input Element Fallback
-        final uploadInput = html.FileUploadInputElement();
-        uploadInput.accept = '.csv,.xlsx';
-        uploadInput.click();
-
-        await uploadInput.onChange.first;
-        if (uploadInput.files != null && uploadInput.files!.isNotEmpty) {
-          final file = uploadInput.files!.first;
-          final reader = html.FileReader();
-          reader.readAsArrayBuffer(file);
-
-          await reader.onLoadEnd.first;
-          final bytes = reader.result as Uint8List;
+        final result = await PlatformFileHelper.pickFileWeb(accept: '.csv,.xlsx');
+        if (result != null) {
+          final fileName = result['name'] as String;
+          final bytes = result['bytes'] as Uint8List;
 
           setState(() {
-            _fileName = file.name;
+            _fileName = fileName;
             _fileBytes = bytes;
             _isProcessing = true;
           });
 
-          final nameLower = file.name.toLowerCase();
+          final nameLower = fileName.toLowerCase();
           if (nameLower.endsWith('.csv')) {
             try {
               _parseCsv(bytes);
@@ -994,7 +984,7 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
           if (_rawRows.isEmpty) {
             if (mounted) CustomToast.show(context, '試算表為空或格式無法自動辨識，請使用標準 .csv 或 .xlsx 檔', ToastType.warning);
           } else {
-            if (mounted) CustomToast.show(context, '已成功讀取檔案：${file.name} (${_rawRows.length} 列)', ToastType.success);
+            if (mounted) CustomToast.show(context, '已成功讀取檔案：$_fileName (${_rawRows.length} 列)', ToastType.success);
           }
         }
       } else {
@@ -1193,20 +1183,21 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
     return '';
   }
 
-  void _downloadSampleTemplate() {
+  void _downloadSampleTemplate() async {
     const csvContent = '\uFEFF客戶姓名,綽號/稱呼,電話號碼,Email信箱,分類標籤,客戶備註,自訂欄位(生日),自訂欄位(地區)\n'
         '陳小明,小明,0912-345-678,ming@example.com,"VIP, 車險",喜好高科技保單,1990-05-12,台北市\n'
         '林美麗,阿麗,0987-654-321,mary@example.com,"壽險, 定期險",需規劃年金險,1985-11-20,新北市\n';
 
     if (kIsWeb) {
-      final bytes = utf8.encode(csvContent);
-      final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', '客戶批次匯入範本_保險助手.csv')
-        ..click();
-      html.Url.revokeObjectUrl(url);
-      CustomToast.show(context, '已成功下載「標準 CSV 範本檔案」！', ToastType.success);
+      final bytes = Uint8List.fromList(utf8.encode(csvContent));
+      await PlatformFileHelper.downloadFile(
+        bytes: bytes,
+        fileName: '客戶批次匯入範本_保險助手.csv',
+        mimeType: 'text/csv;charset=utf-8',
+      );
+      if (mounted) {
+        CustomToast.show(context, '已成功下載「標準 CSV 範本檔案」！', ToastType.success);
+      }
     } else {
       CustomToast.show(context, '範本內容已就緒', ToastType.warning);
     }
