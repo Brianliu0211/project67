@@ -438,10 +438,11 @@ ON CONFLICT (name) DO NOTHING;
 
 -- 2. Tags Table
 CREATE TABLE IF NOT EXISTS public.tags (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    category_id UUID REFERENCES public.tag_categories(id) ON DELETE CASCADE NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category_id UUID REFERENCES public.tag_categories(id) ON DELETE CASCADE,
     name TEXT NOT NULL UNIQUE,
-    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT unique_tags_category_name UNIQUE (category_id, name)
 );
 
 -- Enable RLS and add Policies for tags
@@ -495,47 +496,56 @@ BEGIN
       );
 
     -- Insert/link each tag in the new array
-    FOREACH tag_name IN ARRAY NEW.tags LOOP
-        tag_name := trim(tag_name);
-        IF tag_name = '' THEN
-            CONTINUE;
-        END IF;
-
-        -- Find existing tag
-        SELECT id INTO t_id FROM public.tags WHERE name = tag_name;
-        
-        -- Create tag if not exists
-        IF t_id IS NULL THEN
-            -- Category auto-mapping rules
-            IF tag_name LIKE '%險' OR tag_name LIKE '%保單' OR tag_name LIKE '%規劃' OR tag_name LIKE '%儲蓄' THEN
-                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '已購險種';
-            ELSIF tag_name LIKE '%意願' OR tag_name LIKE '%簽單' OR tag_name LIKE '%跟進' OR tag_name = '已簽單' OR tag_name = '待跟進' THEN
-                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '跟進狀態';
-            ELSIF tag_name LIKE '%體況' OR tag_name LIKE '%病%' OR tag_name LIKE '%血壓' OR tag_name LIKE '%手術' OR tag_name LIKE '%健康' OR tag_name LIKE '%史' THEN
-                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '健康與體況';
-            ELSIF tag_name LIKE '%愛%' OR tag_name LIKE '%運動%' OR tag_name LIKE '%茶%' OR tag_name LIKE '%玩%' OR tag_name LIKE '%露營%' OR tag_name LIKE '%爬山%' OR tag_name LIKE '%旅遊%' THEN
-                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '生活興趣';
-            ELSE
-                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '客戶身分';
+    IF NEW.tags IS NOT NULL AND array_length(NEW.tags, 1) > 0 THEN
+        FOREACH tag_name IN ARRAY NEW.tags LOOP
+            tag_name := trim(tag_name);
+            IF tag_name = '' THEN
+                CONTINUE;
             END IF;
 
-            -- Category fallback
-            IF cat_id IS NULL THEN
-                SELECT id INTO cat_id FROM public.tag_categories WHERE name = '客戶身分';
+            -- Find existing tag
+            SELECT id INTO t_id FROM public.tags WHERE name = tag_name LIMIT 1;
+            
+            -- Create tag if not exists
+            IF t_id IS NULL THEN
+                -- Category auto-mapping rules
+                IF tag_name LIKE '%險' OR tag_name LIKE '%保單' OR tag_name LIKE '%規劃' OR tag_name LIKE '%儲蓄' THEN
+                    SELECT id INTO cat_id FROM public.tag_categories WHERE name = '已購險種' LIMIT 1;
+                ELSIF tag_name LIKE '%意願' OR tag_name LIKE '%簽單' OR tag_name LIKE '%跟進' OR tag_name = '已簽單' OR tag_name = '待跟進' THEN
+                    SELECT id INTO cat_id FROM public.tag_categories WHERE name = '跟進狀態' LIMIT 1;
+                ELSIF tag_name LIKE '%體況' OR tag_name LIKE '%病%' OR tag_name LIKE '%血壓' OR tag_name LIKE '%手術' OR tag_name LIKE '%健康' OR tag_name LIKE '%史' THEN
+                    SELECT id INTO cat_id FROM public.tag_categories WHERE name = '健康與體況' LIMIT 1;
+                ELSIF tag_name LIKE '%愛%' OR tag_name LIKE '%運動%' OR tag_name LIKE '%茶%' OR tag_name LIKE '%玩%' OR tag_name LIKE '%露營%' OR tag_name LIKE '%爬山%' OR tag_name LIKE '%旅遊%' THEN
+                    SELECT id INTO cat_id FROM public.tag_categories WHERE name = '生活興趣' LIMIT 1;
+                ELSE
+                    SELECT id INTO cat_id FROM public.tag_categories WHERE name = '客戶身分' LIMIT 1;
+                END IF;
+
+                -- Category fallback
+                IF cat_id IS NULL THEN
+                    SELECT id INTO cat_id FROM public.tag_categories WHERE name = '客戶身分' LIMIT 1;
+                END IF;
+
+                -- Insert the tag
+                INSERT INTO public.tags (category_id, name)
+                VALUES (cat_id, tag_name)
+                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+                RETURNING id INTO t_id;
+
+                -- Fallback lookup if needed
+                IF t_id IS NULL THEN
+                    SELECT id INTO t_id FROM public.tags WHERE name = tag_name LIMIT 1;
+                END IF;
             END IF;
 
-            -- Insert the tag
-            INSERT INTO public.tags (category_id, name)
-            VALUES (cat_id, tag_name)
-            ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-            RETURNING id INTO t_id;
-        END IF;
-
-        -- Insert junction relation
-        INSERT INTO public.customer_tags (customer_id, tag_id)
-        VALUES (NEW.id, t_id)
-        ON CONFLICT DO NOTHING;
-    END LOOP;
+            -- Insert junction relation
+            IF t_id IS NOT NULL THEN
+                INSERT INTO public.customer_tags (customer_id, tag_id)
+                VALUES (NEW.id, t_id)
+                ON CONFLICT (customer_id, tag_id) DO NOTHING;
+            END IF;
+        END LOOP;
+    END IF;
 
     RETURN NEW;
 END;
