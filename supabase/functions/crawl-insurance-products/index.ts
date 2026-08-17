@@ -5,8 +5,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://algufuoxkeizxwkofmmp.supabase.co";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "sb_publishable_hEIRyFKMgmbB2qVOVioGBQ_61oJxceL";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const CRAWLER_CRON_SECRET = Deno.env.get("CRAWLER_CRON_SECRET") ?? "";
 
 // 20 Life Insurance Companies
 const LIFE_COMPANIES = [
@@ -77,7 +78,56 @@ const PREFIXES = ["真安心", "享安全", "好醫靠", "愛無懼", "守護一
 
 serve(async (req) => {
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // 0. 強制檢查 SUPABASE_SERVICE_ROLE_KEY：缺少立即回傳 500，不得開始爬蟲或部分寫入
+    if (!SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_URL) {
+      console.error("Critical Server Configuration Missing: SUPABASE_SERVICE_ROLE_KEY or SUPABASE_URL");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required"
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const crawlerSecret = req.headers.get("x-crawler-secret") ?? "";
+    const authHeader = req.headers.get("Authorization") ?? "";
+    let isAuthorized = false;
+
+    // 1. 排程 Secret 驗證 (優先檢查專用 Header)
+    if (CRAWLER_CRON_SECRET && crawlerSecret && crawlerSecret === CRAWLER_CRON_SECRET) {
+      isAuthorized = true;
+    }
+
+    // 2. Admin/Dev 使用者 JWT 驗證 (手動觸發模式)
+    if (!isAuthorized && authHeader) {
+      const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+      const authClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+      if (!authError && user) {
+        const { data: profile } = await authClient.from("profiles").select("role").eq("id", user.id).single();
+        if (profile?.role === "admin" || profile?.role === "dev") {
+          isAuthorized = true;
+        } else {
+          return new Response(JSON.stringify({ success: false, error: "Forbidden: Admin or Dev role required" }), {
+            status: 403,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      }
+    }
+
+    // 密鑰不符或未提供：立即 401 攔截，不呼叫 DB、不爬蟲
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({ success: false, error: "Unauthorized: Missing or invalid crawler secret" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    // 初始化寫入專用 Supabase Client (強制使用 Service Role Key)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
     const nowIso = new Date().toISOString();
     const products: any[] = [];
     let count = 1;
@@ -135,10 +185,10 @@ serve(async (req) => {
       }
     }
 
-    // Upsert into policy_clauses
+    // Upsert into policy_clauses using Service Role
     const { data, error } = await supabase
       .from("policy_clauses")
-      .upsert(products, { onConflict: "product_name" });
+      .upsert(products, { onConflict: "company_name,product_name" });
 
     if (error) {
       return new Response(JSON.stringify({ success: false, error: error.message }), {

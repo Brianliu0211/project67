@@ -152,9 +152,9 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
         final now = DateTime.now();
         final monthStart = DateTime(now.year, now.month, 1).toIso8601String();
         final eventsRes = await supabase
-            .from('calendar_events')
+            .from('schedule_events')
             .select('id')
-            .gte('start_time', monthStart);
+            .gte('start_at', monthStart);
         _monthlyVisitCount = (eventsRes as List).length;
       } catch (_) {
         _monthlyVisitCount = 0;

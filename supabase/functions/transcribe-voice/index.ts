@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY') ?? '';
@@ -99,6 +100,17 @@ serve(async (req: Request) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    if (!authHeader || !supabaseUrl || !supabaseAnonKey) {
+      return new Response(JSON.stringify({ error: '未授權請求' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const client = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: { user }, error: authError } = await client.auth.getUser(authHeader.replace(/^Bearer\s+/i, ''));
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: '未授權請求' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const { audioBase64, mimeType } = await req.json();
 
     if (!audioBase64) {
@@ -131,9 +143,7 @@ serve(async (req: Request) => {
     // 回傳包含 Groq 與 Gemini 兩者的診斷原因
     return new Response(
       JSON.stringify({
-        error: '語音轉錄失敗，請檢查 API Key 或詳細紀錄',
-        groqError: groqResult.err,
-        geminiError: geminiResult.err,
+        error: '語音轉錄暫時無法使用，請稍後再試。',
       }),
       { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -141,7 +151,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('Edge Function internal error:', error);
     return new Response(
-      JSON.stringify({ error: `伺服器處理失敗: ${error}` }),
+      JSON.stringify({ error: '伺服器處理失敗，請稍後再試。' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
