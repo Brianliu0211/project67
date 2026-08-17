@@ -64,9 +64,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
 
     // 快速讀取真實資料 (零人工延遲)
     if (isOfflineMode) {
-      if (mounted) {
-        CustomToast.show(context, '目前為離線預覽模式，無法讀取真實客戶資料。', ToastType.warning);
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          CustomToast.show(context, '目前為離線預覽模式，無法讀取真實客戶資料。', ToastType.warning);
+        }
+      });
       setState(() {
         _allCustomers = [];
         _isLoading = false;

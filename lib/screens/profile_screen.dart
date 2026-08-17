@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:ui' as ui;
-import 'dart:html' as html if (dart.library.io) 'dart:io';
+import '../utils/platform_file_helper.dart';
 import '../main.dart';
 import '../services/app_settings.dart';
 import '../services/app_localizations.dart';
@@ -395,13 +395,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       final name = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : '保險名片';
 
       if (kIsWeb) {
-        final blob = html.Blob([pngBytes], 'image/png');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: url)
-          ..setAttribute('download', '${name}_電子名片.png')
-          ..click();
-        html.Url.revokeObjectUrl(url);
-        CustomToast.show(context, '🟢 已成功匯出高清名片圖片 (${name}_電子名片.png)！', ToastType.success);
+        await PlatformFileHelper.downloadFile(
+          bytes: pngBytes,
+          fileName: '${name}_電子名片.png',
+          mimeType: 'image/png',
+        );
+        if (mounted) {
+          CustomToast.show(context, '🟢 已成功匯出高清名片圖片 (${name}_電子名片.png)！', ToastType.success);
+        }
       } else {
         Clipboard.setData(ClipboardData(text: '名片圖片已產生 (${pngBytes.length} bytes)'));
         CustomToast.show(context, '已複製名片圖片資料檔！', ToastType.success);

@@ -787,12 +787,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               if (!_effectiveSidebarCollapsed) ...[
                 const SizedBox(width: 16),
-                Text(
-                  displayTitle,
-                  style: TextStyle(
-                    color: isActive ? primaryColor : inactiveText,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 14,
+                Expanded(
+                  child: Text(
+                    displayTitle,
+                    style: TextStyle(
+                      color: isActive ? primaryColor : inactiveText,
+                      fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -1138,19 +1142,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTimelineHeader(bool isDark, Color primaryColor) {
-    final bool isMobileScreen = context.isMobile;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobileScreen ? 12 : 20,
-        vertical: isMobileScreen ? 8 : 12,
-      ),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade200)),
-      ),
-      child: isMobileScreen
-          ? Column(
-              children: [
-                Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isCompact = constraints.maxWidth < 820;
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isCompact ? 12 : 20,
+            vertical: isCompact ? 8 : 12,
+          ),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF30363D) : Colors.grey.shade200)),
+          ),
+          child: isCompact
+              ? Column(
+                  children: [
+                    Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
@@ -1506,6 +1512,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+        );
+      },
     );
   }
 

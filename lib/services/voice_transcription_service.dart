@@ -7,21 +7,15 @@ import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../main.dart';
-import 'dart:html' as html;
+import 'voice_web_helper.dart';
 
 /// 語音轉錄服務
 ///
-/// 封裝 Web 原生 [html.MediaRecorder] 與 Native [AudioRecorder]，
-/// 透過 Supabase Edge Function 呼叫語音轉文字（STT）模型。
+/// 封裝 Web 原生錄音與 Native [AudioRecorder]，
+/// 透過 Supabase Edge Function 呼叫語音轉文字（STT）與智慧排程模型。
 class VoiceTranscriptionService {
   final AudioRecorder _recorder = AudioRecorder();
-
-  // Web 原生 HTML5 錄音與 Web Speech 變數
-  html.MediaStream? _webMediaStream;
-  html.MediaRecorder? _webMediaRecorder;
-  final List<html.Blob> _webRecordedChunks = [];
-  html.SpeechRecognition? _webSpeechRecognition;
-  String _webLiveTranscript = '';
+  final VoiceWebController _webController = createVoiceWebController();
 
   String _getSupabaseUrl() {
     String? url = dotenv.maybeGet('SUPABASE_URL');
@@ -42,15 +36,7 @@ class VoiceTranscriptionService {
   /// 檢查麥克風權限
   Future<bool> hasPermission() async {
     if (kIsWeb) {
-      try {
-        final mediaDevices = html.window.navigator.mediaDevices;
-        if (mediaDevices == null) return false;
-        final stream = await mediaDevices.getUserMedia({'audio': true});
-        stream.getTracks().forEach((t) => t.stop());
-        return true;
-      } catch (e) {
-        return false;
-      }
+      return await _webController.checkPermission();
     }
     try {
       return await _recorder.hasPermission();
@@ -62,58 +48,8 @@ class VoiceTranscriptionService {
   /// 開始錄音
   Future<void> startRecording() async {
     if (kIsWeb) {
-      _webLiveTranscript = '';
-
-      // 1. 啟動瀏覽器原生 Web Speech API（若瀏覽器支援）
-      if (html.SpeechRecognition.supported) {
-        try {
-          _webSpeechRecognition = html.SpeechRecognition()
-            ..continuous = true
-            ..interimResults = true
-            ..lang = 'zh-TW';
-
-          _webSpeechRecognition!.onResult.listen((event) {
-            final results = event.results;
-            if (results != null) {
-              final sb = StringBuffer();
-              for (var res in results) {
-                if (res.item(0) != null) {
-                  sb.write(res.item(0)!.transcript ?? '');
-                }
-              }
-              if (sb.isNotEmpty) {
-                _webLiveTranscript = sb.toString();
-              }
-            }
-          });
-
-          _webSpeechRecognition!.start();
-        } catch (e) {
-          if (kDebugMode) print('SpeechRecognition init info: $e');
-        }
-      }
-
-      // 2. 啟動 HTML5 MediaRecorder 錄音
-      final mediaDevices = html.window.navigator.mediaDevices;
-      if (mediaDevices == null) {
-        throw Exception('瀏覽器不支援 Web Audio 錄音 API');
-      }
-
-      try {
-        _webMediaStream = await mediaDevices.getUserMedia({'audio': true});
-        _webRecordedChunks.clear();
-        _webMediaRecorder = html.MediaRecorder(_webMediaStream!, {'mimeType': 'audio/webm'});
-        _webMediaRecorder!.addEventListener('dataavailable', (event) {
-          final html.Blob? blob = (event as html.BlobEvent).data;
-          if (blob != null && blob.size > 0) {
-            _webRecordedChunks.add(blob);
-          }
-        });
-        _webMediaRecorder!.start(100);
-        return;
-      } catch (e) {
-        throw Exception('麥克風授權失敗：請在網址列左側點擊 🔒 圖示允許存取麥克風 ($e)');
-      }
+      await _webController.startRecording();
+      return;
     }
 
     try {
@@ -137,42 +73,7 @@ class VoiceTranscriptionService {
 
   Future<Uint8List> _stopAndGetAudioBytes() async {
     if (kIsWeb) {
-      try {
-        _webSpeechRecognition?.stop();
-      } catch (_) {}
-
-      if (_webMediaRecorder == null) {
-        throw Exception('網頁錄音尚未啟動');
-      }
-
-      final completer = Completer<Uint8List>();
-      _webMediaRecorder!.addEventListener('stop', (event) {
-        try {
-          final fullBlob = html.Blob(_webRecordedChunks, 'audio/webm');
-          final reader = html.FileReader();
-          reader.readAsArrayBuffer(fullBlob);
-          reader.onLoadEnd.listen((_) {
-            final result = reader.result;
-            if (result is ByteBuffer) {
-              completer.complete(Uint8List.view(result));
-            } else if (result is Uint8List) {
-              completer.complete(result);
-            } else {
-              completer.complete(Uint8List(0));
-            }
-          });
-        } catch (err) {
-          completer.completeError(err);
-        }
-      });
-
-      _webMediaRecorder!.stop();
-      _webMediaStream?.getTracks().forEach((t) => t.stop());
-      _webMediaStream = null;
-      _webMediaRecorder = null;
-
-      final bytes = await completer.future;
-      return bytes;
+      return await _webController.stopAndGetAudioBytes();
     }
 
     final path = await _recorder.stop();
@@ -194,8 +95,8 @@ class VoiceTranscriptionService {
     }
 
     // 若瀏覽器原生 Web Speech 已成功辨識出文字，直接返回高精度中文
-    if (kIsWeb && _webLiveTranscript.trim().isNotEmpty) {
-      final text = _webLiveTranscript.trim();
+    if (kIsWeb && _webController.liveTranscript.trim().isNotEmpty) {
+      final text = _webController.liveTranscript.trim();
       try {
         await _stopAndGetAudioBytes();
       } catch (_) {}
@@ -213,7 +114,7 @@ class VoiceTranscriptionService {
 
     try {
       final response = await supabase.functions.invoke(
-        'rapid-responder',
+        'transcribe-voice',
         body: {
           'audioBase64': base64Audio,
           'mimeType': 'audio/webm',
@@ -229,7 +130,7 @@ class VoiceTranscriptionService {
       }
     } catch (e) {
       final baseUrl = _getSupabaseUrl();
-      final url = '$baseUrl/functions/v1/rapid-responder';
+      final url = '$baseUrl/functions/v1/transcribe-voice';
       final anonKey = _getSupabaseAnonKey();
 
       final res = await http.post(
@@ -269,7 +170,7 @@ class VoiceTranscriptionService {
       throw Exception('離線模式下無法使用語音智慧排程，請確認網路連線後再試');
     }
 
-    final liveSpeech = _webLiveTranscript.trim();
+    final liveSpeech = _webController.liveTranscript.trim();
     final bytes = await _stopAndGetAudioBytes();
     final base64Audio = bytes.isNotEmpty ? base64Encode(bytes) : '';
     final localTimeStr = _formatIso8601WithOffset(localTime);
@@ -358,8 +259,8 @@ class VoiceTranscriptionService {
     final newEvent = {
       'title': text,
       'description': '由語音輸入自動建立',
-      'start_time': startTime.toIso8601String(),
-      'end_time': endTime.toIso8601String(),
+      'start_at': startTime.toIso8601String(),
+      'end_at': endTime.toIso8601String(),
       'category': 'client_meeting',
       'is_completed': false,
     };
@@ -397,15 +298,7 @@ class VoiceTranscriptionService {
   /// 取消目前錄音（不進行轉錄）
   Future<void> cancelRecording() async {
     if (kIsWeb) {
-      try {
-        _webSpeechRecognition?.stop();
-      } catch (_) {}
-      _webMediaRecorder?.stop();
-      _webMediaStream?.getTracks().forEach((t) => t.stop());
-      _webMediaStream = null;
-      _webMediaRecorder = null;
-      _webRecordedChunks.clear();
-      _webLiveTranscript = '';
+      _webController.cancel();
       return;
     }
     await _recorder.cancel();
@@ -414,12 +307,7 @@ class VoiceTranscriptionService {
   /// 釋放資源
   void dispose() {
     if (kIsWeb) {
-      try {
-        _webSpeechRecognition?.stop();
-      } catch (_) {}
-      _webMediaStream?.getTracks().forEach((t) => t.stop());
-      _webMediaStream = null;
-      _webMediaRecorder = null;
+      _webController.dispose();
     }
     _recorder.dispose();
   }

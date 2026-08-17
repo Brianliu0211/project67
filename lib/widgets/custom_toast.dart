@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 enum ToastType { success, warning, error }
@@ -25,28 +26,44 @@ class CustomToast extends StatefulWidget {
     String? actionLabel,
     VoidCallback? onActionPressed,
   }) {
-    OverlayEntry? overlayEntry;
-    overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        bottom: 24,
-        right: MediaQuery.of(context).size.width >= 768 ? 24 : null,
-        left: MediaQuery.of(context).size.width >= 768 ? null : 24,
-        width: MediaQuery.of(context).size.width >= 768 ? 360 : MediaQuery.of(context).size.width - 48,
-        child: CustomToast(
-          message: message,
-          type: type,
-          actionLabel: actionLabel,
-          onActionPressed: onActionPressed,
-          onDismiss: () {
-            try {
-              overlayEntry?.remove();
-              overlayEntry = null;
-            } catch (_) {}
-          },
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 檢查 context 是否仍然有效與 mounted
+      if (!context.mounted) return;
+
+      OverlayState? overlay;
+      try {
+        overlay = Overlay.maybeOf(context);
+      } catch (_) {
+        return;
+      }
+      if (overlay == null) return;
+
+      late OverlayEntry overlayEntry;
+      overlayEntry = OverlayEntry(
+        builder: (context) => Positioned(
+          top: 24,
+          right: MediaQuery.of(context).size.width >= 768 ? 24 : null,
+          left: MediaQuery.of(context).size.width >= 768 ? null : 24,
+          width: MediaQuery.of(context).size.width >= 768 ? 360 : MediaQuery.of(context).size.width - 48,
+          child: Material(
+            color: Colors.transparent,
+            child: CustomToast(
+              message: message,
+              type: type,
+              actionLabel: actionLabel,
+              onActionPressed: onActionPressed,
+              onDismiss: () {
+                if (overlayEntry.mounted) {
+                  overlayEntry.remove();
+                }
+              },
+            ),
+          ),
         ),
-      ),
-    );
-    Overlay.of(context).insert(overlayEntry!);
+      );
+
+      overlay.insert(overlayEntry);
+    });
   }
 
   @override
@@ -57,6 +74,7 @@ class _CustomToastState extends State<CustomToast> with SingleTickerProviderStat
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  Timer? _dismissTimer;
 
   @override
   void initState() {
@@ -75,10 +93,12 @@ class _CustomToastState extends State<CustomToast> with SingleTickerProviderStat
     _controller.forward();
 
     // Auto dismiss after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
+    _dismissTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) {
         _controller.reverse().then((_) {
-          widget.onDismiss();
+          if (mounted) {
+            widget.onDismiss();
+          }
         });
       }
     });
@@ -86,6 +106,7 @@ class _CustomToastState extends State<CustomToast> with SingleTickerProviderStat
 
   @override
   void dispose() {
+    _dismissTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
