@@ -41,11 +41,21 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
     try {
       final supabase = Supabase.instance.client;
       List<Map<String, dynamic>> loadedCust = [];
-
-      final data = await supabase
+      final user = supabase.auth.currentUser;
+      var query = supabase
           .from('customers')
           .select('id, name, nickname, phone, tags, referral_source_id')
           .isFilter('deleted_at', null);
+
+      if (user?.id != null) {
+        final profileRes = await supabase.from('profiles').select('role').eq('id', user!.id).maybeSingle();
+        final userRole = profileRes?['role']?.toString() ?? 'agent';
+        if (userRole != 'dev' && userRole != 'admin') {
+          query = query.eq('profile_id', user.id);
+        }
+      }
+
+      final data = await query;
 
       if (data != null && (data as List).isNotEmpty) {
         loadedCust = List<Map<String, dynamic>>.from(data);
@@ -109,9 +119,15 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
 
   void _calculateClusterIslandTopology(List<Map<String, dynamic>> customers, List<Map<String, dynamic>> rels) {
     if (customers.isEmpty) {
-      _computedNodes = [];
-      _computedEdges = [];
-      return;
+      if (_allCustomers.isNotEmpty) {
+        customers = _allCustomers;
+      } else if (OfflineDataStore.customers.isNotEmpty) {
+        customers = List<Map<String, dynamic>>.from(OfflineDataStore.customers);
+      } else {
+        _computedNodes = [];
+        _computedEdges = [];
+        return;
+      }
     }
 
     final Map<String, Map<String, dynamic>> custMap = {
@@ -233,16 +249,16 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
         .where((id) => !activeCustIds.contains(id))
         .toList();
 
-    const double centerX = 800.0;
-    const double centerY = 500.0;
+    const double centerX = 600.0;
+    const double centerY = 260.0;
 
     final List<Offset> islandSlots = [
-      const Offset(450, 280),
-      const Offset(1150, 280),
-      const Offset(450, 720),
-      const Offset(1150, 720),
-      const Offset(800, 200),
-      const Offset(800, 800),
+      const Offset(280, 140),
+      const Offset(920, 140),
+      const Offset(280, 380),
+      const Offset(920, 380),
+      const Offset(600, 90),
+      const Offset(600, 430),
     ];
     int islandSlotIdx = 0;
 
@@ -384,7 +400,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
 
     if (isolatedCustIds.isNotEmpty) {
       final int totalIso = isolatedCustIds.length;
-      final double ringRadius = 450.0;
+      final double ringRadius = 200.0;
 
       for (int i = 0; i < totalIso; i++) {
         final id = isolatedCustIds[i];
@@ -421,6 +437,9 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
   void _resetCanvasCenter() {
     setState(() {
       _selectedNodeId = null;
+      _nodePositionCache.clear();
+      _calculateClusterIslandTopology(_allCustomers, _relationships);
+
       if (_computedNodes.isEmpty) {
         _transformationController.value = Matrix4.identity();
         return;
@@ -439,11 +458,20 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
 
       final double graphCenterX = (minX + maxX) / 2;
       final double graphCenterY = (minY + maxY) / 2;
-      final double containerW = _lastCanvasContainerSize.width;
-      final double containerH = _lastCanvasContainerSize.height;
-      final double tx = (containerW / 2) - graphCenterX;
-      final double ty = (containerH / 2) - graphCenterY;
-      _transformationController.value = Matrix4.identity()..translate(tx, ty);
+
+      double containerW = _lastCanvasContainerSize.width;
+      double containerH = _lastCanvasContainerSize.height;
+      if (!containerW.isFinite || containerW <= 0) containerW = 1200;
+      if (!containerH.isFinite || containerH <= 0) containerH = 520;
+
+      const double fitScale = 1.0;
+
+      final Matrix4 matrix = Matrix4.identity()
+        ..translate(containerW / 2, containerH / 2)
+        ..scale(fitScale)
+        ..translate(-graphCenterX, -graphCenterY);
+
+      _transformationController.value = matrix;
     });
     CustomToast.show(context, '🎯 全景視野已自適應置中復位', ToastType.success);
   }
@@ -954,31 +982,34 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
       }
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        _lastCanvasContainerSize = Size(constraints.maxWidth, constraints.maxHeight);
+    return Container(
+      width: double.infinity,
+      height: 520,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          _lastCanvasContainerSize = Size(constraints.maxWidth, constraints.maxHeight);
 
-        return Container(
-          width: double.infinity,
-          height: 520,
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
-          ),
-          child: Stack(
+          return Stack(
             children: [
               InteractiveViewer(
                 transformationController: _transformationController,
-                boundaryMargin: const EdgeInsets.all(800),
+                boundaryMargin: const EdgeInsets.all(1200),
                 minScale: 0.2,
                 maxScale: 4.0,
+                clipBehavior: Clip.none,
                 child: SizedBox(
-                  width: 1600,
-                  height: 1000,
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
                   child: Stack(
-                      children: [
-                        CustomPaint(
+                    clipBehavior: Clip.none,
+                    children: [
+                      CustomPaint(
                           size: Size.infinite,
                           painter: DynamicTopologyPainter(
                             nodes: _computedNodes,
@@ -1000,8 +1031,8 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
                           final bool isFocused = _selectedNodeId == id;
 
                           return Positioned(
-                            left: x - (isCenter ? 36 : 28),
-                            top: y - (isCenter ? 36 : 28),
+                            left: x - (isCenter ? 42 : 34),
+                            top: y - (isCenter ? 42 : 34),
                             child: GestureDetector(
                               onPanUpdate: (details) {
                                 setState(() {
@@ -1038,14 +1069,14 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
                                 ],
                               ),
                               child: CircleAvatar(
-                                radius: isCenter ? 36 : 28,
+                                radius: isCenter ? 42 : 34,
                                 backgroundColor: color,
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
                                       isCenter ? Icons.star_rounded : Icons.person_rounded,
-                                      size: isCenter ? 18 : 14,
+                                      size: isCenter ? 22 : 18,
                                       color: Colors.white,
                                     ),
                                     Text(
@@ -1053,7 +1084,7 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         color: Colors.white,
-                                        fontSize: isCenter ? 10 : 9,
+                                        fontSize: isCenter ? 12 : 11,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -1137,10 +1168,10 @@ class _RelationshipTopologyTabState extends State<RelationshipTopologyTab> {
             ),
           ),
         ],
-      ),
-    );
-      },
-    );
+      );
+    },
+  ),
+);
   }
 }
 
@@ -1223,8 +1254,8 @@ class DynamicTopologyPainter extends CustomPainter {
         final p1 = Offset(node1['x'] as double, node1['y'] as double);
         final p2 = Offset(node2['x'] as double, node2['y'] as double);
 
-        final double r1 = (node1['isCenter'] as bool? ?? false) ? 36.0 : 28.0;
-        final double r2 = (node2['isCenter'] as bool? ?? false) ? 36.0 : 28.0;
+        final double r1 = (node1['isCenter'] as bool? ?? false) ? 42.0 : 34.0;
+        final double r2 = (node2['isCenter'] as bool? ?? false) ? 42.0 : 34.0;
 
         final bool isEdgeFocused = selectedNodeId == null ||
             (fromId == selectedNodeId || toId == selectedNodeId);
