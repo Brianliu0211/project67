@@ -359,6 +359,69 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {});
   }
 
+  Future<void> _performSecretDemoAgentLogin() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+      _emailController.text = 'niulai@helper.tw';
+      _passwordController.text = '676767';
+    });
+
+    if (isOfflineMode) {
+      if (mounted) {
+        CustomToast.show(context, '⚠️ 離線預覽模式：已為您預填 Demo 業務員「牛來」', ToastType.warning);
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      }
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase.auth.signInWithPassword(
+        email: 'niulai@helper.tw',
+        password: '676767',
+      );
+
+      if (response.user != null) {
+        final profile = await supabase
+            .from('profiles')
+            .select('status, role, full_name, team_name')
+            .eq('id', response.user!.id)
+            .maybeSingle();
+
+        final status = profile?['status'] as String? ?? 'active';
+
+        if (mounted) {
+          CustomToast.show(
+            context,
+            '🎉 [秘密通道] 已成功以 Demo 業務員「牛來 (成都團隊)」真實登入！',
+            ToastType.success,
+          );
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        CustomToast.show(context, 'Demo 快速登入失敗: ${e.message}', ToastType.error);
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomToast.show(context, '發生非預期錯誤: $e', ToastType.error);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -394,9 +457,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       // App Icon or Logo Placeholder with Secret 5-Tap Dev Toggle
                       GestureDetector(
+                        key: const ValueKey('shield_secret_logo'),
+                        behavior: HitTestBehavior.opaque,
                         onTap: () async {
                           final now = DateTime.now();
-                          if (_lastSecretTap == null || now.difference(_lastSecretTap!) > const Duration(seconds: 2)) {
+                          if (_lastSecretTap == null || now.difference(_lastSecretTap!) > const Duration(milliseconds: 1800)) {
                             _secretTapCount = 1;
                           } else {
                             _secretTapCount++;
@@ -405,19 +470,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           if (_secretTapCount >= 5) {
                             _secretTapCount = 0;
-                            final prefs = await SharedPreferences.getInstance();
-                            final newVal = !_showFastDemoLogin;
-                            await prefs.setBool('dev_show_fast_demo_login', newVal);
-                            if (mounted) {
-                              setState(() => _showFastDemoLogin = newVal);
-                              CustomToast.show(
-                                context,
-                                newVal 
-                                    ? '🛠️ [開發者手勢] 已解鎖並開啟 Demo 快速通道' 
-                                    : '🔒 [開發者手勢] 已關閉 Demo 快速通道（切換為純淨商業模式）',
-                                ToastType.success,
-                              );
-                            }
+                            await _performSecretDemoAgentLogin();
                           }
                         },
                         child: const MouseRegion(
@@ -754,13 +807,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                                   ),
-                                  onPressed: () {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(builder: (context) => const HomeScreen()),
-                                    );
-                                  },
+                                  onPressed: _isLoading ? null : _performSecretDemoAgentLogin,
                                   icon: const Icon(Icons.speed_rounded, size: 16),
-                                  label: const Text('🚀 快速進入系統預覽與測試模式', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  label: const Text('🚀 快速進入「牛來 (Demo業務員)」模式', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 ),
                               ],
                             ],
