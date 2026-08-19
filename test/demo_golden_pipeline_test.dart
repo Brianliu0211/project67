@@ -75,6 +75,38 @@ void main() {
       await tester.pump(const Duration(seconds: 4));
     });
 
+    testWidgets('Step 1.5: 盾牌 5 連擊秘密真實登入 Demo 業務員「牛來」測試', (WidgetTester tester) async {
+      isOfflineMode = true;
+      offlineReason = 'Demo 測試驗收環境';
+
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // 啟動 App
+      await tester.pumpWidget(const MyApp());
+      await tester.pump(const Duration(milliseconds: 500));
+
+      final Finder shieldFinder = find.byKey(const ValueKey('shield_secret_logo'));
+      expect(shieldFinder, findsOneWidget);
+
+      final center = tester.getCenter(shieldFinder);
+      final safePoint = Offset(center.dx, center.dy + 20);
+      for (int i = 0; i < 5; i++) {
+        await tester.tapAt(safePoint);
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump(const Duration(milliseconds: 1000));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // 驗證已成功進入 HomeScreen
+      expect(find.byType(HomeScreen), findsOneWidget);
+
+      // 清除 Toast timer
+      await tester.pump(const Duration(seconds: 4));
+    });
+
     test('Step 4: 0 成本保單健檢精算與保障缺口秒算測試', () {
       final List<CustomerEnrolledPolicy> samplePolicies = [
         CustomerEnrolledPolicy(
