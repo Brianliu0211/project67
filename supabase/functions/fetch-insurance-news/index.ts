@@ -325,7 +325,8 @@ serve(async (req) => {
     const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
     const serviceKey = SUPABASE_SERVICE_ROLE_KEY || bearerToken || Deno.env.get('SUPABASE_ANON_KEY') || '';
     const supabaseClient = createClient(SUPABASE_URL, serviceKey);
-    const todayDate = new Date().toISOString().split('T')[0];
+    // 使用台灣時間 (Asia/Taipei UTC+8) 取得當前正確日期 YYYY-MM-DD，解決 UTC 22:00 (台灣時間 06:00) 日期誤判為前一日之 Bug
+    const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 
     // 讀取當天已存在之新聞話題（夕報 18:00 追加模式：不刷掉晨報 06:00 已發布話題，而是無縫累加新話題）
     const { data: existingTodayTopics } = await supabaseClient

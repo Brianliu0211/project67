@@ -29,13 +29,13 @@ class ScheduleEvent {
 
   factory ScheduleEvent.fromJson(Map<String, dynamic> json) {
     return ScheduleEvent(
-      id: json['id'] as String,
-      profileId: json['profile_id'] as String,
+      id: (json['id'] as String?) ?? '',
+      profileId: (json['profile_id'] as String?) ?? '',
       customerId: json['customer_id'] as String?,
-      title: json['title'] as String,
+      title: (json['title'] as String?) ?? '新行程',
       // 將 UTC 時間轉換為本地時間顯示
-      startAt: DateTime.parse(json['start_at'] as String).toLocal(),
-      endAt: DateTime.parse(json['end_at'] as String).toLocal(),
+      startAt: json['start_at'] != null ? DateTime.parse(json['start_at'] as String).toLocal() : DateTime.now(),
+      endAt: json['end_at'] != null ? DateTime.parse(json['end_at'] as String).toLocal() : DateTime.now().add(const Duration(hours: 1)),
       location: json['location'] as String?,
       latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
       longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,

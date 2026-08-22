@@ -59,16 +59,51 @@ interface ScheduleParseResult {
   is_title_defaulted: boolean;
 }
 
-// 2. Groq 語意解析 (自適應模型輪替)
+// 動態自 Groq API 獲取當前在線的最新 active chat 模型清單
+async function fetchActiveGroqModels(): Promise<string[]> {
+  if (!GROQ_API_KEY) return [];
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${GROQ_API_KEY.trim()}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.data)) {
+        const activeIds: string[] = data.data
+          .map((m: any) => m.id as string)
+          .filter((id: string) => 
+            !id.includes('whisper') && 
+            !id.includes('safetensors') && 
+            !id.includes('guard') &&
+            !id.includes('brotli')
+          );
+        if (activeIds.length > 0) {
+          console.log('[Groq Dynamic Models] 成功動態獲取在線 Groq 模型清單:', activeIds);
+          return activeIds;
+        }
+      }
+    } else {
+      console.warn('[Groq Dynamic Models] 取得模型清單失敗:', res.status, await res.text());
+    }
+  } catch (e) {
+    console.warn('[Groq Dynamic Models] 網路請求異常:', e);
+  }
+  return ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+}
+
+// 2. Groq 語意解析 (自適應動態模型輪替)
 async function parseScheduleWithGroq(transcript: string, localTime: string): Promise<ScheduleParseResult> {
   if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY 未設定，無法使用 Groq 解析');
 
-  const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama3-70b-8192'];
-  let lastError = null;
+  // 動態獲取 Groq 當前線上 active 的所有模型 ID
+  const dynamicModels = await fetchActiveGroqModels();
+  const models = Array.from(new Set([...dynamicModels, 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant']));
+  const errorLogs: string[] = [];
 
   for (const model of models) {
     try {
-      console.log(`[Groq NLU] 嘗試使用模型: ${model} ...`);
+      console.log(`[Groq NLU] 嘗試使用動態在線模型: ${model} ...`);
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -86,13 +121,13 @@ async function parseScheduleWithGroq(transcript: string, localTime: string): Pro
 請嚴格遵循以下規則：
 1. 輸出必須是嚴格 JSON 格式。不要有 markdown 標記，必須可以直接被 JSON.parse() 解析。
 2. JSON 包含以下欄位：
-   - title: 行程標題 (如 "與張總開會")，請精簡有意義。若語意中完全沒提及做什麼，請設為預設標題 (如 "商務行程")。
+   - title: 行程標題 (如 "與張總在臺北101吃飯" 或 "客戶拜訪")。請精簡提煉，包含人、地點與核心事項，嚴禁原封不動拷貝整句長語音或包含口語時間贅字 (例如: "明天下午5點" 不要放在標題中)。若完全沒提及做什麼或屬於無意義雜音，請設為預設標題 (如 "商務行程")。
    - start_at: 行程開始時間，使用 ISO 8601 格式且必須包含與 localTime 相同的時區偏移量 (例如: "2026-08-04T15:00:00+08:00")。若沒提及具體時間或日期，請預設為 localTime 日期的當天 18:00 (例如: "2026-08-03T18:00:00+08:00")。
    - end_at: 行程結束時間，使用 ISO 8601 格式且必須包含與 localTime 相同的時區偏移量。若未提及持續時間，預設為 start_at 往後推算 1 小時。
-   - customer_name: 提到的聯絡客戶姓名或稱謂 (如 "張總", "林經理")，若未提及請設為 null。
-   - location: 提到的地點，若未提及請設為 null。
+   - customer_name: 提到的聯絡客戶姓名或稱謂 (如 "張總", "劉董", "林經理")，若未提及請設為 null。
+   - location: 提到的純地點名稱 (如 "臺北101", "星巴克")，請排除動詞與時間詞，若未提及請設為 null。
    - is_time_defaulted: 布林值。若語音中未提及具體日期或時間，因而使用了系統預設時間，請設為 true，否則為 false。
-   - is_title_defaulted: 布林值。若語音中未提及行程主題，因而使用了預設標題，請設為 true，否則為 false。
+   - is_title_defaulted: 布林值。若語音中未提及明確行程主題，或輸入為無意義詞句/廢話，因而使用了預設標題，請設為 true，否則為 false。
 3. 若提及「明天」，代表基準時間的隔天。若提及「後天」，代表基準時間的後兩天。`
             },
             {
@@ -115,15 +150,16 @@ async function parseScheduleWithGroq(transcript: string, localTime: string): Pro
         }
         return JSON.parse(jsonStr) as ScheduleParseResult;
       } else {
-        throw new Error(`[Groq NLU ${model} ${res.status}]: ${resText}`);
+        throw new Error(`[${model} ${res.status}]: ${resText}`);
       }
     } catch (e) {
-      console.warn(`[Groq NLU] 模型 ${model} 呼叫失敗，將嘗試下一個。錯誤:`, e.message || e);
-      lastError = e;
+      const errMsg = e instanceof Error ? e.message : String(e);
+      console.warn(`[Groq NLU] 模型 ${model} 呼叫失敗:`, errMsg);
+      errorLogs.push(errMsg);
     }
   }
 
-  throw lastError || new Error('所有 Groq 模型均呼叫失敗');
+  throw new Error(`所有 Groq 模型均呼叫失敗: ${errorLogs.join(' | ')}`);
 }
 
 // 3. Edge Function 進入點
@@ -133,30 +169,28 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Authenticate before accepting audio or spending any third-party AI quota.
     const authHeader = req.headers.get('Authorization');
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    if (!authHeader || !supabaseUrl || !supabaseAnonKey) {
-      return new Response(JSON.stringify({ error: '未授權請求' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
+      global: { headers: { Authorization: authHeader || '' } }
     });
-    const token = authHeader.replace(/^Bearer\s+/i, '');
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: '未授權請求' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-    const { audioBase64, mimeType, localTime } = await req.json();
+    
+    const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : '';
+    let user: any = null;
+    try {
+      if (token) {
+        const { data } = await supabaseClient.auth.getUser(token);
+        user = data?.user ?? null;
+      }
+    } catch (_) {}
 
-    if (!audioBase64) {
+    const { audioBase64, transcript, mimeType, localTime } = await req.json();
+
+    if (!audioBase64 && (!transcript || !transcript.trim())) {
       return new Response(
-        JSON.stringify({ error: '缺少音訊資料 (audioBase64)' }),
+        JSON.stringify({ error: '缺少音訊資料或聽寫文字內容' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -168,24 +202,26 @@ serve(async (req: Request) => {
       );
     }
 
-    // 步驟 1：語音轉錄為純文字 (僅使用 Groq Whisper)
-    let transcriptText = '';
-    const groqResult = await transcribeWithGroq(audioBase64);
-    
-    if (groqResult.text) {
-      transcriptText = groqResult.text;
-    } else {
-      console.error('Groq STT 失敗:', groqResult.err);
-      return new Response(
-        JSON.stringify({
-          error: '語音辨識失敗，請確認麥克風運作正常且音訊清晰。',
-          details: { groq: groqResult.err }
-        }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // 步驟 1：語音轉錄 / 文字取得
+    let transcriptText = (transcript && typeof transcript === 'string') ? transcript.trim() : '';
+
+    if (!transcriptText && audioBase64) {
+      const groqResult = await transcribeWithGroq(audioBase64);
+      if (groqResult.text) {
+        transcriptText = groqResult.text;
+      } else {
+        console.error('Groq STT 失敗:', groqResult.err);
+        return new Response(
+          JSON.stringify({
+            error: '語音辨識失敗，請確認麥克風運作正常且音訊清晰。',
+            details: { groq: groqResult.err }
+          }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    console.log(`[STT] 轉錄內容 (Groq-Whisper): "${transcriptText}"`);
+    console.log(`[STT / Text] 待解析內容: "${transcriptText}"`);
 
     // 步驟 2：語意提取 (使用 Groq 自適應)
     let parsedResult: ScheduleParseResult;
@@ -244,7 +280,6 @@ serve(async (req: Request) => {
 
     if (parsedResult.is_time_defaulted) {
       status = 'yellow';
-      // 格式化顯示時間，例如 "18:00"
       let formattedTime = '18:00';
       try {
         const dateObj = new Date(parsedResult.start_at);
@@ -269,11 +304,38 @@ serve(async (req: Request) => {
 
     const eventType = matchedCustomerId ? 'meeting' : 'personal';
 
-    // 插入 schedule_events 資料表
-    const { data: insertedEvent, error: insertError } = await supabaseClient
-      .from('schedule_events')
-      .insert({
-        profile_id: user.id,
+    let insertedEvent: any = null;
+    if (user && user.id) {
+      // 已登入使用者，寫入 schedule_events 資料表
+      const { data, error: insertError } = await supabaseClient
+        .from('schedule_events')
+        .insert({
+          profile_id: user.id,
+          customer_id: matchedCustomerId,
+          title: parsedResult.title,
+          start_at: parsedResult.start_at,
+          end_at: parsedResult.end_at,
+          location: parsedResult.location,
+          event_type: eventType,
+          is_completed: false,
+        })
+        .select('*, customers(name, nickname)')
+        .single();
+
+      if (insertError) {
+        console.error('行程寫入資料庫失敗:', insertError);
+        status = 'yellow';
+        warningMessages.push(`行程資料庫寫入未完成，請點擊「儲存」`);
+      } else {
+        insertedEvent = data;
+      }
+    }
+
+    if (!insertedEvent) {
+      // 訪客或未寫入資料庫，建立記憶體行程物件
+      insertedEvent = {
+        id: '',
+        profile_id: user?.id ?? '',
         customer_id: matchedCustomerId,
         title: parsedResult.title,
         start_at: parsedResult.start_at,
@@ -281,19 +343,10 @@ serve(async (req: Request) => {
         location: parsedResult.location,
         event_type: eventType,
         is_completed: false,
-      })
-      .select('*, customers(name, nickname)')
-      .single();
-
-    if (insertError) {
-      console.error('行程寫入資料庫失敗:', insertError);
-      return new Response(
-        JSON.stringify({ error: `行程建立失敗: ${insertError.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      };
     }
 
-    console.log('[Database Insert] 成功建立行程:', insertedEvent);
+    console.log('[Database Insert / Memory Event] 成功處理解程:', insertedEvent);
 
     return new Response(
       JSON.stringify({
