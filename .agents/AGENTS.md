@@ -17,7 +17,7 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 - **Multiple Logs Per Day**: If multiple dev logs are written on the same day, each log should use a distinct functional title (e.g., `20260714_客戶卡片UI刻劃.md` and `20260714_Supabase串接與RLS測試.md`). Do NOT use sequential numbering.
 
 ### Shortcut Guide Update (`docs/00_公共規格/開發人員快捷指令.md`)
-- **Rule**: Whenever you (the AI Agent) modify or update the trigger conditions or actions of the developer shortcut commands (such as 「開工」, 「收工」, 「讓我看看」, or 「確認狀況」) in this file, you **MUST** automatically synchronize the changes to [開發人員快捷指令.md](docs/00_公共規格/開發人員快捷指令.md).
+- **Rule**: Whenever you (the AI Agent) modify or update the trigger conditions or actions of the developer shortcut commands (such as 「開工」, 「收工」, 「讓我看看」, 「確認狀況」, or 「回報」) in this file, you **MUST** automatically synchronize the changes to [開發人員快捷指令.md](docs/00_公共規格/開發人員快捷指令.md).
 - **Timing**: Perform this update immediately after updating the respective automation sections in this file.
 
 ---
@@ -107,6 +107,47 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
    - **接下來預期的變化**：說明 AI 接下來預計會修改或建立哪些檔案、會有哪些功能或行為邏輯上的變化。
 3. **引導確認**：
    - 清晰且專注地請專案人員評估當下狀況，等待其提問或指示，在專案人員明確指示下一步前，不可主動恢復代碼開發。
+
+---
+
+## 「回報」Automation (Task Debrief & QA Handoff Command)
+
+### Trigger
+- **Rule**: When the user says **「回報」**, or with parameters like **「回報 人類」**, **「回報 AI」**, **「回報 雙軌」**, you **MUST** automatically perform the following actions:
+
+### Actions
+1. **進入「安全凍結狀態 (Safety Freeze)」**：
+   - 承諾在此輪對話中，**絕對不修改任何檔案、不建立/刪除程式碼，也不執行任何具有變更性的系統指令**。
+2. **互動選單與優雅降級 (Graceful Degradation)**：
+   - **顯式參數優先**：若使用者輸入包含「`人類`」、「`AI`」或「`雙軌`」，直接輸出對應模式，免除選單互動。
+   - **無參數且具備互動工具**：若使用者僅輸入「`回報`」且環境支援 `ask_question`，主動呼叫 `ask_question` 彈窗展示 3 選項（`1. 👤 給人類看 (功能成果與操作驗收)`、`2. 🤖 給 AI 看 (QA 找碴與測試 Prompt)`、`3. 🚀 雙軌都要 (人類摘要 + AI 測試 Prompt)`）。
+   - **無參數且無互動工具**：若環境不支援互動選單，**預設直接輸出「人類模式」**，絕不讓指令失敗。
+3. **證據導向成果審查 (Evidence-Based Reporting)**：
+   - 嚴禁臆測或虛報進度。所有產出必須基於實體代碼與實際驗證結果。
+   - 成果清單與檔案變更強制標註以下狀態之一：
+     - `[已驗證]`：本地已實際跑過 build/test 且功能正常。
+     - `[未驗證]`：代碼已寫入但尚未進行手動點擊或單元測試覆蓋。
+     - `[待部署]`：依賴遠端 Supabase Migration 或 Edge Functions 部署生效。
+4. **動態微型拆解呈現 (Only When Applicable)**：
+   - 檢視本次任務的 4 階段微型拆解，若該任務為純 UI、純文件或小型 Bug 修復，對不適用的階段明確標記為 `[不適用]`，嚴禁硬湊四階段製造假完整感。
+5. **輸出對應格式**：
+   - **👤 給人類看 (Human Mode)**：
+     - 任務與成果摘要（一句話說明完成目標）。
+     - 微型拆解適用進度（明確標註已驗證/未驗證/不適用）。
+     - 實體變更清單（附帶檔案超連結與驗證標籤）。
+     - 👁️ 手動體驗旅程 (UX Flow)：清晰說明操作路徑、預期畫面與 Toast 提示。
+     - 下一步建議（提示是否可收工或需額外確認）。
+   - **🤖 給 AI 測試看 (AI / QA Agent Mode)**：
+     - 輸出為單一可一鍵複製的代碼區塊 (` ```markdown `)。
+     - **內建 QA 安全邊界 (Safety Guardrails)**：
+       - 🔒 唯讀檢查：禁止部署、禁止套用 Migration、禁止修改正式資料庫。
+       - 🛡️ 資安脫敏：禁止輸出任何 API Key、Token、密鑰或使用者個資。
+       - 🚫 誠實驗證：若缺乏測試帳號、環境變數或遠端權限，強制標為 `[無法驗證]`，嚴禁猜測通過。
+     - 包含：改動檔案與架構上下文、Happy Path 功能驗收清單、極限邊界與找碴攻擊清單（空值/長字串/防抖/競態/RLS越權/雙向副作用）、標準化 P0/P1/P2 回報格式。
+   - **🚀 雙軌都要 (Dual Mode)**：
+     - 先輸出人類好讀的任務摘要與操作指引，文末附上完整的 AI QA Prompt 代碼區塊。
+6. **日常執行 100% 唯讀宣告**：
+   - 日常使用「`回報`」指令時，AI 僅輸出成果報告與測試 Prompt，**絕對不修改任何公共文件、進度表或程式碼**。
 
 ---
 

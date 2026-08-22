@@ -42,7 +42,7 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
   int _notesColIndex = -1;
 
   // Flexible Strategy Toggles
-  bool _mergeUnmappedToNotes = true;
+  bool _saveUnmappedToCustomAttributes = true;
   bool _convertCustomToTags = false;
 
   // Processed Data Preview list
@@ -437,7 +437,7 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '提示：即使您原本在 Excel 裡使用了自訂欄位（如生日、配偶、舊保單等），下一步系統會自動將未對照的欄位打包整理至「客戶備註」，資料 100% 完整保留！',
+                    '提示：即使您原本在 Excel 裡使用了自訂欄位（如生日、配偶、舊保單等），下一步系統會自動將未對照的欄位結構化保留至「自訂擴充屬性 (JSONB)」，不污染備註，資料 100% 完整保留！',
                     style: TextStyle(color: textColor, fontSize: 12),
                   ),
                 ),
@@ -507,11 +507,11 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
             child: Column(
               children: [
                 CheckboxListTile(
-                  value: _mergeUnmappedToNotes,
-                  onChanged: (v) => setState(() => _mergeUnmappedToNotes = v ?? true),
+                  value: _saveUnmappedToCustomAttributes,
+                  onChanged: (v) => setState(() => _saveUnmappedToCustomAttributes = v ?? true),
                   activeColor: primaryColor,
-                  title: Text('自動將未映射之欄位打包併入客戶備註 (建議開啟)', style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: Text('例如：原表格有「生日、配偶、舊保單」，將自動整理為『【匯入補充資訊】• 生日: 1985-05-20』併入備註，資料不遺失。', style: TextStyle(color: subTextColor, fontSize: 12)),
+                  title: Text('結構化保存未映射欄位至【自訂擴充屬性】(強烈推薦)', style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: Text('例如：原表格有「生日、配偶、年收入、舊保單」，將自動保留原欄位名存入獨立自訂屬性，不污染備註，且匯出時 100% 完整對稱還原！', style: TextStyle(color: subTextColor, fontSize: 12)),
                 ),
                 Divider(color: borderColor, height: 1),
                 CheckboxListTile(
@@ -685,7 +685,7 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
               const SizedBox(width: 12),
               _buildStatChip('🟢 驗證通過', '$validCount 筆', const Color(0xFF10B981), isDark),
               const SizedBox(width: 12),
-              _buildStatChip('🟡 已正規化/補充備註', '$cleanedCount 筆', const Color(0xFFF59E0B), isDark),
+              _buildStatChip('🟡 已識別自訂屬性', '$cleanedCount 筆', const Color(0xFFF59E0B), isDark),
               const SizedBox(width: 12),
               _buildStatChip('🔴 缺姓名無效檔', '$invalidCount 筆', const Color(0xFFF43F5E), isDark),
             ],
@@ -712,8 +712,9 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
                       DataColumn(label: Text('客戶姓名', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))),
                       DataColumn(label: Text('電話號碼 (自動正規化)', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))),
                       DataColumn(label: Text('Email', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('自訂屬性 (JSONB)', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))),
                       DataColumn(label: Text('分類標籤 (Tags)', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('自動整理之備註 (含未映射欄位)', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('客戶備註', style: TextStyle(color: textColor, fontWeight: FontWeight.bold))),
                     ],
                     rows: _parsedRows.map((row) {
                       return DataRow(
@@ -734,7 +735,7 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
                                 !row.isValid
                                     ? '無效 (缺姓名)'
                                     : row.isCleaned
-                                        ? '已整理備註'
+                                        ? '含自訂屬性'
                                         : '完美符合',
                                 style: TextStyle(
                                   color: !row.isValid
@@ -751,6 +752,34 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
                           DataCell(Text(row.name.isNotEmpty ? row.name : '(空缺)', style: TextStyle(color: textColor, fontWeight: FontWeight.w600))),
                           DataCell(Text(row.phone, style: TextStyle(color: primaryColor))),
                           DataCell(Text(row.email, style: TextStyle(color: textColor))),
+                          DataCell(
+                            row.customAttributes.isEmpty
+                                ? Text('-', style: TextStyle(color: subTextColor, fontSize: 12))
+                                : Tooltip(
+                                    message: row.customAttributes.entries.map((e) => '${e.key}: ${e.value}').join('\n'),
+                                    child: SizedBox(
+                                      width: 180,
+                                      child: Wrap(
+                                        spacing: 4,
+                                        children: row.customAttributes.entries.map((e) {
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF0EA5E9).withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '${e.key}: ${e.value}',
+                                              style: const TextStyle(color: Color(0xFF0EA5E9), fontSize: 10, fontWeight: FontWeight.w600),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                  ),
+                          ),
                           DataCell(
                             Wrap(
                               spacing: 4,
@@ -770,9 +799,9 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
                             Tooltip(
                               message: row.notes,
                               child: SizedBox(
-                                width: 200,
+                                width: 160,
                                 child: Text(
-                                  row.notes,
+                                  row.notes.isNotEmpty ? row.notes : '-',
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(color: subTextColor, fontSize: 12),
                                 ),
@@ -1115,7 +1144,7 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
         tags = rawTags.split(RegExp(r'[,;\s/]+')).where((t) => t.trim().isNotEmpty).toList();
       }
 
-      List<String> unmappedDetails = [];
+      Map<String, dynamic> customAttributes = {};
       for (int c = 0; c < _headers.length; c++) {
         if (c != _nameColIndex &&
             c != _nicknameColIndex &&
@@ -1125,8 +1154,19 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
             c != _notesColIndex) {
           final val = _getValue(row, c);
           if (val.isNotEmpty) {
-            final colName = _headers[c];
-            unmappedDetails.add('• $colName: $val');
+            String colName = _headers[c].trim();
+            // 還原匯出時為了避開核心欄位而附加的「自訂_」或「自訂欄位()」前綴，達成 100% 無損往返
+            if (colName.startsWith('自訂_')) {
+              colName = colName.substring(3).trim();
+            } else if (colName.startsWith('自訂欄位(') && colName.endsWith(')')) {
+              colName = colName.substring(5, colName.length - 1).trim();
+            } else if (colName.startsWith('自訂(') && colName.endsWith(')')) {
+              colName = colName.substring(3, colName.length - 1).trim();
+            }
+
+            if (_saveUnmappedToCustomAttributes) {
+              customAttributes[colName] = val;
+            }
             if (_convertCustomToTags) {
               tags.add('$colName: $val');
             }
@@ -1134,13 +1174,7 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
         }
       }
 
-      bool isCleaned = false;
-      if (unmappedDetails.isNotEmpty && _mergeUnmappedToNotes) {
-        isCleaned = true;
-        final unmappedBlock = '【匯入補充資訊】\n${unmappedDetails.join('\n')}';
-        notes = notes.isNotEmpty ? '$notes\n\n$unmappedBlock' : unmappedBlock;
-      }
-
+      bool isCleaned = customAttributes.isNotEmpty;
       bool isValid = name.isNotEmpty;
 
       _parsedRows.add(_ParsedCustomerRow(
@@ -1151,6 +1185,7 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
         email: email,
         tags: tags,
         notes: notes,
+        customAttributes: customAttributes,
         isValid: isValid,
         isCleaned: isCleaned,
       ));
@@ -1213,6 +1248,7 @@ class _BatchImportCustomersDialogState extends State<BatchImportCustomersDialog>
         'email': r.email,
         'tags': r.tags,
         'notes': r.notes,
+        'custom_attributes': r.customAttributes,
       };
     }).toList();
 
@@ -1229,6 +1265,7 @@ class _ParsedCustomerRow {
   final String email;
   final List<String> tags;
   final String notes;
+  final Map<String, dynamic> customAttributes;
   final bool isValid;
   final bool isCleaned;
 
@@ -1240,6 +1277,7 @@ class _ParsedCustomerRow {
     required this.email,
     required this.tags,
     required this.notes,
+    required this.customAttributes,
     required this.isValid,
     required this.isCleaned,
   });

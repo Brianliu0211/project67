@@ -17,6 +17,7 @@ import '../widgets/color_palette_picker.dart';
 import '../widgets/categorized_tag_accordion_selector.dart';
 import '../widgets/batch_import_customers_dialog.dart';
 import '../widgets/customer_detail_side_sheet.dart';
+import '../widgets/customer_share_export_dialog.dart';
 import '../services/customer_relationship_service.dart';
 
 
@@ -123,6 +124,11 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
           final String agentTeam = profile?['team_name'] as String? ?? 'TAIPEI-01';
           final String displayAgent = agentFullName.isNotEmpty ? agentFullName : (agentEmail.isNotEmpty ? agentEmail : '未知業務員');
 
+          Map<String, dynamic> customAttrs = {};
+          if (data['custom_attributes'] is Map) {
+            customAttrs = Map<String, dynamic>.from(data['custom_attributes']);
+          }
+
           return {
             'id': data['id'],
             'profile_id': data['profile_id']?.toString() ?? '',
@@ -138,6 +144,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
             // Convert postgres array text[] to List<String> safely
             'tags': List<String>.from(data['tags'] ?? []),
             'notes': data['notes'],
+            'custom_attributes': customAttrs,
             'created_at': data['created_at'],
             'deleted_at': data['deleted_at'],
           };
@@ -200,6 +207,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
     required String email,
     required List<String> tags,
     required String notes,
+    Map<String, dynamic> customAttributes = const {},
     Uint8List? imageBytes,
     String? imageName,
     required bool isImageCleared,
@@ -263,6 +271,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
         'email': email,
         'tags': tags,
         'notes': notes,
+        'custom_attributes': customAttributes,
       });
 
       await _fetchCustomers();
@@ -289,6 +298,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
     required String email,
     required List<String> tags,
     required String notes,
+    Map<String, dynamic> customAttributes = const {},
     Uint8List? imageBytes,
     String? imageName,
     required bool isImageCleared,
@@ -348,6 +358,7 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
         'email': email,
         'tags': tags,
         'notes': notes,
+        'custom_attributes': customAttributes,
       }).eq('id', id);
 
       await _fetchCustomers();
@@ -580,6 +591,29 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const Spacer(),
+          ElevatedButton.icon(
+            onPressed: selectedCount == 0
+                ? null
+                : () {
+                    final selectedList = _filteredCustomers
+                        .where((c) => _selectedCustomerIds.contains(c['id'].toString()))
+                        .toList();
+                    CustomerShareExportDialog.show(
+                      context,
+                      customers: selectedList,
+                      scopeDescription: '已勾選之 $selectedCount 位客戶',
+                    );
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            icon: const Icon(Icons.ios_share_rounded, size: 18),
+            label: Text('匯出選取 ($selectedCount)', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 10),
           ElevatedButton.icon(
             onPressed: selectedCount == 0 ? null : _showCreateProjectDialog,
             style: ElevatedButton.styleFrom(
@@ -1353,15 +1387,23 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
         existingCustomers: _allCustomers,
         onImport: (importedList, duplicateStrategy) async {
           int processedCount = 0;
-          for (var item in importedList) {
-            final name = item['name']?.toString() ?? '';
-            final phone = item['phone']?.toString() ?? '';
-            final nickname = item['nickname']?.toString() ?? '';
-            final email = item['email']?.toString() ?? '';
-            final tags = List<String>.from(item['tags'] ?? []);
-            final notes = item['notes']?.toString() ?? '';
+          int failedCount = 0;
 
-            final existingIdx = _allCustomers.indexWhere((c) =>
+          // 維護本機工作清單，防止同批次重複客戶覆蓋競態
+          List<Map<String, dynamic>> localWorkingCustomers = _allCustomers.map((c) => Map<String, dynamic>.from(c)).toList();
+
+          for (var item in importedList) {
+            final name = item['name']?.toString().trim() ?? '';
+            final phone = item['phone']?.toString().trim() ?? '';
+            final nickname = item['nickname']?.toString().trim() ?? '';
+            final email = item['email']?.toString().trim() ?? '';
+            final tags = List<String>.from(item['tags'] ?? []);
+            final notes = item['notes']?.toString().trim() ?? '';
+            final customAttrs = (item['custom_attributes'] is Map)
+                ? Map<String, dynamic>.from(item['custom_attributes'])
+                : <String, dynamic>{};
+
+            final existingIdx = localWorkingCustomers.indexWhere((c) =>
                 (phone.isNotEmpty && c['phone'] == phone) ||
                 (name.isNotEmpty && c['name'] == name));
 
@@ -1369,50 +1411,112 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
               if (duplicateStrategy == 'skip') {
                 continue;
               } else if (duplicateStrategy == 'overwrite') {
-                final existingId = _allCustomers[existingIdx]['id'];
+                final existingId = localWorkingCustomers[existingIdx]['id'];
+                final existingAttrs = (localWorkingCustomers[existingIdx]['custom_attributes'] is Map)
+                    ? Map<String, dynamic>.from(localWorkingCustomers[existingIdx]['custom_attributes'])
+                    : <String, dynamic>{};
+                final mergedAttrs = {...existingAttrs, ...customAttrs};
+
+                final updatedCustomerMap = {
+                  ...localWorkingCustomers[existingIdx],
+                  'name': name,
+                  'nickname': nickname.isNotEmpty ? nickname : localWorkingCustomers[existingIdx]['nickname'],
+                  'phone': phone.isNotEmpty ? phone : localWorkingCustomers[existingIdx]['phone'],
+                  'email': email.isNotEmpty ? email : localWorkingCustomers[existingIdx]['email'],
+                  'tags': tags.isNotEmpty ? tags : localWorkingCustomers[existingIdx]['tags'],
+                  'notes': notes.isNotEmpty ? notes : localWorkingCustomers[existingIdx]['notes'],
+                  'custom_attributes': mergedAttrs,
+                };
+
                 if (isOfflineMode) {
-                  _allCustomers[existingIdx] = {
-                    ..._allCustomers[existingIdx],
-                    'name': name,
-                    'nickname': nickname.isNotEmpty ? nickname : _allCustomers[existingIdx]['nickname'],
-                    'phone': phone.isNotEmpty ? phone : _allCustomers[existingIdx]['phone'],
-                    'email': email.isNotEmpty ? email : _allCustomers[existingIdx]['email'],
-                    'tags': tags.isNotEmpty ? tags : _allCustomers[existingIdx]['tags'],
-                    'notes': notes.isNotEmpty ? notes : _allCustomers[existingIdx]['notes'],
-                  };
+                  localWorkingCustomers[existingIdx] = updatedCustomerMap;
+                  processedCount++;
                 } else {
                   try {
                     await Supabase.instance.client.from('customers').update({
-                      'name': name,
-                      'nickname': nickname,
-                      'phone': phone,
-                      'email': email,
-                      'tags': tags,
-                      'notes': notes,
+                      'name': updatedCustomerMap['name'],
+                      'nickname': updatedCustomerMap['nickname'],
+                      'phone': updatedCustomerMap['phone'],
+                      'email': updatedCustomerMap['email'],
+                      'tags': updatedCustomerMap['tags'],
+                      'notes': updatedCustomerMap['notes'],
+                      'custom_attributes': mergedAttrs,
                     }).eq('id', existingId);
-                  } catch (_) {}
+
+                    localWorkingCustomers[existingIdx] = updatedCustomerMap;
+                    processedCount++;
+                  } catch (e) {
+                    failedCount++;
+                  }
                 }
-                processedCount++;
                 continue;
               }
             }
 
-            await _createCustomer(
-              name: name,
-              nickname: nickname,
-              avatarUrl: '',
-              phone: phone,
-              email: email,
-              tags: tags,
-              notes: notes,
-              isImageCleared: false,
-            );
-            processedCount++;
+            // 新增客戶
+            if (isOfflineMode) {
+              final newCust = {
+                'id': 'offline_${DateTime.now().millisecondsSinceEpoch}_$processedCount',
+                'name': name,
+                'nickname': nickname,
+                'phone': phone,
+                'email': email,
+                'tags': tags,
+                'notes': notes,
+                'custom_attributes': customAttrs,
+                'created_at': DateTime.now().toIso8601String(),
+              };
+              localWorkingCustomers.add(newCust);
+              processedCount++;
+            } else {
+              try {
+                final user = Supabase.instance.client.auth.currentUser;
+                if (user == null) throw Exception('使用者未登入');
+
+                final insertResp = await Supabase.instance.client.from('customers').insert({
+                  'profile_id': user.id,
+                  'name': name,
+                  'nickname': nickname,
+                  'avatar_url': '',
+                  'phone': phone,
+                  'email': email,
+                  'tags': tags,
+                  'notes': notes,
+                  'custom_attributes': customAttrs,
+                }).select('id').single();
+
+                localWorkingCustomers.add({
+                  'id': insertResp['id'],
+                  'name': name,
+                  'nickname': nickname,
+                  'phone': phone,
+                  'email': email,
+                  'tags': tags,
+                  'notes': notes,
+                  'custom_attributes': customAttrs,
+                });
+                processedCount++;
+              } catch (e) {
+                failedCount++;
+              }
+            }
           }
 
           await _fetchCustomers();
           if (mounted) {
-            CustomToast.show(context, '成功匯入並處理 $processedCount 筆客戶資料', ToastType.success);
+            if (failedCount > 0) {
+              CustomToast.show(
+                context,
+                '⚠️ 批次處理完成：成功 $processedCount 筆，失敗 $failedCount 筆 (請檢查網路或權限)',
+                ToastType.warning,
+              );
+            } else {
+              CustomToast.show(
+                context,
+                '🎉 成功匯入並處理 $processedCount 筆客戶資料！',
+                ToastType.success,
+              );
+            }
           }
         },
       ),
@@ -1421,73 +1525,12 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
 
   // Show Share & Export Micro-Animation Modal
   void _showShareExportModal() {
-    final primaryColor = AppSettings.instance.primaryColor;
-
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'ShareExportModal',
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (ctx, anim1, anim2) => const SizedBox(),
-      transitionBuilder: (ctx, anim1, anim2, child) {
-        final curvedValue = CurvedAnimation(parent: anim1, curve: Curves.easeOutBack).value;
-        return Transform.scale(
-          scale: curvedValue,
-          child: Opacity(
-            opacity: anim1.value,
-            child: AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: [
-                  Icon(Icons.ios_share, color: primaryColor),
-                  const SizedBox(width: 10),
-                  const Text('匯出與分享資料庫', style: TextStyle(fontWeight: FontWeight.bold)),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    tileColor: primaryColor.withOpacity(0.08),
-                    leading: const Icon(Icons.table_chart_outlined, color: Color(0xFF10B981)),
-                    title: const Text('📊 匯出 Excel / CSV 試算表', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('完整備份姓名、電話、標籤與備註至 UTF-8 Excel 檔案'),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      CustomToast.show(context, '已成功生成 Excel 報表試算表！(UTF-8)', ToastType.success);
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    tileColor: primaryColor.withOpacity(0.08),
-                    leading: const Icon(Icons.contacts_outlined, color: Color(0xFF3B82F6)),
-                    title: const Text('📇 匯出 vCard 通訊錄 (.vcf)', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('一鍵匯出 iPhone / Android 手機通訊錄聯絡人'),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      CustomToast.show(context, '已生成 vCard (.vcf) 檔案！可點擊導入手機通訊錄。', ToastType.success);
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  ListTile(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    tileColor: primaryColor.withOpacity(0.08),
-                    leading: const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFFEC4899)),
-                    title: const Text('📄 匯出 PDF 客戶檔案報表', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('匯出排版精美之拜訪摘要與客戶總覽 PDF'),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      CustomToast.show(context, '已成功匯出 PDF 客戶總覽報表！', ToastType.success);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+    final query = _searchController.text.trim();
+    final String scopeDescription = query.isEmpty ? '全部客戶檔案' : '搜尋「$query」篩選結果';
+    CustomerShareExportDialog.show(
+      context,
+      customers: _filteredCustomers,
+      scopeDescription: scopeDescription,
     );
   }
 

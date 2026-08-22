@@ -5,6 +5,7 @@ import '../services/policy_crawler_service.dart';
 import '../widgets/custom_toast.dart';
 import '../widgets/categorized_tag_accordion_selector.dart';
 import '../widgets/voice_recorder_widget.dart';
+import 'customer_share_export_dialog.dart';
 
 class CustomerDetailSideSheet extends StatefulWidget {
   final Map<String, dynamic> customer;
@@ -95,6 +96,10 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
   late TextEditingController _notesController;
   late TextEditingController _tagsController;
 
+  // Dynamic custom attributes controllers: Key -> TextEditingController
+  final Map<String, TextEditingController> _customAttrControllers = {};
+  final List<String> _customAttrKeys = [];
+
   List<CustomerEnrolledPolicy> _enrolledPolicies = [];
   CustomerBenefitSummary? _benefitSummary;
   bool _isLoadingPolicies = true;
@@ -121,6 +126,15 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
     final tags = (widget.customer['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
     _tagsController = TextEditingController(text: tags.join(', '));
 
+    final attrs = (widget.customer['custom_attributes'] is Map)
+        ? widget.customer['custom_attributes'] as Map
+        : {};
+    attrs.forEach((k, v) {
+      final keyStr = k.toString();
+      _customAttrKeys.add(keyStr);
+      _customAttrControllers[keyStr] = TextEditingController(text: v?.toString() ?? '');
+    });
+
     _loadCustomerPolicies();
   }
 
@@ -134,7 +148,30 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
     _notesController.dispose();
     _tagsController.dispose();
     _searchCatalogController.dispose();
+    for (final c in _customAttrControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  Map<String, dynamic> _getCurrentCustomerData() {
+    final Map<String, dynamic> customAttributes = {};
+    for (final key in _customAttrKeys) {
+      final c = _customAttrControllers[key];
+      if (c != null && key.trim().isNotEmpty) {
+        customAttributes[key.trim()] = c.text.trim();
+      }
+    }
+    return {
+      ...widget.customer,
+      'name': _nameController.text.trim(),
+      'nickname': _nicknameController.text.trim(),
+      'phone': _phoneController.text.trim(),
+      'email': _emailController.text.trim(),
+      'notes': _notesController.text.trim(),
+      'tags': _tagsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+      'custom_attributes': customAttributes,
+    };
   }
 
   Future<void> _loadCustomerPolicies() async {
@@ -208,6 +245,15 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
     updated['notes'] = _notesController.text.trim();
     updated['tags'] = _tagsController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
+    final Map<String, dynamic> customAttributes = {};
+    for (final key in _customAttrKeys) {
+      final c = _customAttrControllers[key];
+      if (c != null && key.trim().isNotEmpty) {
+        customAttributes[key.trim()] = c.text.trim();
+      }
+    }
+    updated['custom_attributes'] = customAttributes;
+
     widget.onCustomerUpdated(updated);
 
     try {
@@ -220,6 +266,7 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
           'email': updated['email'],
           'notes': updated['notes'],
           'tags': updated['tags'],
+          'custom_attributes': customAttributes,
           'status': updated['status'] ?? 'active',
         }).eq('id', custId);
       }
@@ -289,6 +336,17 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
                       Text('讀寫合一沉浸式檔案 • 本地 0 成本精算', style: TextStyle(fontSize: 11, color: subTextColor)),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.ios_share_rounded, size: 20),
+                  tooltip: '匯出/分享此客戶檔案 (Excel/vCard/PDF)',
+                  onPressed: () {
+                    CustomerShareExportDialog.show(
+                      context,
+                      customers: [_getCurrentCustomerData()],
+                      scopeDescription: '客戶 ${_nameController.text.trim().isNotEmpty ? _nameController.text.trim() : '此客戶'} 個人檔案',
+                    );
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.close_rounded),
@@ -397,6 +455,10 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
           ),
           const SizedBox(height: 18),
 
+          // 🌟 自訂擴充屬性專區 (Custom Attributes)
+          _buildCustomAttributesSection(isDark, borderColor, textColor, subTextColor),
+          const SizedBox(height: 18),
+
           Text('🏷️ 客戶標籤管理：', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
           const SizedBox(height: 8),
           CategorizedTagAccordionSelector(
@@ -453,6 +515,150 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
               icon: const Icon(Icons.save_rounded, size: 18),
               label: const Text('即時儲存基本資料', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomAttributesSection(bool isDark, Color borderColor, Color textColor, Color subTextColor) {
+    final boxBg = isDark ? const Color(0xFF0F172A).withValues(alpha: 0.5) : const Color(0xFFF8FAFC);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: boxBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.extension_outlined, size: 16, color: Color(0xFF0EA5E9)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '自訂擴充屬性 (${_customAttrKeys.length})',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                  ),
+                ],
+              ),
+              TextButton.icon(
+                onPressed: _showAddCustomAttributeDialog,
+                icon: const Icon(Icons.add, size: 14, color: Color(0xFF0EA5E9)),
+                label: const Text('新增欄位', style: TextStyle(fontSize: 12, color: Color(0xFF0EA5E9), fontWeight: FontWeight.bold)),
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+              ),
+            ],
+          ),
+          if (_customAttrKeys.isEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '尚無額外擴充屬性。匯入包含自訂欄位的 Excel 時將自動在此建立，亦可點擊右上方手動新增。',
+              style: TextStyle(fontSize: 11, color: subTextColor),
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            ..._customAttrKeys.map((key) {
+              final controller = _customAttrControllers[key];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 90,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0EA5E9).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        key,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0EA5E9)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        style: TextStyle(fontSize: 12, color: textColor),
+                        decoration: InputDecoration(
+                          hintText: '請輸入 $key',
+                          hintStyle: TextStyle(fontSize: 11, color: subTextColor),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16, color: Colors.redAccent),
+                      tooltip: '刪除此欄位',
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        setState(() {
+                          _customAttrKeys.remove(key);
+                          _customAttrControllers[key]?.dispose();
+                          _customAttrControllers.remove(key);
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showAddCustomAttributeDialog() {
+    final keyCtrl = TextEditingController();
+    final valCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('新增自訂擴充屬性', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: keyCtrl,
+              decoration: const InputDecoration(labelText: '屬性/欄位名稱 (如：生日、配偶、年收入)', isDense: true, border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: valCtrl,
+              decoration: const InputDecoration(labelText: '屬性值內容', isDense: true, border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          ElevatedButton(
+            onPressed: () {
+              final k = keyCtrl.text.trim();
+              final v = valCtrl.text.trim();
+              if (k.isNotEmpty) {
+                setState(() {
+                  if (!_customAttrKeys.contains(k)) {
+                    _customAttrKeys.add(k);
+                  }
+                  _customAttrControllers[k] = TextEditingController(text: v);
+                });
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('新增'),
           ),
         ],
       ),
