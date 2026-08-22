@@ -18,12 +18,10 @@ import 'profile_screen.dart';
 import 'trash_bin_screen.dart';
 import 'insurance_news_tab.dart';
 import '../widgets/route_planner_dialog.dart';
-import '../widgets/responsive_layout.dart';
 import '../widgets/spotlight_tour_overlay.dart';
 import '../models/user_role.dart';
 import '../services/notification_service.dart';
 import '../widgets/notification_center_popover.dart';
-import '../widgets/dev_god_mode_bar.dart';
 import 'admin_dashboard_tab.dart';
 import 'dev_console_screen.dart';
 import 'relationship_topology_tab.dart';
@@ -194,36 +192,32 @@ class _HomeScreenState extends State<HomeScreen> {
       final status = result['status'] as String? ?? 'green';
       final eventMap = result['event'] as Map<String, dynamic>?;
 
+      ScheduleEvent? event;
       if (eventMap != null) {
-        final event = ScheduleEvent.fromJson(eventMap);
-        if (status == 'yellow') {
-          CustomToast.show(context, '行程資訊有所遺漏，請手動補完！', ToastType.warning);
-          await _openAddEditEventDialog(event);
-        } else {
-          final localStart = event.startAt.toLocal();
-          final isSameDate = localStart.year == _selectedDate.year &&
-              localStart.month == _selectedDate.month &&
-              localStart.day == _selectedDate.day;
-
-          final dateStr = '${localStart.month}/${localStart.day}';
-          final timeStr = '${localStart.hour.toString().padLeft(2, '0')}:${localStart.minute.toString().padLeft(2, '0')}';
-
-          if (isSameDate) {
-            CustomToast.show(context, '已成功自動建立今日行程：「${event.title}」($timeStr)', ToastType.success);
-            _fetchEventsForSelectedDate();
-          } else {
-            // 保留當前 _selectedDate 視角不被打斷，並明確告知建立在何日
-            CustomToast.show(
-              context,
-              '已成功建立 $dateStr ($timeStr) 行程：「${event.title}」',
-              ToastType.success,
-            );
-            if (_calendarViewMode == 'month_grid') {
-              _fetchEventsForSelectedDate(silent: true);
-            }
-          }
+        try {
+          event = ScheduleEvent.fromJson(eventMap);
+        } catch (e) {
+          debugPrint('解析語音行程失敗，改用預設行程物件: $e');
         }
       }
+
+      if (event != null) {
+        setState(() {
+          _selectedDate = DateTime(event!.startAt.year, event.startAt.month, event.startAt.day);
+        });
+      }
+
+      if (status == 'yellow') {
+        final warnings = List<String>.from(result['warning_messages'] ?? []);
+        final warningText = warnings.isNotEmpty
+            ? '⚠️ ' + warnings.join('； ')
+            : '行程資訊有所遺漏，請核對並補充細節！';
+        CustomToast.show(context, warningText, ToastType.warning);
+      } else {
+        CustomToast.show(context, '語音辨識完成，請確認並儲存行程！', ToastType.success);
+      }
+      // 不論綠燈、黃燈或解析例外，均一律開啟手動編輯視窗供專案人員最終核對與儲存
+      await _openAddEditEventDialog(event);
     }
   }
 

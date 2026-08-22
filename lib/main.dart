@@ -30,15 +30,21 @@ void main() async {
     // If dotenv.load fails, it might still have environment defines
   }
 
-  // Dual-track fallback: check dotenv first, then const String.fromEnvironment
+  // Dual-track fallback: check dotenv first, then const String.fromEnvironment, then project defaults
   String? supabaseUrl = dotenv.maybeGet('SUPABASE_URL');
   if (supabaseUrl == null || supabaseUrl.isEmpty) {
     supabaseUrl = const String.fromEnvironment('SUPABASE_URL');
+  }
+  if (supabaseUrl.isEmpty) {
+    supabaseUrl = 'https://algufuoxkeizxwkofmmp.supabase.co';
   }
 
   String? supabaseKey = dotenv.maybeGet('SUPABASE_ANON_KEY');
   if (supabaseKey == null || supabaseKey.isEmpty) {
     supabaseKey = const String.fromEnvironment('SUPABASE_ANON_KEY');
+  }
+  if (supabaseKey.isEmpty) {
+    supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsZ3VmdW94a2Vpenh3a29mbW1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTU2NzgsImV4cCI6MjA5OTA3MTY3OH0.QMEU47EHuLwEr7ok7O28h6U7Sh-geldoTQ5eZfI5tBA';
   }
 
   // If placeholders or empty values are detected, fall back to offline preview

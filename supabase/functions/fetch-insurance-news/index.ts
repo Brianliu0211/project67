@@ -125,12 +125,21 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
   ]
 }`;
 
-  const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
-  let lastGroqError = '';
+  const staticCandidateModels = [
+    'groq/compound',
+    'groq/compound-mini',
+    'qwen/qwen3.6-27b',
+    'openai/gpt-oss-20b',
+    'llama-3.3-70b-versatile',
+  ];
+  const modelErrors: string[] = [];
+  const triedModels = new Set<string>();
 
-  for (const model of models) {
+  // 輔助函式：對指定 Groq 模型發起 Completion 請求
+  async function tryModel(modelName: string): Promise<ClusteringOutput | null> {
+    triedModels.add(modelName);
     try {
-      console.log(`[Groq News Clustering] 嘗試使用模型: ${model}...`);
+      console.log(`[Groq News Clustering] 嘗試使用模型: ${modelName}...`);
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -138,7 +147,7 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
           'Authorization': `Bearer ${GROQ_API_KEY.trim()}`,
         },
         body: JSON.stringify({
-          model: model,
+          model: modelName,
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: systemPrompt },
@@ -151,9 +160,9 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
 
       if (!res.ok) {
         const errText = await res.text();
-        console.error(`[Groq ${model} Error]:`, res.status, errText);
-        lastGroqError = `[HTTP ${res.status}] ${errText}`;
-        continue;
+        console.error(`[Groq ${modelName} Error]:`, res.status, errText);
+        modelErrors.push(`[${modelName} HTTP ${res.status}] ${errText}`);
+        return null;
       }
 
       const resData = await res.json();
@@ -178,12 +187,61 @@ async function clusterNewsWithGroq(rssItems: RSSItem[]): Promise<ClusteringOutpu
         }
       }
     } catch (err: any) {
-      console.error(`[Groq Catch Error ${model}]:`, err);
-      lastGroqError = err.message || String(err);
+      console.error(`[Groq Catch Error ${modelName}]:`, err);
+      modelErrors.push(`[${modelName} Exception] ${err.message || String(err)}`);
     }
+    return null;
   }
 
-  throw new Error(`Groq 新聞聚類解析失敗: ${lastGroqError}`);
+  // 第一階段：優先嘗試預設靜態候選模型清單
+  for (const model of staticCandidateModels) {
+    const output = await tryModel(model);
+    if (output) return output;
+  }
+
+  // 第二階段：【緊急自我修復動態巡檢】
+  // 當預設模型皆廢棄/失效時，自動打 API 取得 Groq 在線可用模型清單
+  console.warn('⚠️ [Groq Auto-Discovery] 所有靜態候選模型皆無回應或被廢棄，啟動動態 Groq 模型自我修復搜尋...');
+  try {
+    const modelsRes = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { 'Authorization': `Bearer ${GROQ_API_KEY.trim()}` },
+    });
+
+    if (modelsRes.ok) {
+      const modelsData = await modelsRes.json();
+      const liveModels: any[] = modelsData.data || [];
+
+      // 自動過濾語音(whisper)、安全防護(safeguard/prompt-guard)及特定微調模型，保留文本生成模型
+      const discoveredModels = liveModels
+        .map((m: any) => m.id as string)
+        .filter((id: string) => {
+          if (!id) return false;
+          if (triedModels.has(id)) return false; // 跳過先前已試過的模型
+          const lower = id.toLowerCase();
+          const isNonTextModel = lower.includes('whisper') ||
+                                 lower.includes('prompt-guard') ||
+                                 lower.includes('safeguard') ||
+                                 lower.includes('orpheus') ||
+                                 lower.includes('vision');
+          return !isNonTextModel;
+        });
+
+      console.log(`[Groq Dynamic Auto-Discovery] 自動發現 ${discoveredModels.length} 個在線文字模型:`, discoveredModels);
+
+      for (const discoveredModel of discoveredModels) {
+        const output = await tryModel(discoveredModel);
+        if (output) {
+          console.log(`🎉 [Groq Dynamic Auto-Discovery Success] 成功找到最新可替代模型: ${discoveredModel}`);
+          return output;
+        }
+      }
+    }
+  } catch (discoveryErr: any) {
+    console.error('[Groq Auto-Discovery Exception]:', discoveryErr);
+    modelErrors.push(`[Auto-Discovery Exception] ${discoveryErr.message || String(discoveryErr)}`);
+  }
+
+  throw new Error(`Groq 新聞聚類與模型自我修復解析失敗 (共嘗試 ${triedModels.size} 個模型): ${modelErrors.join(' | ')}`);
 }
 
 serve(async (req) => {
@@ -267,7 +325,8 @@ serve(async (req) => {
     const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
     const serviceKey = SUPABASE_SERVICE_ROLE_KEY || bearerToken || Deno.env.get('SUPABASE_ANON_KEY') || '';
     const supabaseClient = createClient(SUPABASE_URL, serviceKey);
-    const todayDate = new Date().toISOString().split('T')[0];
+    // 使用台灣時間 (Asia/Taipei UTC+8) 取得當前正確日期 YYYY-MM-DD，解決 UTC 22:00 (台灣時間 06:00) 日期誤判為前一日之 Bug
+    const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 
     // 讀取當天已存在之新聞話題（夕報 18:00 追加模式：不刷掉晨報 06:00 已發布話題，而是無縫累加新話題）
     const { data: existingTodayTopics } = await supabaseClient
