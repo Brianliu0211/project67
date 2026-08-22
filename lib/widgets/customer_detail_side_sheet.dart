@@ -822,8 +822,8 @@ class _CustomerDetailSideSheetState extends State<CustomerDetailSideSheet> with 
               if (text.trim().isNotEmpty) {
                 final old = _notesController.text.trim();
                 final now = DateTime.now();
-                final dateStr = '${now.month}/${now.day} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-                final updated = old.isEmpty ? '[$dateStr 拜訪語音速記]\n$text' : '$old\n\n[$dateStr 拜訪語音速記]\n$text';
+                final dateStr = '${now.year}/${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+                final updated = old.isEmpty ? '--- 🎙️ $dateStr 語音速記 ---\n$text' : '$old\n\n--- 🎙️ $dateStr 語音速記 ---\n$text';
                 setState(() {
                   _notesController.text = updated;
                 });

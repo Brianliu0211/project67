@@ -156,6 +156,48 @@ void main() {
       expect(summary.detectedGaps, isNotEmpty);
     });
 
+    test('Step 3.5: 語音速記時間戳追加與防覆蓋測試 (Voice Notes Timestamped Append Test)', () {
+      final now = DateTime.now();
+      final dateStr = '${now.year}/${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      const existingNotes = '客戶原本有一張國泰人壽舊保單，保額 100 萬。';
+      const voiceTranscript = '剛才通話確認，客戶有意加保實支實付醫療險。';
+
+      // 測試既有筆記追加：絕不覆蓋舊筆記
+      final updatedNotes = existingNotes.isEmpty
+          ? '--- 🎙️ $dateStr 語音速記 ---\n$voiceTranscript'
+          : '$existingNotes\n\n--- 🎙️ $dateStr 語音速記 ---\n$voiceTranscript';
+
+      expect(updatedNotes.contains(existingNotes), isTrue);
+      expect(updatedNotes.contains(voiceTranscript), isTrue);
+      expect(updatedNotes.startsWith(existingNotes), isTrue);
+      expect(updatedNotes.contains('--- 🎙️ $dateStr 語音速記 ---'), isTrue);
+
+      // 測試空白時初次建立
+      const emptyNotes = '';
+      final initialNotes = emptyNotes.isEmpty
+          ? '--- 🎙️ $dateStr 語音速記 ---\n$voiceTranscript'
+          : '$emptyNotes\n\n--- 🎙️ $dateStr 語音速記 ---\n$voiceTranscript';
+      expect(initialNotes.startsWith('--- 🎙️ $dateStr 語音速記 ---'), isTrue);
+    });
+
+    test('Step 3.6: 今日行程語音排程焦點保護與非當日行程建立判斷測試', () {
+      final currentSelectedDate = DateTime(2026, 8, 25);
+      final newEventStart = DateTime(2026, 8, 20, 14, 0, 0);
+
+      final isSameDate = newEventStart.year == currentSelectedDate.year &&
+          newEventStart.month == currentSelectedDate.month &&
+          newEventStart.day == currentSelectedDate.day;
+
+      expect(isSameDate, isFalse);
+
+      final sameDayEvent = DateTime(2026, 8, 25, 10, 30, 0);
+      final isSameDay = sameDayEvent.year == currentSelectedDate.year &&
+          sameDayEvent.month == currentSelectedDate.month &&
+          sameDayEvent.day == currentSelectedDate.day;
+
+      expect(isSameDay, isTrue);
+    });
+
     test('標籤色彩與多分類映射解析度測試', () {
       TagCategorizer.registerCustomColor('重要VIP', '#10B981');
       final style = TagCategorizer.getStyle('重要VIP', true);

@@ -169,6 +169,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openVoiceSchedulerDialog() async {
+    if (isOfflineMode) {
+      CustomToast.show(context, '⚠️ 離線預覽模式：語音排程需要雲端 AI 連線，請在連線模式下使用。', ToastType.warning);
+      return;
+    }
+
     final result = await showGeneralDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
@@ -195,8 +200,28 @@ class _HomeScreenState extends State<HomeScreen> {
           CustomToast.show(context, '行程資訊有所遺漏，請手動補完！', ToastType.warning);
           await _openAddEditEventDialog(event);
         } else {
-          CustomToast.show(context, '已成功自動建立行程：「${event.title}」', ToastType.success);
-          _fetchEventsForSelectedDate();
+          final localStart = event.startAt.toLocal();
+          final isSameDate = localStart.year == _selectedDate.year &&
+              localStart.month == _selectedDate.month &&
+              localStart.day == _selectedDate.day;
+
+          final dateStr = '${localStart.month}/${localStart.day}';
+          final timeStr = '${localStart.hour.toString().padLeft(2, '0')}:${localStart.minute.toString().padLeft(2, '0')}';
+
+          if (isSameDate) {
+            CustomToast.show(context, '已成功自動建立今日行程：「${event.title}」($timeStr)', ToastType.success);
+            _fetchEventsForSelectedDate();
+          } else {
+            // 保留當前 _selectedDate 視角不被打斷，並明確告知建立在何日
+            CustomToast.show(
+              context,
+              '已成功建立 $dateStr ($timeStr) 行程：「${event.title}」',
+              ToastType.success,
+            );
+            if (_calendarViewMode == 'month_grid') {
+              _fetchEventsForSelectedDate(silent: true);
+            }
+          }
         }
       }
     }

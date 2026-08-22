@@ -1091,9 +1091,14 @@ class _CustomerManagementTabState extends State<CustomerManagementTab> with Auto
                         primaryColor: primaryColor,
                         isDark: isDark,
                         onTranscribed: (text) {
+                          if (text.trim().isEmpty) return;
+                          final now = DateTime.now();
+                          final dateStr = '${now.year}/${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
                           final current = notesController.text.trim();
-                          notesController.text =
-                              current.isEmpty ? text : '$current\n\n$text';
+                          notesController.text = current.isEmpty
+                              ? '--- 🎙️ $dateStr 語音速記 ---\n$text'
+                              : '$current\n\n--- 🎙️ $dateStr 語音速記 ---\n$text';
+                          CustomToast.show(context, '✅ 語音速記已成功追加至備註！', ToastType.success);
                         },
                       ),
                       const SizedBox(height: 8),

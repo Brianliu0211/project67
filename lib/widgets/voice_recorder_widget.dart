@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/voice_transcription_service.dart';
 import '../services/app_localizations.dart';
+import '../main.dart';
 
 /// 語音錄音 UI 元件
 ///
@@ -94,6 +95,11 @@ class _VoiceRecorderWidgetState extends State<VoiceRecorderWidget>
   // ─── Actions ─────────────────────────────────────────────────
 
   Future<void> _startRecording() async {
+    if (isOfflineMode) {
+      _showError('離線預覽模式無法使用語音轉錄，請在連線模式下使用');
+      return;
+    }
+
     try {
       await _service.startRecording();
       if (!mounted) return;
