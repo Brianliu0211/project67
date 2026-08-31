@@ -86,7 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
             _fetchEventsForSelectedDate(silent: true);
           }
         });
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('⚠️ [HomeScreen] Supabase 離線模式跳過 Auth 監聽: $e');
+      }
     }
     _loadUserProfile();
     _loadSavedMenu().then((_) {

@@ -7,6 +7,7 @@ import '../models/schedule_event.dart';
 import '../services/app_localizations.dart';
 import '../services/location_service.dart';
 import '../services/schedule_service.dart';
+import '../services/google_calendar_sync_service.dart';
 import 'custom_toast.dart';
 import '../main.dart';
 import 'categorized_tag_accordion_selector.dart';
@@ -345,6 +346,32 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                     isEdit ? context.l10n('event_edit_title') : context.l10n('event_add_title'),
                     style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
+                  if (GoogleCalendarSyncService.instance.isSyncEnabled) ...[
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4285F4).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF4285F4).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            (widget.eventToEdit?.isGoogleSynced ?? false) ? Icons.sync : Icons.cloud_sync_outlined,
+                            size: 13,
+                            color: const Color(0xFF4285F4),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            (widget.eventToEdit?.isGoogleSynced ?? false) ? 'Google 已對齊' : '自動對齊 Google',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF4285F4), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
               IconButton(
