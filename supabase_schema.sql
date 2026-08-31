@@ -657,6 +657,7 @@ CREATE TABLE IF NOT EXISTS public.schedule_events (
     is_completed BOOLEAN DEFAULT FALSE NOT NULL,
     google_event_id TEXT,
     google_calendar_id TEXT,
+    sync_status TEXT DEFAULT 'local_only',
     last_synced_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
