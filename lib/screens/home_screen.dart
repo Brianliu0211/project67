@@ -26,6 +26,7 @@ import 'admin_dashboard_tab.dart';
 import 'dev_console_screen.dart';
 import 'relationship_topology_tab.dart';
 import 'data_dashboard_tab.dart';
+import 'schedule_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -715,7 +716,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                   },
                                 )
                               : _activeMenu == '今日行程'
-                                  ? _buildScheduleView(isWideScreen, isDark, textColor, subTextColor, borderColor, primaryColor)
+                                  ? ScheduleTab(
+                                      isWideScreen: isWideScreen,
+                                      isDark: isDark,
+                                      primaryColor: primaryColor,
+                                      onMenuChanged: (menu) {
+                                        setState(() {
+                                          _activeMenu = menu;
+                                        });
+                                      },
+                                    )
                                   : _activeMenu == '新聞頭條'
                                       ? const InsuranceNewsTab()
                                       : _activeMenu == '客戶管理'

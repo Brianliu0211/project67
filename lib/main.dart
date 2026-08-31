@@ -251,5 +251,6 @@ class _AuthGatewayState extends State<AuthGateway> {
 class OfflineDataStore {
   static List<Map<String, dynamic>> customers = [];
   static List<Map<String, dynamic>> customerRelationships = [];
+  static List<Map<String, dynamic>> scheduleEvents = [];
 }
 
