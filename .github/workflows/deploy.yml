@@ -42,5 +42,14 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel
 
-      - name: Deploy build/web Directly to Vercel Production
-        run: vercel deploy build/web --prod --token=$VERCEL_TOKEN --yes
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+
+      - name: Build Vercel Project Structure
+        run: vercel build --prod --token=$VERCEL_TOKEN
+
+      - name: Inject Flutter Web Build Artifacts
+        run: cp -r build/web/* .vercel/output/static/
+
+      - name: Deploy Prebuilt Artifacts to Vercel Production
+        run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
