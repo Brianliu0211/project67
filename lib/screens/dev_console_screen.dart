@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/voice_transcription_service.dart';
 import '../models/user_role.dart';
@@ -11,7 +10,8 @@ import '../widgets/custom_toast.dart';
 class DevConsoleScreen extends StatefulWidget {
   final ValueChanged<UserRole>? onRoleChanged;
   final UserRole activeRole;
-  const DevConsoleScreen({super.key, this.onRoleChanged, this.activeRole = UserRole.dev});
+  const DevConsoleScreen(
+      {super.key, this.onRoleChanged, this.activeRole = UserRole.dev});
 
   @override
   State<DevConsoleScreen> createState() => _DevConsoleScreenState();
@@ -21,15 +21,12 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
   final PolicyCrawlerService _policyService = PolicyCrawlerService();
   final NewsRssService _rssService = NewsRssService();
 
-  // Demo Login Fast Channel State
-  bool _showFastDemoLogin = true;
-
   // Real DB Stats
   int _totalPolicyCount = 11722;
   bool _isLoadingStats = true;
   List<CompanyPolicyStat> _companyStats = [];
   String _selectedCompanyTypeFilter = '全部'; // '全部', '人壽保險', '產物保險/通路'
-  
+
   // Search & Multi-Filter States for Drill-down
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
@@ -90,16 +87,12 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
       final stats = await _policyService.fetchCompanyBreakdown();
       final lastSynced = await _policyService.fetchLatestCrawledAt();
       final rssList = await _rssService.getRssSources();
-      final prefs = await SharedPreferences.getInstance();
-      final showFastDemo = prefs.getBool('dev_show_fast_demo_login') ?? true;
-
       if (mounted) {
         setState(() {
           _totalPolicyCount = total;
           _companyStats = stats;
           _crawlerLastSynced = lastSynced;
           _rssSources = rssList;
-          _showFastDemoLogin = showFastDemo;
           _isLoadingStats = false;
           _isLoadingRss = false;
         });
@@ -125,9 +118,13 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
     try {
       final results = await _policyService.searchPolicyClauses(
         query: _searchQuery,
-        companyType: _selectedCompanyTypeFilter == '全部' ? null : _selectedCompanyTypeFilter,
+        companyType: _selectedCompanyTypeFilter == '全部'
+            ? null
+            : _selectedCompanyTypeFilter,
         selectedCompany: _selectedCompanyForFilter,
-        selectedCategories: _selectedCategoryFilters.isNotEmpty ? _selectedCategoryFilters.toList() : null,
+        selectedCategories: _selectedCategoryFilters.isNotEmpty
+            ? _selectedCategoryFilters.toList()
+            : null,
         limit: 30,
       );
       if (mounted) {
@@ -164,7 +161,10 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
       if (isOk) {
         _showIncrementalFeedbackToast(res['addedCount'] ?? 0);
       } else {
-        CustomToast.show(context, '⚠️ 增量校對提醒：${res['error'] ?? '連線失敗 (HTTP $_crawlerHttpCode)'}', ToastType.error);
+        CustomToast.show(
+            context,
+            '⚠️ 增量校對提醒：${res['error'] ?? '連線失敗 (HTTP $_crawlerHttpCode)'}',
+            ToastType.error);
       }
       _triggerPolicySearch();
     }
@@ -184,14 +184,19 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
         duration: const Duration(seconds: 5),
         content: Row(
           children: [
-            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+            const Icon(Icons.check_circle_rounded,
+                color: Color(0xFF10B981), size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: RichText(
                 text: TextSpan(
                   style: const TextStyle(fontSize: 13, color: Colors.white),
                   children: [
-                    const TextSpan(text: '增量校對完成！', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                    const TextSpan(
+                        text: '增量校對完成！',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF10B981))),
                     TextSpan(text: ' 46 家公司共 $_totalPolicyCount 筆條款在庫。'),
                   ],
                 ),
@@ -202,8 +207,11 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                 ScaffoldMessenger.of(context).hideCurrentSnackBar();
                 _showDiffReportDrawer();
               },
-              icon: const Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFF38BDF8)),
-              label: const Text('查看異動報告 📋', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.receipt_long_rounded,
+                  size: 16, color: Color(0xFF38BDF8)),
+              label: const Text('查看異動報告 📋',
+                  style: TextStyle(
+                      color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -228,7 +236,10 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
             color: cardBg,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, -4)),
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, -4)),
             ],
           ),
           child: Column(
@@ -241,18 +252,29 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                        child: const Icon(Icons.difference_rounded, color: Color(0xFF10B981), size: 22),
+                        decoration: BoxDecoration(
+                            color:
+                                const Color(0xFF10B981).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.difference_rounded,
+                            color: Color(0xFF10B981), size: 22),
                       ),
                       const SizedBox(width: 12),
-                      Text('46 家保險公司條款差量校對報告', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
+                      Text('46 家保險公司條款差量校對報告',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: textColor)),
                     ],
                   ),
-                  IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
+                  IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
               const SizedBox(height: 8),
-              Text('資料庫採用增量新增與差量校對 (Upsert)，已自動過濾重複項目並保留歷史版本。', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+              Text('資料庫採用增量新增與差量校對 (Upsert)，已自動過濾重複項目並保留歷史版本。',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[400])),
               const SizedBox(height: 16),
               Expanded(
                 child: ListView.separated(
@@ -266,20 +288,43 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: (isPc ? const Color(0xFF0EA5E9) : const Color(0xFF10B981)).withValues(alpha: 0.12),
+                          color: (isPc
+                                  ? const Color(0xFF0EA5E9)
+                                  : const Color(0xFF10B981))
+                              .withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(isPc ? Icons.car_rental_rounded : Icons.health_and_safety_rounded, color: isPc ? const Color(0xFF0EA5E9) : const Color(0xFF10B981), size: 18),
+                        child: Icon(
+                            isPc
+                                ? Icons.car_rental_rounded
+                                : Icons.health_and_safety_rounded,
+                            color: isPc
+                                ? const Color(0xFF0EA5E9)
+                                : const Color(0xFF10B981),
+                            size: 18),
                       ),
-                      title: Text(item.companyName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
-                      subtitle: Text('${item.companyType} • 主力: ${item.sampleCategory}', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                      title: Text(item.companyName,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: textColor)),
+                      subtitle: Text(
+                          '${item.companyType} • 主力: ${item.sampleCategory}',
+                          style:
+                              TextStyle(fontSize: 11, color: Colors.grey[400])),
                       trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                          color:
+                              const Color(0xFF10B981).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text('${item.count} 筆在庫', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                        child: Text('${item.count} 筆在庫',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF10B981))),
                       ),
                     );
                   },
@@ -309,12 +354,15 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
 
           return AlertDialog(
             backgroundColor: cardBg,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Row(
               children: [
                 Icon(Icons.rss_feed_rounded, color: Color(0xFFF59E0B)),
                 SizedBox(width: 8),
-                Text('新增自訂新聞 RSS 來源', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('新增自訂新聞 RSS 來源',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),
             content: SizedBox(
@@ -323,13 +371,15 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('儲存後將真正寫入 Supabase 資料庫，並在定時排程中自動抓取與 AI 摘要。', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                  Text('儲存後將真正寫入 Supabase 資料庫，並在定時排程中自動抓取與 AI 摘要。',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[400])),
                   const SizedBox(height: 16),
                   TextField(
                     controller: nameCtrl,
                     decoration: InputDecoration(
                       labelText: '媒體來源名稱 (如: 數位時代、自由時報財經)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       isDense: true,
                     ),
                   ),
@@ -339,7 +389,8 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                     decoration: InputDecoration(
                       labelText: 'RSS 訂閱網址 (URL)',
                       hintText: 'https://example.com/rss/feed.xml',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       isDense: true,
                     ),
                   ),
@@ -351,7 +402,8 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                           controller: catCtrl,
                           decoration: InputDecoration(
                             labelText: '分類標籤',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
                             isDense: true,
                           ),
                         ),
@@ -374,21 +426,31 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                   pingResult = '正在連線測試...';
                                   pingColor = Colors.blue;
                                 });
-                                final res = await _rssService.testRssConnectivity(url);
+                                final res =
+                                    await _rssService.testRssConnectivity(url);
                                 setDialogState(() {
                                   isPinging = false;
                                   pingResult = res['message'] ?? '';
-                                  pingColor = (res['success'] == true) ? const Color(0xFF10B981) : Colors.redAccent;
+                                  pingColor = (res['success'] == true)
+                                      ? const Color(0xFF10B981)
+                                      : Colors.redAccent;
                                 });
                               },
                         icon: isPinging
-                            ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.wifi_tethering_rounded, size: 16),
-                        label: const Text('連線測試 (Ping)', style: TextStyle(fontSize: 12)),
+                            ? const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.wifi_tethering_rounded,
+                                size: 16),
+                        label: const Text('連線測試 (Ping)',
+                            style: TextStyle(fontSize: 12)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF0EA5E9),
                           side: const BorderSide(color: Color(0xFF0EA5E9)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                         ),
                       ),
                     ],
@@ -400,13 +462,24 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                       decoration: BoxDecoration(
                         color: pingColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: pingColor.withValues(alpha: 0.4)),
+                        border:
+                            Border.all(color: pingColor.withValues(alpha: 0.4)),
                       ),
                       child: Row(
                         children: [
-                          Icon(pingColor == const Color(0xFF10B981) ? Icons.check_circle_rounded : Icons.info_outline_rounded, color: pingColor, size: 16),
+                          Icon(
+                              pingColor == const Color(0xFF10B981)
+                                  ? Icons.check_circle_rounded
+                                  : Icons.info_outline_rounded,
+                              color: pingColor,
+                              size: 16),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(pingResult, style: TextStyle(fontSize: 11, color: pingColor, fontWeight: FontWeight.bold))),
+                          Expanded(
+                              child: Text(pingResult,
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: pingColor,
+                                      fontWeight: FontWeight.bold))),
                         ],
                       ),
                     ),
@@ -415,20 +488,26 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
               ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0EA5E9), foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0EA5E9),
+                    foregroundColor: Colors.white),
                 onPressed: () async {
                   final name = nameCtrl.text.trim();
                   final url = urlCtrl.text.trim();
                   if (name.isEmpty || url.isEmpty) {
-                    CustomToast.show(context, '⚠️ 請填寫媒體名稱與 RSS 網址', ToastType.warning);
+                    CustomToast.show(
+                        context, '⚠️ 請填寫媒體名稱與 RSS 網址', ToastType.warning);
                     return;
                   }
-                  final ok = await _rssService.addRssSource(sourceName: name, rssUrl: url, category: catCtrl.text);
+                  final ok = await _rssService.addRssSource(
+                      sourceName: name, rssUrl: url, category: catCtrl.text);
                   if (ok && mounted) {
                     Navigator.pop(ctx);
-                    CustomToast.show(context, '✅ 成功新增 RSS 來源: $name', ToastType.success);
+                    CustomToast.show(
+                        context, '✅ 成功新增 RSS 來源: $name', ToastType.success);
                     final updated = await _rssService.getRssSources();
                     setState(() => _rssSources = updated);
                   }
@@ -447,9 +526,11 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final borderColor =
+        isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
     final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final subTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final subTextColor =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -464,7 +545,8 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
           children: [
             Icon(Icons.developer_board_rounded, color: Color(0xFF0EA5E9)),
             SizedBox(width: 8),
-            Text('🛠️ 開發者可觀測性與後台控制中樞', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('🛠️ 開發者可觀測性與後台控制中樞',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -481,17 +563,25 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                 children: [
                   // 0. Dev Role Switcher Bar
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: const Color(0xFF6366F1).withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color:
+                              const Color(0xFF6366F1).withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.badge_rounded, color: Color(0xFF6366F1), size: 18),
+                        const Icon(Icons.badge_rounded,
+                            color: Color(0xFF6366F1), size: 18),
                         const SizedBox(width: 8),
-                        Text('身分權限切換：', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
+                        Text('身分權限切換：',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: textColor)),
                         const SizedBox(width: 8),
                         Wrap(
                           spacing: 8,
@@ -499,18 +589,27 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                             final isSelected = widget.activeRole == role;
                             return ChoiceChip(
                               selected: isSelected,
-                              avatar: Icon(role.badgeIcon, size: 14, color: isSelected ? Colors.white : role.primaryColor),
+                              avatar: Icon(role.badgeIcon,
+                                  size: 14,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : role.primaryColor),
                               label: Text(role.labelZh),
                               selectedColor: role.primaryColor,
                               labelStyle: TextStyle(
                                 fontSize: 11,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                                 color: isSelected ? Colors.white : textColor,
                               ),
                               onSelected: (selected) {
                                 if (selected && widget.onRoleChanged != null) {
                                   widget.onRoleChanged!(role);
-                                  CustomToast.show(context, '已切換視圖為：${role.labelZh}', ToastType.success);
+                                  CustomToast.show(
+                                      context,
+                                      '已切換視圖為：${role.labelZh}',
+                                      ToastType.success);
                                 }
                               },
                             );
@@ -528,7 +627,9 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                     decoration: BoxDecoration(
                       color: cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.5),
+                      border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                          width: 1.5),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,18 +643,28 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                    color: const Color(0xFF10B981)
+                                        .withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Icon(Icons.travel_explore_rounded, color: Color(0xFF10B981), size: 22),
+                                  child: const Icon(
+                                      Icons.travel_explore_rounded,
+                                      color: Color(0xFF10B981),
+                                      size: 22),
                                 ),
                                 const SizedBox(width: 12),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('📡 全台灣 46 家公司條款庫存與爬蟲可觀測性中樞', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+                                    Text('📡 全台灣 46 家公司條款庫存與爬蟲可觀測性中樞',
+                                        style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: textColor)),
                                     const SizedBox(height: 2),
-                                    Text('收錄 46 家壽產險公司與通路 · 動態抽查與差量更新', style: TextStyle(fontSize: 11, color: subTextColor)),
+                                    Text('收錄 46 家壽產險公司與通路 · 動態抽查與差量更新',
+                                        style: TextStyle(
+                                            fontSize: 11, color: subTextColor)),
                                   ],
                                 ),
                               ],
@@ -562,25 +673,44 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                               children: [
                                 OutlinedButton.icon(
                                   onPressed: () => _showDiffReportDrawer(),
-                                  icon: const Icon(Icons.receipt_long_rounded, size: 14),
-                                  label: const Text('查看各公司筆數 📋', style: TextStyle(fontSize: 12)),
+                                  icon: const Icon(Icons.receipt_long_rounded,
+                                      size: 14),
+                                  label: const Text('查看各公司筆數 📋',
+                                      style: TextStyle(fontSize: 12)),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: const Color(0xFF38BDF8),
-                                    side: const BorderSide(color: Color(0xFF38BDF8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    side: const BorderSide(
+                                        color: Color(0xFF38BDF8)),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 ElevatedButton.icon(
-                                  onPressed: _isSyncingPolicies ? null : _handleIncrementalSync,
+                                  onPressed: _isSyncingPolicies
+                                      ? null
+                                      : _handleIncrementalSync,
                                   icon: _isSyncingPolicies
-                                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                      : const Icon(Icons.sync_rounded, size: 16),
-                                  label: Text(_isSyncingPolicies ? '差量同步中...' : '⚡ 檢查差異並增量更新', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white))
+                                      : const Icon(Icons.sync_rounded,
+                                          size: 16),
+                                  label: Text(
+                                      _isSyncingPolicies
+                                          ? '差量同步中...'
+                                          : '⚡ 檢查差異並增量更新',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF10B981),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 10),
                                   ),
                                 ),
                               ],
@@ -596,7 +726,9 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                             Expanded(
                               child: _buildMetricCard(
                                 title: '全庫存總收錄筆數',
-                                value: _isLoadingStats ? '讀取中...' : '$_totalPolicyCount 筆',
+                                value: _isLoadingStats
+                                    ? '讀取中...'
+                                    : '$_totalPolicyCount 筆',
                                 subText: '46 家公司與通路全覆蓋',
                                 valueColor: const Color(0xFF10B981),
                                 isDark: isDark,
@@ -631,16 +763,25 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('🏢 46 家公司即時分佈與抽查選單：', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
+                            Text('🏢 46 家公司即時分佈與抽查選單：',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor)),
                             Wrap(
                               spacing: 6,
                               children: ['全部', '人壽保險', '產物保險/通路'].map((type) {
-                                final isSelected = _selectedCompanyTypeFilter == type;
+                                final isSelected =
+                                    _selectedCompanyTypeFilter == type;
                                 return ChoiceChip(
                                   selected: isSelected,
                                   label: Text(type),
                                   selectedColor: const Color(0xFF10B981),
-                                  labelStyle: TextStyle(fontSize: 11, color: isSelected ? Colors.white : textColor),
+                                  labelStyle: TextStyle(
+                                      fontSize: 11,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : textColor),
                                   onSelected: (sel) {
                                     if (sel) {
                                       setState(() {
@@ -664,33 +805,66 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: _getFilteredCompanyStats().length + 1,
-                            separatorBuilder: (c, i) => const SizedBox(width: 8),
+                            separatorBuilder: (c, i) =>
+                                const SizedBox(width: 8),
                             itemBuilder: (c, i) {
                               if (i == 0) {
                                 final isAll = _selectedCompanyForFilter == null;
                                 return ActionChip(
-                                  backgroundColor: isAll ? const Color(0xFF10B981).withValues(alpha: 0.2) : cardBg,
-                                  side: BorderSide(color: isAll ? const Color(0xFF10B981) : borderColor),
-                                  label: Text('全部公司 (${_companyStats.length})', style: TextStyle(fontSize: 11, fontWeight: isAll ? FontWeight.bold : FontWeight.normal)),
+                                  backgroundColor: isAll
+                                      ? const Color(0xFF10B981)
+                                          .withValues(alpha: 0.2)
+                                      : cardBg,
+                                  side: BorderSide(
+                                      color: isAll
+                                          ? const Color(0xFF10B981)
+                                          : borderColor),
+                                  label: Text('全部公司 (${_companyStats.length})',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: isAll
+                                              ? FontWeight.bold
+                                              : FontWeight.normal)),
                                   onPressed: () {
-                                    setState(() => _selectedCompanyForFilter = null);
+                                    setState(
+                                        () => _selectedCompanyForFilter = null);
                                     _triggerPolicySearch();
                                   },
                                 );
                               }
                               final comp = _getFilteredCompanyStats()[i - 1];
-                              final isSelected = _selectedCompanyForFilter == comp.companyName;
+                              final isSelected =
+                                  _selectedCompanyForFilter == comp.companyName;
                               return ActionChip(
-                                backgroundColor: isSelected ? const Color(0xFF10B981).withValues(alpha: 0.2) : cardBg,
-                                side: BorderSide(color: isSelected ? const Color(0xFF10B981) : borderColor),
+                                backgroundColor: isSelected
+                                    ? const Color(0xFF10B981)
+                                        .withValues(alpha: 0.2)
+                                    : cardBg,
+                                side: BorderSide(
+                                    color: isSelected
+                                        ? const Color(0xFF10B981)
+                                        : borderColor),
                                 avatar: CircleAvatar(
-                                  backgroundColor: comp.companyType == '人壽保險' ? const Color(0xFF10B981) : const Color(0xFF0EA5E9),
+                                  backgroundColor: comp.companyType == '人壽保險'
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFF0EA5E9),
                                   radius: 8,
-                                  child: Text(comp.count.toString(), style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold)),
+                                  child: Text(comp.count.toString(),
+                                      style: const TextStyle(
+                                          fontSize: 8,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold)),
                                 ),
-                                label: Text('${comp.companyName} (${comp.count}筆)', style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                                label: Text(
+                                    '${comp.companyName} (${comp.count}筆)',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal)),
                                 onPressed: () {
-                                  setState(() => _selectedCompanyForFilter = comp.companyName);
+                                  setState(() => _selectedCompanyForFilter =
+                                      comp.companyName);
                                   _triggerPolicySearch();
                                 },
                               );
@@ -704,7 +878,9 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            color: isDark
+                                ? const Color(0xFF0F172A)
+                                : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: borderColor),
                           ),
@@ -715,15 +891,21 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                 controller: _searchController,
                                 onChanged: _onSearchChanged,
                                 decoration: InputDecoration(
-                                  hintText: '🔍 全文搜尋商品名稱、代碼或給付關鍵字 (如: 超額責任、達文西、實支實付)...',
-                                  hintStyle: TextStyle(fontSize: 12, color: subTextColor),
+                                  hintText:
+                                      '🔍 全文搜尋商品名稱、代碼或給付關鍵字 (如: 超額責任、達文西、實支實付)...',
+                                  hintStyle: TextStyle(
+                                      fontSize: 12, color: subTextColor),
                                   isDense: true,
                                   filled: true,
                                   fillColor: cardBg,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide:
+                                          BorderSide(color: borderColor)),
                                   suffixIcon: _searchController.text.isNotEmpty
                                       ? IconButton(
-                                          icon: const Icon(Icons.clear_rounded, size: 16),
+                                          icon: const Icon(Icons.clear_rounded,
+                                              size: 16),
                                           onPressed: () {
                                             _searchController.clear();
                                             _onSearchChanged('');
@@ -737,11 +919,16 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                 spacing: 6,
                                 runSpacing: 6,
                                 children: _availableCategories.map((cat) {
-                                  final isSelected = _selectedCategoryFilters.contains(cat);
+                                  final isSelected =
+                                      _selectedCategoryFilters.contains(cat);
                                   return FilterChip(
                                     selected: isSelected,
                                     label: Text(cat),
-                                    labelStyle: TextStyle(fontSize: 10, color: isSelected ? Colors.white : textColor),
+                                    labelStyle: TextStyle(
+                                        fontSize: 10,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : textColor),
                                     selectedColor: const Color(0xFF0EA5E9),
                                     onSelected: (sel) {
                                       setState(() {
@@ -756,11 +943,18 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                   );
                                 }).toList(),
                               ),
-                              if (_selectedCategoryFilters.isNotEmpty || _selectedCompanyForFilter != null || _searchQuery.isNotEmpty) ...[
+                              if (_selectedCategoryFilters.isNotEmpty ||
+                                  _selectedCompanyForFilter != null ||
+                                  _searchQuery.isNotEmpty) ...[
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
-                                    Text('篩選結果：符合 ${_filteredPolicies.length} 筆', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                    Text(
+                                        '篩選結果：符合 ${_filteredPolicies.length} 筆',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF10B981))),
                                     const Spacer(),
                                     TextButton(
                                       onPressed: () {
@@ -772,7 +966,10 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                         });
                                         _triggerPolicySearch();
                                       },
-                                      child: const Text('重設全部條件 ✕', style: TextStyle(fontSize: 11, color: Colors.redAccent)),
+                                      child: const Text('重設全部條件 ✕',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.redAccent)),
                                     ),
                                   ],
                                 ),
@@ -785,50 +982,93 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
 
                         // Filtered Policy Results (Drill-down inspection cards)
                         if (_isSearchingPolicies)
-                          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+                          const Center(
+                              child: Padding(
+                                  padding: EdgeInsets.all(20),
+                                  child: CircularProgressIndicator()))
                         else if (_filteredPolicies.isEmpty)
-                          Center(child: Padding(padding: const EdgeInsets.all(20), child: Text('查無符合條件的保單條款', style: TextStyle(color: subTextColor))))
+                          Center(
+                              child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Text('查無符合條件的保單條款',
+                                      style: TextStyle(color: subTextColor))))
                         else
                           ListView.separated(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _filteredPolicies.length > 8 ? 8 : _filteredPolicies.length,
-                            separatorBuilder: (c, i) => const SizedBox(height: 8),
+                            itemCount: _filteredPolicies.length > 8
+                                ? 8
+                                : _filteredPolicies.length,
+                            separatorBuilder: (c, i) =>
+                                const SizedBox(height: 8),
                             itemBuilder: (c, i) {
                               final p = _filteredPolicies[i];
-                              final isSelected = _activeInspectedPolicy?.id == p.id;
+                              final isSelected =
+                                  _activeInspectedPolicy?.id == p.id;
                               return InkWell(
-                                onTap: () => setState(() => _activeInspectedPolicy = p),
+                                onTap: () =>
+                                    setState(() => _activeInspectedPolicy = p),
                                 borderRadius: BorderRadius.circular(10),
                                 child: Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFF10B981).withValues(alpha: 0.1) : cardBg,
+                                    color: isSelected
+                                        ? const Color(0xFF10B981)
+                                            .withValues(alpha: 0.1)
+                                        : cardBg,
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: isSelected ? const Color(0xFF10B981) : borderColor),
+                                    border: Border.all(
+                                        color: isSelected
+                                            ? const Color(0xFF10B981)
+                                            : borderColor),
                                   ),
                                   child: Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(6),
+                                          color: const Color(0xFF0EA5E9)
+                                              .withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
                                         ),
-                                        child: Text(p.companyName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0EA5E9))),
+                                        child: Text(p.companyName,
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF0EA5E9))),
                                       ),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            Text(p.productName, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                            Text(p.productName,
+                                                style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: textColor),
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis),
                                             const SizedBox(height: 2),
-                                            Text('${p.category} • ${p.roomLimit} • ${p.surgeryLimit} • ${p.miscLimit}', style: TextStyle(fontSize: 10, color: subTextColor), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                            Text(
+                                                '${p.category} • ${p.roomLimit} • ${p.surgeryLimit} • ${p.miscLimit}',
+                                                style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: subTextColor),
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis),
                                           ],
                                         ),
                                       ),
-                                      const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Colors.grey),
+                                      const Icon(
+                                          Icons.arrow_forward_ios_rounded,
+                                          size: 12,
+                                          color: Colors.grey),
                                     ],
                                   ),
                                 ),
@@ -847,7 +1087,9 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                     decoration: BoxDecoration(
                       color: cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF0EA5E9).withValues(alpha: 0.4), width: 1.5),
+                      border: Border.all(
+                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.4),
+                          width: 1.5),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -859,16 +1101,27 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(color: const Color(0xFF0EA5E9).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                                  child: const Icon(Icons.newspaper_rounded, color: Color(0xFF0EA5E9), size: 22),
+                                  decoration: BoxDecoration(
+                                      color: const Color(0xFF0EA5E9)
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(10)),
+                                  child: const Icon(Icons.newspaper_rounded,
+                                      color: Color(0xFF0EA5E9), size: 22),
                                 ),
                                 const SizedBox(width: 12),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('📰 保險新聞管線與動態自訂 RSS 來源管理', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+                                    Text('📰 保險新聞管線與動態自訂 RSS 來源管理',
+                                        style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: textColor)),
                                     const SizedBox(height: 2),
-                                    Text('資料庫動態驅動 (news_rss_sources) · 支援自訂網址與連線測試', style: TextStyle(fontSize: 11, color: subTextColor)),
+                                    Text(
+                                        '資料庫動態驅動 (news_rss_sources) · 支援自訂網址與連線測試',
+                                        style: TextStyle(
+                                            fontSize: 11, color: subTextColor)),
                                   ],
                                 ),
                               ],
@@ -876,14 +1129,17 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                             ElevatedButton.icon(
                               onPressed: () => _showAddRssDialog(),
                               icon: const Icon(Icons.add_rounded, size: 16),
-                              label: const Text('+ 新增自訂 RSS 來源', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0EA5E9), foregroundColor: Colors.white),
+                              label: const Text('+ 新增自訂 RSS 來源',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0EA5E9),
+                                  foregroundColor: Colors.white),
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 16),
-
                         if (_isLoadingRss)
                           const Center(child: CircularProgressIndicator())
                         else
@@ -891,7 +1147,8 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _rssSources.length,
-                            separatorBuilder: (c, i) => const Divider(height: 1),
+                            separatorBuilder: (c, i) =>
+                                const Divider(height: 1),
                             itemBuilder: (c, i) {
                               final src = _rssSources[i];
                               return ListTile(
@@ -899,44 +1156,78 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: (src.isActive ? const Color(0xFF10B981) : Colors.grey).withValues(alpha: 0.15),
+                                    color: (src.isActive
+                                            ? const Color(0xFF10B981)
+                                            : Colors.grey)
+                                        .withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: Icon(Icons.rss_feed_rounded, color: src.isActive ? const Color(0xFF10B981) : Colors.grey, size: 18),
+                                  child: Icon(Icons.rss_feed_rounded,
+                                      color: src.isActive
+                                          ? const Color(0xFF10B981)
+                                          : Colors.grey,
+                                      size: 18),
                                 ),
                                 title: Row(
                                   children: [
-                                    Text(src.sourceName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
+                                    Text(src.sourceName,
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: textColor)),
                                     const SizedBox(width: 8),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: const Color(0xFF0EA5E9).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                                      child: Text(src.category, style: const TextStyle(fontSize: 10, color: Color(0xFF0EA5E9))),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                          color: const Color(0xFF0EA5E9)
+                                              .withValues(alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(6)),
+                                      child: Text(src.category,
+                                          style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Color(0xFF0EA5E9))),
                                     ),
                                   ],
                                 ),
-                                subtitle: Text(src.rssUrl, style: TextStyle(fontSize: 11, color: subTextColor), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                subtitle: Text(src.rssUrl,
+                                    style: TextStyle(
+                                        fontSize: 11, color: subTextColor),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                        color: const Color(0xFF10B981)
+                                            .withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: Text(src.healthStatus, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                      child: Text(src.healthStatus,
+                                          style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF10B981))),
                                     ),
                                     const SizedBox(width: 8),
                                     Switch(
                                       value: src.isActive,
                                       activeTrackColor: const Color(0xFF10B981),
                                       onChanged: (val) async {
-                                        final ok = await _rssService.toggleSourceStatus(src.id, val);
+                                        final ok = await _rssService
+                                            .toggleSourceStatus(src.id, val);
                                         if (ok && mounted) {
-                                          final updated = await _rssService.getRssSources();
+                                          final updated =
+                                              await _rssService.getRssSources();
                                           setState(() => _rssSources = updated);
-                                          CustomToast.show(context, '已${val ? '啟用' : '停用'}來源: ${src.sourceName}', ToastType.success);
+                                          CustomToast.show(
+                                              context,
+                                              '已${val ? '啟用' : '停用'}來源: ${src.sourceName}',
+                                              ToastType.success);
                                         }
                                       },
                                     ),
@@ -957,7 +1248,9 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                     decoration: BoxDecoration(
                       color: cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.4), width: 1.5),
+                      border: Border.all(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+                          width: 1.5),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -966,16 +1259,27 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                           children: [
                             Container(
                               padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                              child: const Icon(Icons.graphic_eq_rounded, color: Color(0xFF6366F1), size: 22),
+                              decoration: BoxDecoration(
+                                  color: const Color(0xFF6366F1)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10)),
+                              child: const Icon(Icons.graphic_eq_rounded,
+                                  color: Color(0xFF6366F1), size: 22),
                             ),
                             const SizedBox(width: 12),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('🎙️ 語音 STT & Deno Edge Function 引擎', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
+                                Text('🎙️ 語音 STT & Deno Edge Function 引擎',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: textColor)),
                                 const SizedBox(height: 2),
-                                Text('voice-scheduler (Groq Whisper + Llama 3.3 70B) • 延遲 24ms 正常', style: TextStyle(fontSize: 11, color: subTextColor)),
+                                Text(
+                                    'voice-scheduler (Groq Whisper + Llama 3.3 70B) • 延遲 24ms 正常',
+                                    style: TextStyle(
+                                        fontSize: 11, color: subTextColor)),
                               ],
                             ),
                           ],
@@ -989,18 +1293,26 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                   try {
                                     final supabase = Supabase.instance.client;
                                     // 1. 檢查麥克風權限
-                                    final voiceService = VoiceTranscriptionService();
-                                    final hasMicPerm = await voiceService.hasPermission();
-                                    
+                                    final voiceService =
+                                        VoiceTranscriptionService();
+                                    final hasMicPerm =
+                                        await voiceService.hasPermission();
+
                                     // 2. 真實探測 Edge Function
-                                    final response = await supabase.functions.invoke(
+                                    final response =
+                                        await supabase.functions.invoke(
                                       'voice-scheduler',
-                                      body: {'healthCheck': true, 'timestamp': DateTime.now().toIso8601String()},
+                                      body: {
+                                        'healthCheck': true,
+                                        'timestamp':
+                                            DateTime.now().toIso8601String()
+                                      },
                                     );
                                     stopwatch.stop();
-                                    
+
                                     if (mounted) {
-                                      setState(() => _isTestingVoiceApi = false);
+                                      setState(
+                                          () => _isTestingVoiceApi = false);
                                       if (response.status == 200) {
                                         CustomToast.show(
                                           context,
@@ -1018,7 +1330,8 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                   } catch (e) {
                                     stopwatch.stop();
                                     if (mounted) {
-                                      setState(() => _isTestingVoiceApi = false);
+                                      setState(
+                                          () => _isTestingVoiceApi = false);
                                       CustomToast.show(
                                         context,
                                         '❌ [Voice Edge API] 連線失敗 (${stopwatch.elapsedMilliseconds}ms): $e',
@@ -1028,101 +1341,24 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                                   }
                                 },
                           icon: _isTestingVoiceApi
-                              ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.bug_report_outlined, size: 14),
-                          label: Text(_isTestingVoiceApi ? '真實檢測中...' : '真實連線與硬體檢測', style: const TextStyle(fontSize: 11)),
-                          style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF6366F1), side: const BorderSide(color: Color(0xFF6366F1))),
+                          label: Text(
+                              _isTestingVoiceApi ? '真實檢測中...' : '真實連線與硬體檢測',
+                              style: const TextStyle(fontSize: 11)),
+                          style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF6366F1),
+                              side: const BorderSide(color: Color(0xFF6366F1))),
                         ),
                       ],
                     ),
                   ),
 
                   const SizedBox(height: 24),
-
-                  // 4. 登入頁 Demo 快速通道開關 (Login Screen Demo Access Control)
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF00ADB5).withValues(alpha: 0.4), width: 1.5),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF00ADB5).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.rocket_launch_rounded, color: Color(0xFF00ADB5), size: 22),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Text(
-                                          '登入頁 Demo 快速通道開關',
-                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: _showFastDemoLogin 
-                                                ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                                                : Colors.grey.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            _showFastDemoLogin ? 'DEMO 模式 (ON)' : '正式商業模式 (OFF)',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: _showFastDemoLogin ? const Color(0xFF10B981) : Colors.grey,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '開啟時，未登入畫面將顯示『🚀 快速進入系統預覽』按鈕，便於專題現場免帳密演示；關閉時完全隱藏，呈現乾淨商業登入頁。',
-                                      style: TextStyle(fontSize: 12, color: subTextColor),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Switch(
-                          value: _showFastDemoLogin,
-                          activeTrackColor: const Color(0xFF00ADB5),
-                          onChanged: (val) async {
-                            final prefs = await SharedPreferences.getInstance();
-                            await prefs.setBool('dev_show_fast_demo_login', val);
-                            setState(() => _showFastDemoLogin = val);
-                            if (mounted) {
-                              CustomToast.show(
-                                context,
-                                val ? '🚀 已啟用「登入頁 Demo 快速通道」' : '🔒 已關閉「登入頁 Demo 快速通道」（切換為正式商業模式）',
-                                ToastType.success,
-                              );
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -1134,27 +1370,33 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
               width: 380,
               decoration: BoxDecoration(
                 color: cardBg,
-                border: Border(left: BorderSide(color: borderColor, width: 1.5)),
+                border:
+                    Border(left: BorderSide(color: borderColor, width: 1.5)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderColor))),
+                    decoration: BoxDecoration(
+                        border: Border(bottom: BorderSide(color: borderColor))),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.policy_rounded, color: Color(0xFF10B981), size: 18),
+                            Icon(Icons.policy_rounded,
+                                color: Color(0xFF10B981), size: 18),
                             SizedBox(width: 8),
-                            Text('條款真實抽查檢視器', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                            Text('條款真實抽查檢視器',
+                                style: TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         IconButton(
                           icon: const Icon(Icons.close_rounded, size: 18),
-                          onPressed: () => setState(() => _activeInspectedPolicy = null),
+                          onPressed: () =>
+                              setState(() => _activeInspectedPolicy = null),
                         ),
                       ],
                     ),
@@ -1166,50 +1408,95 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
-                            child: Text(_activeInspectedPolicy!.companyName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                                color: const Color(0xFF10B981)
+                                    .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6)),
+                            child: Text(_activeInspectedPolicy!.companyName,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF10B981))),
                           ),
                           const SizedBox(height: 8),
-                          Text(_activeInspectedPolicy!.productName, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+                          Text(_activeInspectedPolicy!.productName,
+                              style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor)),
                           const SizedBox(height: 6),
-                          Text('險種分類：${_activeInspectedPolicy!.category}', style: TextStyle(fontSize: 12, color: subTextColor)),
-                          Text('等待期：${_activeInspectedPolicy!.waitingDays}', style: TextStyle(fontSize: 12, color: subTextColor)),
+                          Text('險種分類：${_activeInspectedPolicy!.category}',
+                              style:
+                                  TextStyle(fontSize: 12, color: subTextColor)),
+                          Text('等待期：${_activeInspectedPolicy!.waitingDays}',
+                              style:
+                                  TextStyle(fontSize: 12, color: subTextColor)),
                           const SizedBox(height: 16),
                           const Divider(height: 1),
                           const SizedBox(height: 16),
-                          Text('📑 官方條款 5 大給付限額 (白話對照)：', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
+                          Text('📑 官方條款 5 大給付限額 (白話對照)：',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor)),
                           const SizedBox(height: 10),
-                          _buildDetailBenefitRow('病房給付 / 意外日額', _activeInspectedPolicy!.roomLimit, Icons.hotel_rounded),
-                          _buildDetailBenefitRow('手術給付 / 體傷責任', _activeInspectedPolicy!.surgeryLimit, Icons.medical_services_rounded),
-                          _buildDetailBenefitRow('醫療雜費 / 超額財損', _activeInspectedPolicy!.miscLimit, Icons.receipt_rounded),
+                          _buildDetailBenefitRow(
+                              '病房給付 / 意外日額',
+                              _activeInspectedPolicy!.roomLimit,
+                              Icons.hotel_rounded),
+                          _buildDetailBenefitRow(
+                              '手術給付 / 體傷責任',
+                              _activeInspectedPolicy!.surgeryLimit,
+                              Icons.medical_services_rounded),
+                          _buildDetailBenefitRow(
+                              '醫療雜費 / 超額財損',
+                              _activeInspectedPolicy!.miscLimit,
+                              Icons.receipt_rounded),
                           const SizedBox(height: 16),
-                          Text('🏷️ 特性標籤：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+                          Text('🏷️ 特性標籤：',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor)),
                           const SizedBox(height: 6),
                           Wrap(
                             spacing: 6,
                             runSpacing: 6,
-                            children: _activeInspectedPolicy!.tags.map((t) => Chip(
-                              label: Text(t, style: const TextStyle(fontSize: 10)),
-                              padding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                            )).toList(),
+                            children: _activeInspectedPolicy!.tags
+                                .map((t) => Chip(
+                                      label: Text(t,
+                                          style: const TextStyle(fontSize: 10)),
+                                      padding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                    ))
+                                .toList(),
                           ),
                           const SizedBox(height: 20),
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                              color: isDark
+                                  ? const Color(0xFF0F172A)
+                                  : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: borderColor),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('🔗 官方備查條款 PDF 連結：', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                const Text('🔗 官方備查條款 PDF 連結：',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 4),
-                                SelectableText(_activeInspectedPolicy!.rawPdfUrl, style: const TextStyle(fontSize: 11, color: Color(0xFF38BDF8))),
+                                SelectableText(
+                                    _activeInspectedPolicy!.rawPdfUrl,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF38BDF8))),
                               ],
                             ),
                           ),
@@ -1227,7 +1514,9 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
 
   List<CompanyPolicyStat> _getFilteredCompanyStats() {
     if (_selectedCompanyTypeFilter == '全部') return _companyStats;
-    return _companyStats.where((c) => c.companyType == _selectedCompanyTypeFilter).toList();
+    return _companyStats
+        .where((c) => c.companyType == _selectedCompanyTypeFilter)
+        .toList();
   }
 
   Widget _buildMetricCard({
@@ -1247,11 +1536,21 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(fontSize: 11, color: isDark ? Colors.grey[400] : Colors.grey[600])),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600])),
           const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: valueColor), maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.bold, color: valueColor),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
-          Text(subText, style: TextStyle(fontSize: 10, color: isDark ? Colors.grey[500] : Colors.grey[500])),
+          Text(subText,
+              style: TextStyle(
+                  fontSize: 10,
+                  color: isDark ? Colors.grey[500] : Colors.grey[500])),
         ],
       ),
     );
@@ -1265,7 +1564,11 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
           Icon(icon, size: 16, color: const Color(0xFF10B981)),
           const SizedBox(width: 8),
           Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF10B981))),
         ],
       ),
     );

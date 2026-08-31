@@ -7,7 +7,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const CRAWLER_CRON_SECRET = Deno.env.get("CRAWLER_CRON_SECRET") || "insurance_helper_cron_secret";
+const CRAWLER_CRON_SECRET = Deno.env.get("CRAWLER_CRON_SECRET") ?? "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,8 +104,8 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization") ?? "";
     let isAuthorized = false;
 
-    // 1. 排程 Secret 驗證 (支援硬編碼與環境變數)
-    if (crawlerSecret === "insurance_helper_cron_secret" || (CRAWLER_CRON_SECRET && crawlerSecret === CRAWLER_CRON_SECRET)) {
+    // 1. 排程 Secret 驗證：只接受伺服器環境變數，絕不提供預設值。
+    if (CRAWLER_CRON_SECRET && crawlerSecret === CRAWLER_CRON_SECRET) {
       isAuthorized = true;
     }
 
@@ -123,7 +123,7 @@ serve(async (req) => {
     }
 
     if (!isAuthorized) {
-      return new Response(JSON.stringify({ success: false, error: "Unauthorized: Missing or invalid crawler secret" }), {
+      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });

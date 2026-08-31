@@ -75,7 +75,7 @@ void main() {
       await tester.pump(const Duration(seconds: 4));
     });
 
-    testWidgets('Step 1.5: 盾牌 5 連擊秘密真實登入 Demo 業務員「牛來」測試', (WidgetTester tester) async {
+    testWidgets('Step 1.5: 登入頁安全防護與常用信箱網域快選測試', (WidgetTester tester) async {
       isOfflineMode = true;
       offlineReason = 'Demo 測試驗收環境';
 
@@ -88,20 +88,21 @@ void main() {
       await tester.pumpWidget(const MyApp());
       await tester.pump(const Duration(milliseconds: 500));
 
-      final Finder shieldFinder = find.byKey(const ValueKey('shield_secret_logo'));
-      expect(shieldFinder, findsOneWidget);
+      // 驗證登入介面元素與標題
+      expect(find.text('insurance_helper'), findsOneWidget);
+      expect(find.text('常用信箱網域 ▾'), findsOneWidget);
 
-      final center = tester.getCenter(shieldFinder);
-      final safePoint = Offset(center.dx, center.dy + 20);
-      for (int i = 0; i < 5; i++) {
-        await tester.tapAt(safePoint);
-        await tester.pump(const Duration(milliseconds: 100));
-      }
-      await tester.pump(const Duration(milliseconds: 1000));
-      await tester.pump(const Duration(milliseconds: 500));
+      // 點擊常用網域快選按鈕
+      final domainSelector = find.text('常用信箱網域 ▾');
+      await tester.tap(domainSelector);
+      await tester.pumpAndSettle();
 
-      // 驗證已成功進入 HomeScreen
-      expect(find.byType(HomeScreen), findsOneWidget);
+      // 驗證網域選單彈出
+      expect(find.text('(@gmail.com)'), findsOneWidget);
+
+      // 點擊 Gmail 網域
+      await tester.tap(find.text('(@gmail.com)'));
+      await tester.pumpAndSettle();
 
       // 清除 Toast timer
       await tester.pump(const Duration(seconds: 4));
