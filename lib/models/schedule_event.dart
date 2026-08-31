@@ -11,6 +11,11 @@ class ScheduleEvent {
   final String? tag;
   final String eventType;
   final bool isCompleted;
+  final String? description;
+  final String? googleEventId;
+  final String? googleCalendarId;
+  final String syncStatus;
+  final DateTime? lastSyncedAt;
 
   ScheduleEvent({
     required this.id,
@@ -25,7 +30,14 @@ class ScheduleEvent {
     this.tag,
     this.eventType = 'personal',
     this.isCompleted = false,
+    this.description,
+    this.googleEventId,
+    this.googleCalendarId,
+    this.syncStatus = 'local_only',
+    this.lastSyncedAt,
   });
+
+  bool get isGoogleSynced => googleEventId != null && googleEventId!.isNotEmpty;
 
   factory ScheduleEvent.fromJson(Map<String, dynamic> json) {
     return ScheduleEvent(
@@ -42,6 +54,11 @@ class ScheduleEvent {
       tag: json['tag'] as String?,
       eventType: json['event_type'] as String? ?? 'personal',
       isCompleted: json['is_completed'] as bool? ?? false,
+      description: json['description'] as String?,
+      googleEventId: json['google_event_id'] as String?,
+      googleCalendarId: json['google_calendar_id'] as String?,
+      syncStatus: (json['sync_status'] as String?) ?? 'local_only',
+      lastSyncedAt: json['last_synced_at'] != null ? DateTime.parse(json['last_synced_at'] as String).toLocal() : null,
     );
   }
 
@@ -60,6 +77,51 @@ class ScheduleEvent {
       'tag': tag,
       'event_type': eventType,
       'is_completed': isCompleted,
+      'description': description,
+      'google_event_id': googleEventId,
+      'google_calendar_id': googleCalendarId,
+      'sync_status': syncStatus,
+      'last_synced_at': lastSyncedAt?.toUtc().toIso8601String(),
     };
+  }
+
+  ScheduleEvent copyWith({
+    String? id,
+    String? profileId,
+    String? customerId,
+    String? title,
+    DateTime? startAt,
+    DateTime? endAt,
+    String? location,
+    double? latitude,
+    double? longitude,
+    String? tag,
+    String? eventType,
+    bool? isCompleted,
+    String? description,
+    String? googleEventId,
+    String? googleCalendarId,
+    String? syncStatus,
+    DateTime? lastSyncedAt,
+  }) {
+    return ScheduleEvent(
+      id: id ?? this.id,
+      profileId: profileId ?? this.profileId,
+      customerId: customerId ?? this.customerId,
+      title: title ?? this.title,
+      startAt: startAt ?? this.startAt,
+      endAt: endAt ?? this.endAt,
+      location: location ?? this.location,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      tag: tag ?? this.tag,
+      eventType: eventType ?? this.eventType,
+      isCompleted: isCompleted ?? this.isCompleted,
+      description: description ?? this.description,
+      googleEventId: googleEventId ?? this.googleEventId,
+      googleCalendarId: googleCalendarId ?? this.googleCalendarId,
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+    );
   }
 }

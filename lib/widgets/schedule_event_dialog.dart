@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../models/schedule_event.dart';
 import '../services/app_localizations.dart';
 import '../services/location_service.dart';
+import '../services/schedule_service.dart';
 import 'custom_toast.dart';
 import '../main.dart';
 import 'categorized_tag_accordion_selector.dart';
@@ -15,6 +16,7 @@ class ScheduleEventDialog extends StatefulWidget {
   final ScheduleEvent? eventToEdit;
   final String? initialTitle;
   final String? initialEventType;
+  final String? initialCustomerId;
 
   const ScheduleEventDialog({
     super.key,
@@ -22,6 +24,7 @@ class ScheduleEventDialog extends StatefulWidget {
     this.eventToEdit,
     this.initialTitle,
     this.initialEventType,
+    this.initialCustomerId,
   });
 
   @override
@@ -34,7 +37,12 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
   late TextEditingController _titleController;
   late TextEditingController _locationController;
   late TextEditingController _tagController;
+  late TextEditingController _descriptionController;
   final TextEditingController _mapSearchController = TextEditingController();
+
+  String? _selectedCustomerId;
+  List<Map<String, dynamic>> _availableCustomers = [];
+  bool _isLoadingCustomers = false;
 
   late DateTime _startDate;
   late TimeOfDay _startTime;
@@ -62,6 +70,8 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
       _titleController = TextEditingController(text: event.title);
       _locationController = TextEditingController(text: event.location ?? '');
       _tagController = TextEditingController(text: event.tag ?? '');
+      _descriptionController = TextEditingController(text: event.description ?? '');
+      _selectedCustomerId = event.customerId;
       _startDate = event.startAt;
       _startTime = TimeOfDay.fromDateTime(event.startAt);
       _endDate = event.endAt;
@@ -72,7 +82,9 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
       _titleController = TextEditingController(text: widget.initialTitle ?? '');
       _locationController = TextEditingController();
       _tagController = TextEditingController();
-      
+      _descriptionController = TextEditingController();
+      _selectedCustomerId = widget.initialCustomerId;
+
       final now = DateTime.now();
       _startDate = DateTime(
         widget.initialDate.year,
@@ -82,7 +94,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
         0,
       );
       _startTime = TimeOfDay(hour: _startDate.hour, minute: 0);
-      
+
       _endDate = _startDate.add(const Duration(hours: 1));
       _endTime = TimeOfDay(hour: _endDate.hour, minute: 0);
 
@@ -96,6 +108,34 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
         }
       });
     }
+
+    _loadCustomers();
+  }
+
+  Future<void> _loadCustomers() async {
+    setState(() => _isLoadingCustomers = true);
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (isOfflineMode || user == null) {
+        _availableCustomers = List<Map<String, dynamic>>.from(OfflineDataStore.customers)
+            .where((c) => c['deleted_at'] == null)
+            .toList();
+      } else {
+        final data = await Supabase.instance.client
+            .from('customers')
+            .select('id, name, nickname, phone, tags, custom_attributes')
+            .isFilter('deleted_at', null)
+            .order('name');
+        _availableCustomers = List<Map<String, dynamic>>.from(data as List);
+      }
+    } catch (e) {
+      debugPrint('⚠️ 載入客戶清單失敗，降級本地: $e');
+      _availableCustomers = List<Map<String, dynamic>>.from(OfflineDataStore.customers)
+          .where((c) => c['deleted_at'] == null)
+          .toList();
+    } finally {
+      if (mounted) setState(() => _isLoadingCustomers = false);
+    }
   }
 
   @override
@@ -103,6 +143,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
     _titleController.dispose();
     _locationController.dispose();
     _tagController.dispose();
+    _descriptionController.dispose();
     _mapSearchController.dispose();
     _mapController.dispose();
     super.dispose();
@@ -186,52 +227,35 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
       final user = Supabase.instance.client.auth.currentUser;
       final profileId = user?.id ?? 'offline-user';
 
-      final eventData = <String, dynamic>{
-        'profile_id': profileId,
-        'title': _titleController.text.trim(),
-        'start_at': startDateTime.toUtc().toIso8601String(),
-        'end_at': endDateTime.toUtc().toIso8601String(),
-        'location': _locationController.text.trim().isEmpty ? null : _locationController.text.trim(),
-        'latitude': _selectedLat,
-        'longitude': _selectedLng,
-        'tag': _tagController.text.trim().isEmpty ? null : _tagController.text.trim(),
-        'event_type': widget.eventToEdit?.eventType ?? widget.initialEventType ?? 'personal',
-      };
+      final eventToSave = ScheduleEvent(
+        id: widget.eventToEdit?.id ?? '',
+        profileId: widget.eventToEdit?.profileId ?? profileId,
+        customerId: _selectedCustomerId,
+        title: _titleController.text.trim(),
+        startAt: startDateTime,
+        endAt: endDateTime,
+        location: _locationController.text.trim().isEmpty ? null : _locationController.text.trim(),
+        latitude: _selectedLat,
+        longitude: _selectedLng,
+        tag: _tagController.text.trim().isEmpty ? null : _tagController.text.trim(),
+        eventType: widget.eventToEdit?.eventType ?? widget.initialEventType ?? (_selectedCustomerId != null ? 'visit' : 'personal'),
+        isCompleted: widget.eventToEdit?.isCompleted ?? false,
+        description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+        googleEventId: widget.eventToEdit?.googleEventId,
+        googleCalendarId: widget.eventToEdit?.googleCalendarId,
+        syncStatus: widget.eventToEdit?.syncStatus ?? 'local_only',
+        lastSyncedAt: widget.eventToEdit?.lastSyncedAt,
+      );
 
-      if (!isOfflineMode && user != null) {
-        try {
-          if (widget.eventToEdit != null) {
-            await Supabase.instance.client
-                .from('schedule_events')
-                .update(eventData)
-                .eq('id', widget.eventToEdit!.id);
-          } else {
-            await Supabase.instance.client
-                .from('schedule_events')
-                .insert(eventData);
-          }
-        } catch (dbErr) {
-          final errStr = dbErr.toString();
-          // 若線上資料庫尚未套用 latitude/longitude 欄位 (PGRST204)，則備援寫入純文字地址
-          if (errStr.contains('latitude') || errStr.contains('PGRST204')) {
-            eventData.remove('latitude');
-            eventData.remove('longitude');
-            if (widget.eventToEdit != null) {
-              await Supabase.instance.client
-                  .from('schedule_events')
-                  .update(eventData)
-                  .eq('id', widget.eventToEdit!.id);
-            } else {
-              await Supabase.instance.client
-                  .from('schedule_events')
-                  .insert(eventData);
-            }
-            if (mounted) {
-              CustomToast.show(context, '線上資料庫尚未擴充經緯度欄位，已自動相容儲存。', ToastType.warning);
-            }
-          } else {
-            rethrow;
-          }
+      if (widget.eventToEdit != null) {
+        await ScheduleService.instance.updateEvent(eventToSave);
+        if (mounted) {
+          CustomToast.show(context, '行程更新成功 ✅', ToastType.success);
+        }
+      } else {
+        await ScheduleService.instance.createEvent(eventToSave);
+        if (mounted) {
+          CustomToast.show(context, '行程建立成功 📅', ToastType.success);
         }
       }
 
@@ -250,7 +274,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
 
   Future<void> _deleteEvent() async {
     if (widget.eventToEdit == null) return;
-    
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -272,14 +296,9 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
     setState(() => _isDeleting = true);
 
     try {
-      if (!isOfflineMode) {
-        await Supabase.instance.client
-            .from('schedule_events')
-            .delete()
-            .eq('id', widget.eventToEdit!.id);
-      }
-
+      await ScheduleService.instance.deleteEvent(widget.eventToEdit!.id);
       if (mounted) {
+        CustomToast.show(context, '行程已成功刪除', ToastType.warning);
         Navigator.of(context).pop('deleted');
       }
     } catch (e) {
@@ -296,11 +315,13 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
     final isEdit = widget.eventToEdit != null;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final currentCenter = (_selectedLat != null && _selectedLng != null)
-        ? LatLng(_selectedLat!, _selectedLng!)
-        : _defaultCenter;
-
     Widget buildFormColumn() {
+      // Find selected customer info if any
+      final selectedCustomer = _availableCustomers.firstWhere(
+        (c) => c['id'].toString() == _selectedCustomerId,
+        orElse: () => {},
+      );
+
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,15 +330,137 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                isEdit ? context.l10n('event_edit_title') : context.l10n('event_add_title'),
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.event_available, color: Color(0xFF0284C7), size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    isEdit ? context.l10n('event_edit_title') : context.l10n('event_add_title'),
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+
+          // Customer Selector Section (關聯客戶)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.person_outline, size: 18, color: Color(0xFF0284C7)),
+                        const SizedBox(width: 6),
+                        Text(
+                          '關聯客戶 (可選)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_selectedCustomerId != null)
+                      TextButton(
+                        onPressed: () => setState(() => _selectedCustomerId = null),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(40, 24),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('清除關聯', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedCustomerId,
+                    isExpanded: true,
+                    hint: Text(
+                      _isLoadingCustomers ? '載入客戶中...' : '👤 選擇此行程關聯的客戶 (選定後自動帶入備註)',
+                      style: TextStyle(fontSize: 13, color: isDark ? Colors.white38 : Colors.black38),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('無關聯客戶 (個人行程)', style: TextStyle(fontSize: 13)),
+                      ),
+                      ..._availableCustomers.map((cust) {
+                        final name = cust['name']?.toString() ?? '未命名';
+                        final phone = cust['phone']?.toString() ?? '';
+                        return DropdownMenuItem<String?>(
+                          value: cust['id'].toString(),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 12,
+                                backgroundColor: const Color(0xFF0284C7).withValues(alpha: 0.2),
+                                child: Text(
+                                  name.isNotEmpty ? name[0] : '?',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                              if (phone.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Text('($phone)', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black45)),
+                              ],
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedCustomerId = val;
+                        if (val != null) {
+                          final c = _availableCustomers.firstWhere((x) => x['id'].toString() == val, orElse: () => {});
+                          if (c.isNotEmpty) {
+                            final name = c['name']?.toString() ?? '';
+                            if (_titleController.text.trim().isEmpty || _titleController.text.startsWith('拜訪:')) {
+                              _titleController.text = '拜訪 $name';
+                            }
+                            // Check for customer address in custom_attributes or notes
+                            final customAttrs = c['custom_attributes'] as Map<String, dynamic>?;
+                            final addr = customAttrs?['address']?.toString() ?? '';
+                            if (addr.isNotEmpty && _locationController.text.trim().isEmpty) {
+                              _locationController.text = addr;
+                            }
+                          }
+                        }
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -449,7 +592,6 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
           TextFormField(
             controller: _locationController,
             textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => _saveEvent(),
             decoration: InputDecoration(
               labelText: context.l10n('event_location_label'),
               hintText: context.l10n('event_location_hint'),
@@ -481,6 +623,23 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
               ],
             ),
           ],
+          const SizedBox(height: 16),
+
+          // Description Input (拜訪重點 / 備註)
+          TextFormField(
+            controller: _descriptionController,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: '📝 行程詳細備註 / 拜訪重點',
+              hintText: '例：討論醫療險續約、檢視實支實付收據、客戶偏好下午喝茶...',
+              alignLabelWithHint: true,
+              prefixIcon: Padding(
+                padding: EdgeInsets.only(bottom: 24),
+                child: Icon(Icons.notes_outlined),
+              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+            ),
+          ),
           const SizedBox(height: 16),
 
           // Dynamic Categorized Tag Selector
@@ -521,7 +680,10 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : Text(isEdit ? context.l10n('profile_save_changes') : context.l10n('event_add_title'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    : Text(
+                        isEdit ? context.l10n('profile_save_changes') : context.l10n('event_add_title'),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
               ),
             ],
           ),
@@ -532,7 +694,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        width: MediaQuery.of(context).size.width >= 560 ? 480 : MediaQuery.of(context).size.width * 0.92,
+        width: MediaQuery.of(context).size.width >= 560 ? 520 : MediaQuery.of(context).size.width * 0.94,
         padding: const EdgeInsets.all(24.0),
         child: Form(
           key: _formKey,
@@ -554,10 +716,6 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (modalCtx, setModalState) {
-          final currentCenter = (_selectedLat != null && _selectedLng != null)
-              ? LatLng(_selectedLat!, _selectedLng!)
-              : _defaultCenter;
-
           return Dialog(
             insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -598,21 +756,20 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           decoration: InputDecoration(
                             hintText: '搜尋地點 (例: 星巴克, 台北車站)',
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            prefixIcon: const Icon(Icons.search, size: 20),
                             suffixIcon: _isSearchingPlace
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                    child: Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
                                   )
                                 : IconButton(
-                                    icon: const Icon(Icons.search, size: 20),
-                                    onPressed: () async {
-                                      await _performSearch(_mapSearchController.text);
-                                      setModalState(() {});
-                                    },
+                                    icon: const Icon(Icons.clear, size: 18),
+                                    onPressed: () => _mapSearchController.clear(),
                                   ),
+                            border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
                           ),
                           onSubmitted: (val) async {
                             await _performSearch(val);
@@ -621,48 +778,52 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: '在 Google 地圖中開啟',
-                        icon: const Icon(Icons.open_in_new, color: Color(0xFF0284C7)),
-                        onPressed: () => LocationService.openInGoogleMaps(
-                          lat: _selectedLat,
-                          lon: _selectedLng,
-                          address: _locationController.text,
+                      ElevatedButton(
+                        onPressed: () async {
+                          await _performSearch(_mapSearchController.text);
+                          setModalState(() {});
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
+                        child: const Text('搜尋'),
                       ),
                     ],
                   ),
+
+                  // Search Results List (if any)
                   if (_searchResults.isNotEmpty)
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 120),
-                      child: Container(
-                        margin: const EdgeInsets.only(top: 6),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: isDark ? Colors.white24 : Colors.grey.shade300),
-                        ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _searchResults.length,
-                          itemBuilder: (c, idx) {
-                            final item = _searchResults[idx];
-                            return ListTile(
-                              dense: true,
-                              leading: const Icon(Icons.location_on, size: 18, color: Colors.redAccent),
-                              title: Text(item.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-                              onTap: () {
-                                _selectSearchResult(item);
-                                setModalState(() {});
-                              },
-                            );
-                          },
-                        ),
+                    Container(
+                      margin: const EdgeInsets.only(top: 6),
+                      constraints: const BoxConstraints(maxHeight: 140),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _searchResults.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, idx) {
+                          final item = _searchResults[idx];
+                          return ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.location_on, size: 18, color: Color(0xFF0284C7)),
+                            title: Text(item.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () {
+                              _selectSearchResult(item);
+                              setModalState(() {});
+                            },
+                          );
+                        },
                       ),
                     ),
                   const SizedBox(height: 10),
 
-                  // Map Canvas Area
+                  // Interactive Flutter Map View
                   Expanded(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -671,10 +832,12 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                           FlutterMap(
                             mapController: _mapController,
                             options: MapOptions(
-                              initialCenter: currentCenter,
-                              initialZoom: 14,
-                              onTap: (tapPos, point) {
-                                _onMapTap(point);
+                              initialCenter: (_selectedLat != null && _selectedLng != null)
+                                  ? LatLng(_selectedLat!, _selectedLng!)
+                                  : _defaultCenter,
+                              initialZoom: 15,
+                              onTap: (_, point) async {
+                                await _onMapTap(point);
                                 setModalState(() {});
                               },
                             ),
