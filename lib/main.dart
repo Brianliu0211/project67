@@ -19,7 +19,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('zh_TW', null);
   await initializeDateFormatting('en_US', null);
-  
+
   // Load AppSettings
   await AppSettings.instance.loadSettings();
 
@@ -44,12 +44,13 @@ void main() async {
     supabaseKey = const String.fromEnvironment('SUPABASE_ANON_KEY');
   }
   if (supabaseKey.isEmpty) {
-    supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsZ3VmdW94a2Vpenh3a29mbW1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTU2NzgsImV4cCI6MjA5OTA3MTY3OH0.QMEU47EHuLwEr7ok7O28h6U7Sh-geldoTQ5eZfI5tBA';
+    supabaseKey =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsZ3VmdW94a2Vpenh3a29mbW1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTU2NzgsImV4cCI6MjA5OTA3MTY3OH0.QMEU47EHuLwEr7ok7O28h6U7Sh-geldoTQ5eZfI5tBA';
   }
 
   // If placeholders or empty values are detected, fall back to offline preview
-  if (supabaseUrl.isEmpty || 
-      supabaseKey.isEmpty || 
+  if (supabaseUrl.isEmpty ||
+      supabaseKey.isEmpty ||
       supabaseUrl.contains('your-project-id')) {
     isOfflineMode = true;
     offlineReason = '未檢測到有效的 Supabase URL 或 ANON KEY';
@@ -120,7 +121,10 @@ class MyApp extends StatelessWidget {
             backgroundColor: Colors.white,
             elevation: 1,
             iconTheme: IconThemeData(color: primaryColor),
-            titleTextStyle: const TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold),
+            titleTextStyle: const TextStyle(
+                color: Colors.black87,
+                fontSize: 18,
+                fontWeight: FontWeight.bold),
           ),
           cardTheme: const CardThemeData(
             color: Colors.white,
@@ -207,8 +211,10 @@ class _AuthGatewayState extends State<AuthGateway> {
           );
         }
 
-        final session = snapshot.data?.session ?? Supabase.instance.client.auth.currentSession;
+        final session = snapshot.data?.session ??
+            Supabase.instance.client.auth.currentSession;
         if (session != null) {
+          OfflineDataStore.ensureOwner(session.user.id);
           // Check profile status from Supabase to enforce pending approval gate
           return FutureBuilder<Map<String, dynamic>?>(
             future: Supabase.instance.client
@@ -225,10 +231,20 @@ class _AuthGatewayState extends State<AuthGateway> {
                 );
               }
               final profileData = profileSnap.data;
-              final status = profileData?['status'] as String? ?? 'active';
+              final status = profileData?['status'] as String?;
               final role = profileData?['role'] as String? ?? 'agent';
 
-              // If status is pending and user is not dev, block access and route to PendingApprovalScreen
+              // A missing or unknown status must never grant access.
+              if (profileData == null ||
+                  status == null ||
+                  status == 'deleted' ||
+                  status == 'suspended') {
+                return _AccessDeniedScreen(
+                  onSignOut: () => Supabase.instance.client.auth.signOut(),
+                );
+              }
+
+              // Pending users wait for approval unless they are the development account.
               if (status == 'pending' && role != 'dev') {
                 return PendingApprovalScreen(
                   userEmail: session.user.email ?? '',
@@ -241,6 +257,7 @@ class _AuthGatewayState extends State<AuthGateway> {
             },
           );
         } else {
+          OfflineDataStore.clear();
           return const LoginScreen();
         }
       },
@@ -249,8 +266,57 @@ class _AuthGatewayState extends State<AuthGateway> {
 }
 
 class OfflineDataStore {
+  static String? _ownerId;
   static List<Map<String, dynamic>> customers = [];
   static List<Map<String, dynamic>> customerRelationships = [];
   static List<Map<String, dynamic>> scheduleEvents = [];
+
+  static void ensureOwner(String ownerId) {
+    if (_ownerId != ownerId) {
+      clear();
+      _ownerId = ownerId;
+    }
+  }
+
+  static void clear() {
+    _ownerId = null;
+    customers = [];
+    customerRelationships = [];
+    scheduleEvents = [];
+  }
 }
 
+class _AccessDeniedScreen extends StatelessWidget {
+  const _AccessDeniedScreen({required this.onSignOut});
+
+  final Future<void> Function() onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline_rounded,
+                  size: 48, color: Color(0xFFEF4444)),
+              const SizedBox(height: 16),
+              const Text('此帳號目前無法使用系統',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('帳號可能已停用、刪除，或尚未完成設定；請聯絡管理員。',
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: onSignOut,
+                child: const Text('返回登入頁'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

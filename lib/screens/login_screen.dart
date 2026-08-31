@@ -28,26 +28,12 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isSignUp = false;
   bool _obscurePassword = true;
 
-  bool _showFastDemoLogin = true;
-  int _secretTapCount = 0;
-  DateTime? _lastSecretTap;
-
   @override
   void initState() {
     super.initState();
-    _loadFastDemoSetting();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUrlErrors();
     });
-  }
-
-  Future<void> _loadFastDemoSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _showFastDemoLogin = prefs.getBool('dev_show_fast_demo_login') ?? true;
-      });
-    }
   }
 
   void _checkUrlErrors() {
@@ -105,15 +91,17 @@ class _LoginScreenState extends State<LoginScreen> {
         String? redirectTo;
         if (kIsWeb) {
           final origin = Uri.base.origin;
-          redirectTo = (origin.contains('localhost') && !origin.contains(':8080'))
-              ? 'http://localhost:8080'
-              : origin;
+          redirectTo =
+              (origin.contains('localhost') && !origin.contains(':8080'))
+                  ? 'http://localhost:8080'
+                  : origin;
         } else {
           redirectTo = 'http://localhost:8080';
         }
 
         final prefs = await SharedPreferences.getInstance();
-        final bool enableAutoApproval = prefs.getBool('enable_auto_approval') ?? false;
+        final bool enableAutoApproval =
+            prefs.getBool('enable_auto_approval') ?? false;
         // Default to active during development so users do not get blocked by approval dialogs
         final String status = enableAutoApproval ? 'active' : 'pending';
 
@@ -123,7 +111,8 @@ class _LoginScreenState extends State<LoginScreen> {
           emailRedirectTo: redirectTo,
           data: {
             'full_name': _nameController.text.trim(),
-            'role': UserRole.agent.value, // Public registration is strictly locked to 'agent'
+            'role': UserRole.agent
+                .value, // Public registration is strictly locked to 'agent'
             'team_code': _teamCodeController.text.trim(),
             'team_name': '國泰台北第一通訊處',
             'status': status,
@@ -131,7 +120,8 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         // Precise check: Supabase returns user with empty identities list if email is already registered
-        if (response.user != null && (response.user!.identities?.isEmpty ?? false)) {
+        if (response.user != null &&
+            (response.user!.identities?.isEmpty ?? false)) {
           if (mounted) {
             CustomToast.show(
               context,
@@ -241,7 +231,8 @@ class _LoginScreenState extends State<LoginScreen> {
     } on AuthException catch (e) {
       if (mounted) {
         String msg = e.message;
-        if (msg.contains('User already registered') || msg.contains('already exists')) {
+        if (msg.contains('User already registered') ||
+            msg.contains('already exists')) {
           msg = '此 Email 已被註冊！請直接切換至「業務員登入」或點擊「忘記密碼」。';
         } else if (msg.contains('Password should be at least')) {
           msg = '密碼長度不足，請輸入至少 6 位字元。';
@@ -256,7 +247,8 @@ class _LoginScreenState extends State<LoginScreen> {
             onActionPressed: () async {
               final email = _emailController.text.trim();
               if (email.isEmpty) {
-                CustomToast.show(context, '請先在上方填寫您的 Email 帳號', ToastType.warning);
+                CustomToast.show(
+                    context, '請先在上方填寫您的 Email 帳號', ToastType.warning);
                 return;
               }
               try {
@@ -265,11 +257,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   email: email,
                 );
                 if (mounted) {
-                  CustomToast.show(context, '全新驗證信已寄出！請至 Email 收件匣點擊最新信件。', ToastType.success);
+                  CustomToast.show(context, '全新驗證信已寄出！請至 Email 收件匣點擊最新信件。',
+                      ToastType.success);
                 }
               } catch (resendErr) {
                 if (mounted) {
-                  CustomToast.show(context, '重發失敗: $resendErr', ToastType.error);
+                  CustomToast.show(
+                      context, '重發失敗: $resendErr', ToastType.error);
                 }
               }
             },
@@ -359,73 +353,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {});
   }
 
-  Future<void> _performSecretDemoAgentLogin() async {
-    if (_isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-      _emailController.text = 'niulai@helper.tw';
-      _passwordController.text = '676767';
-    });
-
-    if (isOfflineMode) {
-      if (mounted) {
-        CustomToast.show(context, '⚠️ 離線預覽模式：已為您預填 Demo 業務員「牛來」', ToastType.warning);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-      }
-      setState(() => _isLoading = false);
-      return;
-    }
-
-    try {
-      final supabase = Supabase.instance.client;
-      final response = await supabase.auth.signInWithPassword(
-        email: 'niulai@helper.tw',
-        password: '676767',
-      );
-
-      if (response.user != null) {
-        final profile = await supabase
-            .from('profiles')
-            .select('status, role, full_name, team_name')
-            .eq('id', response.user!.id)
-            .maybeSingle();
-
-        final status = profile?['status'] as String? ?? 'active';
-
-        if (mounted) {
-          CustomToast.show(
-            context,
-            '🎉 [秘密通道] 已成功以 Demo 業務員「牛來 (成都團隊)」真實登入！',
-            ToastType.success,
-          );
-
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          );
-        }
-      }
-    } on AuthException catch (e) {
-      if (mounted) {
-        CustomToast.show(context, 'Demo 快速登入失敗: ${e.message}', ToastType.error);
-      }
-    } catch (e) {
-      if (mounted) {
-        CustomToast.show(context, '發生非預期錯誤: $e', ToastType.error);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       body: Stack(
         children: [
@@ -442,7 +373,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-          
+
           // Outer scroll view for keyboard resizing
           Center(
             child: SingleChildScrollView(
@@ -455,35 +386,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // App Icon or Logo Placeholder with Secret 5-Tap Dev Toggle
-                      GestureDetector(
-                        key: const ValueKey('shield_secret_logo'),
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () async {
-                          final now = DateTime.now();
-                          if (_lastSecretTap == null || now.difference(_lastSecretTap!) > const Duration(milliseconds: 1800)) {
-                            _secretTapCount = 1;
-                          } else {
-                            _secretTapCount++;
-                          }
-                          _lastSecretTap = now;
-
-                          if (_secretTapCount >= 5) {
-                            _secretTapCount = 0;
-                            await _performSecretDemoAgentLogin();
-                          }
-                        },
-                        child: const MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: Icon(
-                            Icons.shield_outlined,
-                            size: 64,
-                            color: Color(0xFF00ADB5),
-                          ),
-                        ),
+                      const Icon(
+                        Icons.shield_outlined,
+                        size: 64,
+                        color: Color(0xFF00ADB5),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // App Title
                       Text(
                         'insurance_helper',
@@ -495,7 +404,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // App Subtitle
                       Text(
                         '智慧保險 CRM & AI 語意跟進排程',
@@ -505,7 +414,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
-                      
+
                       // Form Card
                       Card(
                         shape: RoundedRectangleBorder(
@@ -527,7 +436,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                               const SizedBox(height: 20),
-                              
+
                               // Name Input (Only shown on Sign Up)
                               if (_isSignUp) ...[
                                 TextFormField(
@@ -551,7 +460,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                               // Email Input Label & Quick Domain Selector
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
                                     '電子信箱',
@@ -570,18 +480,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                     color: const Color(0xFF1E293B),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF00ADB5).withOpacity(0.12),
+                                        color: const Color(0xFF00ADB5)
+                                            .withOpacity(0.12),
                                         borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
-                                          color: const Color(0xFF00ADB5).withOpacity(0.3),
+                                          color: const Color(0xFF00ADB5)
+                                              .withOpacity(0.3),
                                         ),
                                       ),
                                       child: const Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.alternate_email_rounded, size: 14, color: Color(0xFF00ADB5)),
+                                          Icon(Icons.alternate_email_rounded,
+                                              size: 14,
+                                              color: Color(0xFF00ADB5)),
                                           SizedBox(width: 4),
                                           Text(
                                             '常用信箱網域 ▾',
@@ -594,14 +509,26 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ],
                                       ),
                                     ),
-                                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                    itemBuilder: (BuildContext context) =>
+                                        <PopupMenuEntry<String>>[
                                       const PopupMenuItem<String>(
                                         value: '@gmail.com',
                                         child: Row(
                                           children: [
-                                            Text('🌐 ', style: TextStyle(fontSize: 14)),
-                                            Text('Google ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                                            Text('(@gmail.com)', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                            Text('🌐 ',
+                                                style: TextStyle(fontSize: 14)),
+                                            Text('Google ',
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white)),
+                                            Expanded(
+                                              child: Text('(@gmail.com)',
+                                                  style: TextStyle(
+                                                      color: Colors.white60,
+                                                      fontSize: 12),
+                                                  overflow:
+                                                      TextOverflow.ellipsis),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -609,9 +536,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                         value: '@yahoo.com.tw',
                                         child: Row(
                                           children: [
-                                            Text('✉️ ', style: TextStyle(fontSize: 14)),
-                                            Text('Yahoo 台灣 ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                                            Text('(@yahoo.com.tw)', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                            Text('✉️ ',
+                                                style: TextStyle(fontSize: 14)),
+                                            Text('Yahoo 台灣 ',
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white)),
+                                            Expanded(
+                                              child: Text('(@yahoo.com.tw)',
+                                                  style: TextStyle(
+                                                      color: Colors.white60,
+                                                      fontSize: 12),
+                                                  overflow:
+                                                      TextOverflow.ellipsis),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -619,9 +557,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                         value: '@outlook.com',
                                         child: Row(
                                           children: [
-                                            Text('💼 ', style: TextStyle(fontSize: 14)),
-                                            Text('Outlook / Hotmail ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                                            Text('(@outlook.com)', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                            Text('💼 ',
+                                                style: TextStyle(fontSize: 14)),
+                                            Text('Outlook ',
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white)),
+                                            Expanded(
+                                              child: Text('(@outlook.com)',
+                                                  style: TextStyle(
+                                                      color: Colors.white60,
+                                                      fontSize: 12),
+                                                  overflow:
+                                                      TextOverflow.ellipsis),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -629,9 +578,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                         value: '@icloud.com',
                                         child: Row(
                                           children: [
-                                            Text('🍏 ', style: TextStyle(fontSize: 14)),
-                                            Text('Apple iCloud ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                                            Text('(@icloud.com)', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                            Text('🍏 ',
+                                                style: TextStyle(fontSize: 14)),
+                                            Text('Apple iCloud ',
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white)),
+                                            Expanded(
+                                              child: Text('(@icloud.com)',
+                                                  style: TextStyle(
+                                                      color: Colors.white60,
+                                                      fontSize: 12),
+                                                  overflow:
+                                                      TextOverflow.ellipsis),
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -655,14 +615,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                   if (value == null || value.trim().isEmpty) {
                                     return '請輸入 Email';
                                   }
-                                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                                  if (!RegExp(
+                                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                      .hasMatch(value.trim())) {
                                     return '請輸入有效的 Email 格式';
                                   }
                                   return null;
                                 },
                               ),
                               const SizedBox(height: 16),
-                              
+
                               // Password Input
                               TextFormField(
                                 controller: _passwordController,
@@ -679,7 +641,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   border: const OutlineInputBorder(),
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                      _obscurePassword
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
                                       color: Colors.white54,
                                     ),
                                     onPressed: () {
@@ -707,15 +671,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                     onPressed: () {
                                       showDialog(
                                         context: context,
-                                        builder: (context) => ForgotPasswordDialog(
-                                          initialEmail: _emailController.text.trim(),
+                                        builder: (context) =>
+                                            ForgotPasswordDialog(
+                                          initialEmail:
+                                              _emailController.text.trim(),
                                         ),
                                       );
                                     },
                                     style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 8),
                                       minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                     ),
                                     child: const Text(
                                       '忘記密碼？',
@@ -729,14 +697,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ],
                               const SizedBox(height: 20),
-                              
+
                               // Submit Button
                               ElevatedButton(
                                 onPressed: _isLoading ? null : _handleSubmit,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF00ADB5),
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -747,25 +716,31 @@ class _LoginScreenState extends State<LoginScreen> {
                                         width: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  Colors.white),
                                         ),
                                       )
                                     : Text(_isSignUp ? '註冊帳號' : '登入'),
                               ),
                               const SizedBox(height: 16),
-                              
+
                               // Divider
                               const Row(
                                 children: [
-                                  Expanded(child: Divider(color: Colors.white24)),
+                                  Expanded(
+                                      child: Divider(color: Colors.white24)),
                                   Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 12),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 12),
                                     child: Text(
                                       '或使用第三方帳號',
-                                      style: TextStyle(fontSize: 12, color: Colors.white54),
+                                      style: TextStyle(
+                                          fontSize: 12, color: Colors.white54),
                                     ),
                                   ),
-                                  Expanded(child: Divider(color: Colors.white24)),
+                                  Expanded(
+                                      child: Divider(color: Colors.white24)),
                                 ],
                               ),
                               const SizedBox(height: 16),
@@ -777,14 +752,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                 isLoading: _isLoading,
                               ),
                               const SizedBox(height: 12),
-                              
+
                               // Toggle Sign In / Sign Up
                               TextButton(
                                 onPressed: () {
                                   setState(() {
                                     _isSignUp = !_isSignUp;
                                     if (_isSignUp) {
-                                      if (_teamCodeController.text.trim().isEmpty) {
+                                      if (_teamCodeController.text
+                                          .trim()
+                                          .isEmpty) {
                                         _teamCodeController.text = 'TAIPEI-01';
                                       }
                                       // Removed auto-name filling from email prefix
@@ -798,20 +775,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                               ),
-                              if (_showFastDemoLogin || isOfflineMode) ...[
-                                const SizedBox(height: 8),
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(color: const Color(0xFF00ADB5).withValues(alpha: 0.4)),
-                                    foregroundColor: const Color(0xFF00ADB5),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  ),
-                                  onPressed: _isLoading ? null : _performSecretDemoAgentLogin,
-                                  icon: const Icon(Icons.speed_rounded, size: 16),
-                                  label: const Text('🚀 快速進入「牛來 (Demo業務員)」模式', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                ),
-                              ],
                             ],
                           ),
                         ),
@@ -823,7 +786,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-          
+
           // Offline Preview Mode Banner at top
           if (isOfflineMode)
             Positioned(
@@ -835,7 +798,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: SafeArea(
                   bottom: false,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -855,13 +819,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextButton(
                           style: TextButton.styleFrom(
                             backgroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           onPressed: () {
                             Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(builder: (context) => const HomeScreen()),
+                              MaterialPageRoute(
+                                  builder: (context) => const HomeScreen()),
                             );
                           },
                           child: const Text(

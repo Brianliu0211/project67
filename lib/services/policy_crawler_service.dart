@@ -61,7 +61,9 @@ class PolicyClauseItem {
       miscLimit: json['misc_limit'] ?? '120,000 元',
       rawPdfUrl: json['raw_pdf_url'] ?? 'https://www.ibdb.org.tw/',
       benefitsJson: json['benefits_json'] as Map<String, dynamic>?,
-      crawledAt: json['crawled_at'] != null ? DateTime.tryParse(json['crawled_at']) : null,
+      crawledAt: json['crawled_at'] != null
+          ? DateTime.tryParse(json['crawled_at'])
+          : null,
     );
   }
 }
@@ -82,7 +84,8 @@ class PolicySearchResult {
 }
 
 class PolicyCrawlerService {
-  static final PolicyCrawlerService _instance = PolicyCrawlerService._internal();
+  static final PolicyCrawlerService _instance =
+      PolicyCrawlerService._internal();
   factory PolicyCrawlerService() => _instance;
   PolicyCrawlerService._internal();
 
@@ -105,26 +108,64 @@ class PolicyCrawlerService {
       key = const String.fromEnvironment('SUPABASE_ANON_KEY');
     }
     if (key.isEmpty) {
-      key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsZ3VmdW94a2Vpenh3a29mbW1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTU2NzgsImV4cCI6MjA5OTA3MTY3OH0.QMEU47EHuLwEr7ok7O28h6U7Sh-geldoTQ5eZfI5tBA';
+      key =
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsZ3VmdW94a2Vpenh3a29mbW1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0OTU2NzgsImV4cCI6MjA5OTA3MTY3OH0.QMEU47EHuLwEr7ok7O28h6U7Sh-geldoTQ5eZfI5tBA';
     }
     return key;
   }
 
   // 20 Life Companies List
   static const List<String> lifeCompanies = [
-    "國泰人壽", "富邦人壽", "南山人壽", "新光人壽", "台灣人壽",
-    "三商美邦人壽", "凱基人壽", "遠雄人壽", "全球人壽", "安聯人壽",
-    "元大人壽", "安達人壽", "第一金人壽", "宏泰人壽", "保誠人壽",
-    "友邦人壽", "法巴人壽", "臺銀人壽", "合作金庫人壽", "中華郵政壽險"
+    "國泰人壽",
+    "富邦人壽",
+    "南山人壽",
+    "新光人壽",
+    "台灣人壽",
+    "三商美邦人壽",
+    "凱基人壽",
+    "遠雄人壽",
+    "全球人壽",
+    "安聯人壽",
+    "元大人壽",
+    "安達人壽",
+    "第一金人壽",
+    "宏泰人壽",
+    "保誠人壽",
+    "友邦人壽",
+    "法巴人壽",
+    "臺銀人壽",
+    "合作金庫人壽",
+    "中華郵政壽險"
   ];
 
   // 26 P&C / Channel Companies List
   static const List<String> pcCompanies = [
-    "富邦產物", "國泰世紀產物", "新安東京海上產物", "明台產物", "華南產物",
-    "台灣產物", "兆豐產物", "旺旺友聯產物", "第一產物", "泰安產物",
-    "新光產物", "和泰產物", "南山產物", "安達產物", "法國巴黎產物",
-    "美商安達產物", "新加坡商美國國際產險", "科法斯產物", "裕利安宜產險", "日本興亞產物",
-    "聯邦產物", "蘇黎世產物", "錠嵂保經專屬通路", "公勝保經專屬通路", "大誠保經專屬通路", "永達保經專屬通路"
+    "富邦產物",
+    "國泰世紀產物",
+    "新安東京海上產物",
+    "明台產物",
+    "華南產物",
+    "台灣產物",
+    "兆豐產物",
+    "旺旺友聯產物",
+    "第一產物",
+    "泰安產物",
+    "新光產物",
+    "和泰產物",
+    "南山產物",
+    "安達產物",
+    "法國巴黎產物",
+    "美商安達產物",
+    "新加坡商美國國際產險",
+    "科法斯產物",
+    "裕利安宜產險",
+    "日本興亞產物",
+    "聯邦產物",
+    "蘇黎世產物",
+    "錠嵂保經專屬通路",
+    "公勝保經專屬通路",
+    "大誠保經專屬通路",
+    "永達保經專屬通路"
   ];
 
   /// 取得目前資料庫 policy_clauses 的精確總筆數
@@ -213,8 +254,16 @@ class PolicyCrawlerService {
       if (kDebugMode) print('Error fetching company breakdown: $e');
       // Return default 46 company stats
       return [
-        ...lifeCompanies.map((c) => CompanyPolicyStat(companyName: c, companyType: '人壽保險', count: 285, sampleCategory: '醫療實支/癌症一次金')),
-        ...pcCompanies.map((c) => CompanyPolicyStat(companyName: c, companyType: '產物保險/通路', count: 245, sampleCategory: '汽機車責任與超額險')),
+        ...lifeCompanies.map((c) => CompanyPolicyStat(
+            companyName: c,
+            companyType: '人壽保險',
+            count: 285,
+            sampleCategory: '醫療實支/癌症一次金')),
+        ...pcCompanies.map((c) => CompanyPolicyStat(
+            companyName: c,
+            companyType: '產物保險/通路',
+            count: 245,
+            sampleCategory: '汽機車責任與超額險')),
       ];
     }
   }
@@ -260,11 +309,14 @@ class PolicyCrawlerService {
       var dataBuilder = _supabase.from('policy_clauses').select();
 
       for (var token in tokens) {
-        final filter = 'product_name.ilike.%$token%,company_name.ilike.%$token%,category.ilike.%$token%';
+        final filter =
+            'product_name.ilike.%$token%,company_name.ilike.%$token%,category.ilike.%$token%';
         dataBuilder = dataBuilder.or(filter);
       }
 
-      if (selectedCompany != null && selectedCompany.isNotEmpty && selectedCompany != '全部') {
+      if (selectedCompany != null &&
+          selectedCompany.isNotEmpty &&
+          selectedCompany != '全部') {
         dataBuilder = dataBuilder.eq('company_name', selectedCompany);
       }
 
@@ -280,15 +332,18 @@ class PolicyCrawlerService {
           .toList();
 
       if (companyType == '人壽保險') {
-        items = items.where((i) => lifeCompanies.contains(i.companyName)).toList();
+        items =
+            items.where((i) => lifeCompanies.contains(i.companyName)).toList();
       } else if (companyType == '產物保險/通路') {
-        items = items.where((i) => pcCompanies.contains(i.companyName)).toList();
+        items =
+            items.where((i) => pcCompanies.contains(i.companyName)).toList();
       }
 
       final int totalCount = items.length;
       final int from = (page - 1) * pageSize;
       final int to = math.min(from + pageSize, totalCount);
-      final pagedItems = (from < totalCount) ? items.sublist(from, to) : <PolicyClauseItem>[];
+      final pagedItems =
+          (from < totalCount) ? items.sublist(from, to) : <PolicyClauseItem>[];
 
       return PolicySearchResult(
         items: pagedItems,
@@ -298,7 +353,8 @@ class PolicyCrawlerService {
       );
     } catch (e) {
       if (kDebugMode) print('Error searching policy clauses paged: $e');
-      return PolicySearchResult(items: [], totalCount: 0, page: page, pageSize: pageSize);
+      return PolicySearchResult(
+          items: [], totalCount: 0, page: page, pageSize: pageSize);
     }
   }
 
@@ -306,16 +362,19 @@ class PolicyCrawlerService {
   Future<Map<String, dynamic>> runIncrementalSync() async {
     final startTime = DateTime.now();
     final List<String> executionLogs = [];
-    
-    executionLogs.add('[${_formatTime(startTime)}] [INIT] 開始發起 46 家公司全量條款差量校對佇列...');
+
+    executionLogs
+        .add('[${_formatTime(startTime)}] [INIT] 開始發起 46 家公司全量條款差量校對佇列...');
 
     int httpCode = 0;
     String statusMessage = '';
-    
+
     try {
       final initialCount = await fetchTotalPolicyCount();
-      executionLogs.add('[${_formatTime(DateTime.now())}] [DB STATUS] 校對前資料庫條款總計: $initialCount 筆 (46 家公司覆蓋)');
-      executionLogs.add('[${_formatTime(DateTime.now())}] [HTTP] 呼叫 Supabase Edge Function: crawl-insurance-products...');
+      executionLogs.add(
+          '[${_formatTime(DateTime.now())}] [DB STATUS] 校對前資料庫條款總計: $initialCount 筆 (46 家公司覆蓋)');
+      executionLogs.add(
+          '[${_formatTime(DateTime.now())}] [HTTP] 呼叫 Supabase Edge Function: crawl-insurance-products...');
 
       bool invokedSuccess = false;
       Map<String, dynamic>? edgeData;
@@ -323,9 +382,6 @@ class PolicyCrawlerService {
       try {
         final FunctionResponse response = await _supabase.functions.invoke(
           'crawl-insurance-products',
-          headers: {
-            'x-crawler-secret': 'insurance_helper_cron_secret',
-          },
         );
 
         httpCode = response.status;
@@ -334,21 +390,28 @@ class PolicyCrawlerService {
             edgeData = Map<String, dynamic>.from(response.data as Map);
           } else if (response.data is String) {
             try {
-              edgeData = jsonDecode(response.data as String) as Map<String, dynamic>;
+              edgeData =
+                  jsonDecode(response.data as String) as Map<String, dynamic>;
             } catch (_) {}
           }
         }
-        invokedSuccess = (httpCode == 200 && (edgeData == null || edgeData['success'] != false));
+        invokedSuccess = (httpCode == 200 &&
+            (edgeData == null || edgeData['success'] != false));
       } catch (e) {
-        if (kDebugMode) print('functions.invoke crawl-insurance-products error: $e');
-        executionLogs.add('[${_formatTime(DateTime.now())}] [WARN] SDK invoke 異常 ($e)，發起 HTTP POST 備援連線...');
-        
+        if (kDebugMode)
+          print('functions.invoke crawl-insurance-products error: $e');
+        executionLogs.add(
+            '[${_formatTime(DateTime.now())}] [WARN] SDK invoke 異常 ($e)，發起 HTTP POST 備援連線...');
+
         // HTTP POST fallback
         try {
           final supabaseUrl = _getSupabaseUrl();
           final anonKey = _getSupabaseAnonKey();
           final session = _supabase.auth.currentSession;
-          final token = session?.accessToken ?? anonKey;
+          final token = session?.accessToken;
+          if (token == null || token.isEmpty) {
+            throw StateError('需要有效的開發者登入工作階段才能觸發條款更新。');
+          }
 
           final res = await http.post(
             Uri.parse('$supabaseUrl/functions/v1/crawl-insurance-products'),
@@ -356,7 +419,6 @@ class PolicyCrawlerService {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $token',
               'apikey': anonKey,
-              'x-crawler-secret': 'insurance_helper_cron_secret',
             },
           );
 
@@ -366,12 +428,14 @@ class PolicyCrawlerService {
               edgeData = jsonDecode(res.body) as Map<String, dynamic>;
             } catch (_) {}
           }
-          invokedSuccess = (httpCode == 200 && (edgeData == null || edgeData['success'] != false));
+          invokedSuccess = (httpCode == 200 &&
+              (edgeData == null || edgeData['success'] != false));
         } catch (httpErr) {
           if (kDebugMode) print('Direct HTTP POST error: $httpErr');
           httpCode = 500;
           edgeData = {'error': '網路連線異常: $httpErr'};
-          executionLogs.add('[${_formatTime(DateTime.now())}] [ERROR] 備援連線失敗: $httpErr');
+          executionLogs
+              .add('[${_formatTime(DateTime.now())}] [ERROR] 備援連線失敗: $httpErr');
         }
       }
 
@@ -382,9 +446,12 @@ class PolicyCrawlerService {
 
       if (invokedSuccess) {
         statusMessage = edgeData?['message'] ?? '🎉 46 家公司條款差量校對與更新成功！';
-        executionLogs.add('[${_formatTime(DateTime.now())}] [EDGE RESPONSE] HTTP $httpCode - $statusMessage');
-        executionLogs.add('[${_formatTime(DateTime.now())}] [DB STATUS] 校對後最新資料庫條款筆數: $newTotalCount 筆 (新增/更新 $addedCount 筆)');
-        executionLogs.add('[${_formatTime(endTime)}] [SUCCESS] 46 家公司條款全量同步完成 (耗時: ${durationMs}ms)');
+        executionLogs.add(
+            '[${_formatTime(DateTime.now())}] [EDGE RESPONSE] HTTP $httpCode - $statusMessage');
+        executionLogs.add(
+            '[${_formatTime(DateTime.now())}] [DB STATUS] 校對後最新資料庫條款筆數: $newTotalCount 筆 (新增/更新 $addedCount 筆)');
+        executionLogs.add(
+            '[${_formatTime(endTime)}] [SUCCESS] 46 家公司條款全量同步完成 (耗時: ${durationMs}ms)');
 
         // Get dynamic breakdown stats from DB
         final companyStats = await fetchCompanyBreakdown();
@@ -397,7 +464,8 @@ class PolicyCrawlerService {
           'success': true,
           'httpCode': httpCode,
           'totalCount': newTotalCount,
-          'addedCount': addedCount > 0 ? addedCount : (edgeData?['totalCompanies'] ?? 46),
+          'addedCount':
+              addedCount > 0 ? addedCount : (edgeData?['totalCompanies'] ?? 46),
           'updatedCount': edgeData?['totalCompanies'] ?? 46,
           'durationMs': durationMs,
           'lastSynced': _formatDateTime(endTime),
@@ -406,7 +474,8 @@ class PolicyCrawlerService {
         };
       } else {
         final errMsg = edgeData?['error'] ?? 'HTTP $httpCode 請求失敗';
-        executionLogs.add('[${_formatTime(DateTime.now())}] [ERROR] Edge Function 執行未成功: $errMsg');
+        executionLogs.add(
+            '[${_formatTime(DateTime.now())}] [ERROR] Edge Function 執行未成功: $errMsg');
         return {
           'success': false,
           'httpCode': httpCode,

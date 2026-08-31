@@ -177,14 +177,25 @@ serve(async (req: Request) => {
       global: { headers: { Authorization: authHeader || '' } }
     });
     
-    const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : '';
+    const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : '';
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     let user: any = null;
     try {
-      if (token) {
-        const { data } = await supabaseClient.auth.getUser(token);
-        user = data?.user ?? null;
-      }
-    } catch (_) {}
+      const { data, error } = await supabaseClient.auth.getUser(token);
+      if (error) throw error;
+      user = data.user;
+    } catch (_) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { audioBase64, transcript, mimeType, localTime } = await req.json();
 
