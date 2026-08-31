@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/app_settings.dart';
 import '../services/app_localizations.dart';
+import '../services/google_calendar_sync_service.dart';
 import '../widgets/google_sign_in_button.dart';
 import '../main.dart';
 import '../services/spotlight_tour_service.dart';
@@ -476,6 +477,40 @@ class SettingsScreen extends StatelessWidget {
                                 icon: Icon(isGoogleConnected ? Icons.check_circle_outline : Icons.link, size: 16),
                                 label: Text(isGoogleConnected ? '已連線 / 重新授權' : '未連線 / 點擊授權'),
                               ),
+                            ),
+                            const Divider(height: 24),
+                            StatefulBuilder(
+                              builder: (context, setState) {
+                                final syncService = GoogleCalendarSyncService.instance;
+                                final isSyncEnabled = syncService.isSyncEnabled;
+                                return SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  secondary: const Icon(Icons.calendar_month, color: Color(0xFF4285F4)),
+                                  title: const Text('Google 日曆行程雙向自動同步', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                  subtitle: Text(
+                                    isSyncEnabled
+                                        ? '已啟用！專屬次日曆「保險助手」與本地行程雙向自動對齊'
+                                        : '點擊開啟，將 App 拜訪行程自動寫入 Google 日曆並防重疊衝突',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isSyncEnabled ? const Color(0xFF10B981) : (isDark ? Colors.white70 : Colors.black54),
+                                    ),
+                                  ),
+                                  value: isSyncEnabled,
+                                  onChanged: (val) async {
+                                    await syncService.setSyncEnabled(val);
+                                    setState(() {});
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(val ? '已開啟 Google 日曆雙向自動同步' : '已關閉 Google 日曆同步'),
+                                          backgroundColor: val ? const Color(0xFF10B981) : Colors.orangeAccent,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                );
+                              },
                             ),
                           ],
                         ),

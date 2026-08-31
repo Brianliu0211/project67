@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:insurance_helper/main.dart';
 import 'package:insurance_helper/screens/home_screen.dart';
 import 'package:insurance_helper/screens/customer_management_tab.dart';
@@ -7,6 +8,9 @@ import 'package:insurance_helper/widgets/categorized_tag_accordion_selector.dart
 import 'package:insurance_helper/widgets/voice_recorder_widget.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
   testWidgets('App loads LoginScreen in offline preview mode', (WidgetTester tester) async {
     isOfflineMode = true;
     offlineReason = '測試環境';
@@ -35,9 +39,8 @@ void main() {
     final Finder skipLoginBtn = find.text('直接跳過登入');
     expect(skipLoginBtn, findsOneWidget);
     await tester.tap(skipLoginBtn);
-    // Allow route transition to complete
-    await tester.pump(const Duration(milliseconds: 1000));
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
 
     // 3. Verify HomeScreen loaded
     expect(find.byType(HomeScreen), findsOneWidget);

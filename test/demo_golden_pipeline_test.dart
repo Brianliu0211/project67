@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:insurance_helper/main.dart';
 import 'package:insurance_helper/screens/home_screen.dart';
 import 'package:insurance_helper/screens/customer_management_tab.dart';
@@ -9,6 +10,9 @@ import 'package:insurance_helper/widgets/categorized_tag_accordion_selector.dart
 import 'package:insurance_helper/widgets/voice_recorder_widget.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
   group('專題 Demo 核心流程黃金閉環 (Golden Pipeline E2E Test)', () {
     testWidgets('Step 1 -> Step 2 -> Step 3: 登入跳過 -> 客戶管理新增打標 -> 語音排程入口驗證', (WidgetTester tester) async {
       isOfflineMode = true;
@@ -30,8 +34,8 @@ void main() {
       final Finder skipBtn = find.text('直接跳過登入');
       expect(skipBtn, findsOneWidget);
       await tester.tap(skipBtn);
-      await tester.pump(const Duration(milliseconds: 1000));
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
 
       // 驗證首頁已載入
       expect(find.byType(HomeScreen), findsOneWidget);

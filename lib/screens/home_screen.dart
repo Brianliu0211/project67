@@ -79,11 +79,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _isSidebarCollapsed = AppSettings.instance.isSidebarCollapsedByDefault;
     AppSettings.instance.addListener(_handleSettingsChanged);
     _notifService.addListener(_handleNotifChanged);
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      if (mounted) {
-        _fetchEventsForSelectedDate(silent: true);
+    if (!isOfflineMode) {
+      try {
+        _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+          if (mounted) {
+            _fetchEventsForSelectedDate(silent: true);
+          }
+        });
+      } catch (e) {
+        debugPrint('⚠️ [HomeScreen] Supabase 離線模式跳過 Auth 監聽: $e');
       }
-    });
+    }
     _loadUserProfile();
     _loadSavedMenu().then((_) {
       if (mounted) _fetchEventsForSelectedDate(silent: true);

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/schedule_event.dart';
+import 'google_calendar_sync_service.dart';
 import '../main.dart';
 
 /// 全域行程業務邏輯與資料存取服務 (Singleton)
@@ -76,10 +77,16 @@ class ScheduleService {
           .toList();
 
       _cachedEvents = list;
+      if (GoogleCalendarSyncService.instance.isSyncEnabled) {
+        try {
+          final aligned = await GoogleCalendarSyncService.instance.pullAndAlignEvents(list);
+          _cachedEvents = aligned;
+        } catch (_) {}
+      }
       // 同步一份至 OfflineDataStore 做本地快取備份
-      OfflineDataStore.scheduleEvents = list.map((e) => e.toJson()).toList();
+      OfflineDataStore.scheduleEvents = _cachedEvents.map((e) => e.toJson()).toList();
       _notifyChange();
-      return list;
+      return _cachedEvents;
     } catch (e) {
       debugPrint('⚠️ [ScheduleService] 載入行程失敗，降級使用本地快取: $e');
       if (OfflineDataStore.scheduleEvents.isNotEmpty) {
@@ -110,6 +117,7 @@ class ScheduleService {
       OfflineDataStore.scheduleEvents.insert(0, json);
       _cachedEvents.insert(0, newEvent);
       _notifyChange();
+      _syncToGoogleCalendar(newEvent);
       return newEvent;
     }
 
@@ -128,6 +136,7 @@ class ScheduleService {
       
       OfflineDataStore.scheduleEvents = _cachedEvents.map((e) => e.toJson()).toList();
       _notifyChange();
+      _syncToGoogleCalendar(created);
       return created;
     } catch (dbErr) {
       final errStr = dbErr.toString();
@@ -144,6 +153,7 @@ class ScheduleService {
         _cachedEvents.add(created);
         _cachedEvents.sort((a, b) => a.startAt.compareTo(b.startAt));
         _notifyChange();
+        _syncToGoogleCalendar(created);
         return created;
       }
       rethrow;
@@ -164,6 +174,7 @@ class ScheduleService {
         _cachedEvents[cIdx] = event;
       }
       _notifyChange();
+      _syncToGoogleCalendar(event);
       return event;
     }
 
@@ -187,6 +198,7 @@ class ScheduleService {
 
       OfflineDataStore.scheduleEvents = _cachedEvents.map((e) => e.toJson()).toList();
       _notifyChange();
+      _syncToGoogleCalendar(updated);
       return updated;
     } catch (e) {
       debugPrint('⚠️ [ScheduleService] 更新行程失敗: $e');
@@ -197,6 +209,14 @@ class ScheduleService {
   /// 刪除行程
   Future<bool> deleteEvent(String id) async {
     final user = _currentUser;
+
+    final target = _cachedEvents.firstWhere(
+      (e) => e.id == id,
+      orElse: () => ScheduleEvent(id: id, profileId: '', title: '', startAt: DateTime.now(), endAt: DateTime.now()),
+    );
+    if (GoogleCalendarSyncService.instance.isSyncEnabled && target.isGoogleSynced) {
+      GoogleCalendarSyncService.instance.deleteRemoteEvent(target.googleCalendarId, target.googleEventId);
+    }
 
     if (isOfflineMode || user == null) {
       OfflineDataStore.scheduleEvents.removeWhere((e) => e['id'] == id);
@@ -218,6 +238,33 @@ class ScheduleService {
     } catch (e) {
       debugPrint('⚠️ [ScheduleService] 刪除行程失敗: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _syncToGoogleCalendar(ScheduleEvent event) async {
+    if (!GoogleCalendarSyncService.instance.isSyncEnabled) return;
+    try {
+      final synced = await GoogleCalendarSyncService.instance.pushLocalToRemote(event);
+      if (synced.googleEventId != null && synced.googleEventId != event.googleEventId) {
+        final idx = _cachedEvents.indexWhere((e) => e.id == synced.id);
+        if (idx != -1) {
+          _cachedEvents[idx] = synced;
+          _notifyChange();
+        }
+        if (!isOfflineMode && _currentUser != null) {
+          await Supabase.instance.client
+              .from('schedule_events')
+              .update({
+                'google_event_id': synced.googleEventId,
+                'google_calendar_id': synced.googleCalendarId,
+                'sync_status': synced.syncStatus,
+                'last_synced_at': synced.lastSyncedAt?.toUtc().toIso8601String(),
+              })
+              .eq('id', synced.id);
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [ScheduleService] 異步 Google 日曆同步處置警告: $e');
     }
   }
 
