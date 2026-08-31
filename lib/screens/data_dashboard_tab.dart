@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
+import '../services/customer_policy_service.dart';
 import '../services/policy_crawler_service.dart';
 import '../widgets/custom_toast.dart';
+import 'policy_comparison_screen.dart';
 
 class DataDashboardTab extends StatefulWidget {
-  const DataDashboardTab({super.key});
+  final Function(String menu)? onMenuChanged;
+
+  const DataDashboardTab({super.key, this.onMenuChanged});
 
   @override
   State<DataDashboardTab> createState() => _DataDashboardTabState();
@@ -12,601 +16,155 @@ class DataDashboardTab extends StatefulWidget {
 
 class _DataDashboardTabState extends State<DataDashboardTab> {
   final PolicyCrawlerService _policyService = PolicyCrawlerService();
+  final CustomerPolicyService _customerPolicyService = CustomerPolicyService();
+
   bool _isLoading = true;
-  int _monthlyVisitCount = 0;
-  int _vipCustomerCount = 0;
-  double _healthCheckPercent = 0.85;
+  bool _isSearching = false;
+  int _totalLiveClausesCount = 0;
 
-  // Selected Products for Multi-Product Comparison (Up to 4)
-  final Set<String> _selectedProductsForComparison = {};
-  String _activeCategoryFilter = '全部';
-  final TextEditingController _searchProductController = TextEditingController();
+  // Real Funnel Metrics
+  CustomerFunnelSummary _funnelSummary = CustomerFunnelSummary(
+    totalCustomers: 0,
+    leadsCount: 0,
+    prospectsCount: 0,
+    clientsCount: 0,
+    monthlyVisitsCompleted: 0,
+    monthlyVisitsTotal: 0,
+    activeProjectsCount: 0,
+  );
 
-  final List<Map<String, dynamic>> _catalogProducts = [
-    {
-      'id': 'CAT-01',
-      'title': '心守健康手術醫療終身健康保險 (XSSI)',
-      'company': '三商美邦人壽',
-      'category': '實支實付醫療險',
-      'waitingDays': '疾病等待期 30 日',
-      'tags': ['手術給付一筆金', '表外處置列舉', '可補醫療自費缺口'],
-      'roomLimit': '2,000 元/日',
-      'surgeryLimit': '150,000 元',
-      'miscLimit': '120,000 元',
-    },
-    {
-      'id': 'CAT-02',
-      'title': '心好健康終身醫療健康保險附約 (CHHIR3)',
-      'company': '三商美邦人壽',
-      'category': '實支實付醫療險',
-      'waitingDays': '疾病等待期 30 日',
-      'tags': ['賠住院醫療費', '手術也可看護額', '續保規則透明'],
-      'roomLimit': '1,500 元/日',
-      'surgeryLimit': '100,000 元',
-      'miscLimit': '100,000 元',
-    },
-    {
-      'id': 'CAT-03',
-      'title': '心享平安定期傷害保險 (XSPA)',
-      'company': '三商美邦人壽',
-      'category': '意外傷害險',
-      'waitingDays': '意外事故通常無等待期',
-      'tags': ['只保意外事故', '可補醫療或失能', '職業等級影響保費'],
-      'roomLimit': '1,000 元/日',
-      'surgeryLimit': '50,000 元',
-      'miscLimit': '50,000 元',
-    },
-    {
-      'id': 'CAT-04',
-      'title': '心享安防癌症定期健康保險 (SSA)',
-      'company': '三商美邦人壽',
-      'category': '癌症險',
-      'waitingDays': '癌症等待期 90 日',
-      'tags': ['罹癌時給現金', '療程支出可補貼', '癌症分期看清楚'],
-      'roomLimit': '3,000 元/日',
-      'surgeryLimit': '200,000 元',
-      'miscLimit': '300,000 元 (含自費標靶)',
-    },
-    {
-      'id': 'CAT-06',
-      'title': '享安全實支實付醫療健康保險 (HSV)',
-      'company': '富邦人壽',
-      'category': '實支實付醫療險',
-      'waitingDays': '疾病等待期 30 日',
-      'tags': ['概括式條款', '門診手術包含自費藥材', '收據正本理賠'],
-      'roomLimit': '2,500 元/日',
-      'surgeryLimit': '180,000 元',
-      'miscLimit': '150,000 元',
-    },
-    {
-      'id': 'CAT-07',
-      'title': '真安心醫療終身保險 (CAT-2026)',
-      'company': '國泰人壽',
-      'category': '實支實付醫療險',
-      'waitingDays': '疾病等待期 30 日',
-      'tags': ['住院手術加倍給付', '醫療雜費實支實付', '保單健診推薦'],
-      'roomLimit': '2,000 元/日',
-      'surgeryLimit': '150,000 元',
-      'miscLimit': '120,000 元',
-    },
-    {
-      'id': 'CAT-08',
-      'title': '好醫靠一生醫療健康保險 (NHS)',
-      'company': '南山人壽',
-      'category': '重大傷病險',
-      'waitingDays': '疾病等待期 30 日',
-      'tags': ['健保卡認定給付', '一次金 100 萬', '癌症標靶醫療保證'],
-      'roomLimit': '無定額病房',
-      'surgeryLimit': '一次給付 1,000,000 元',
-      'miscLimit': '健保重大傷病證明一次付清',
-    },
-    {
-      'id': 'CAT-09',
-      'title': '活力長照終身健康保險 (LTB)',
-      'company': '新光人壽',
-      'category': '意外傷害險',
-      'waitingDays': '免等待期',
-      'tags': ['意外事故保證付', '巴氏量表認定', '年給付復健金'],
-      'roomLimit': '1,500 元/日',
-      'surgeryLimit': '80,000 元',
-      'miscLimit': '60,000 元',
-    },
-    {
-      'id': 'CAT-10',
-      'title': '愛無懼癌症定期健康保險 (YCD)',
-      'company': '台灣人壽',
-      'category': '癌症險',
-      'waitingDays': '癌症等待期 90 日',
-      'tags': ['初期癌症給付 20%', '重度癌症給付 100%', '標靶藥物專屬保額'],
-      'roomLimit': '3,500 元/日',
-      'surgeryLimit': '250,000 元',
-      'miscLimit': '350,000 元',
-    },
+  // Selected Products for Side-by-Side Comparison (2 to 8 items)
+  final List<PolicyClauseItem> _selectedProducts = [];
+
+  // Filter State
+  String _activeCategory = '全部';
+  String _activeCompany = '全部公司';
+  final TextEditingController _searchController = TextEditingController();
+
+  // Search Results
+  List<PolicyClauseItem> _clauseItems = [];
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _filteredCount = 0;
+
+  // SafeCheck Categories
+  final List<String> _categoryFilters = [
+    '全部',
+    '實支實付醫療險',
+    '日額型醫療險',
+    '手術險',
+    '癌症險',
+    '重大傷病險',
+    '長照險 / 失能險',
+    '意外傷害險',
+    '定期壽險',
+    '終身壽險',
+    '儲蓄險 / 年金險',
+    '汽機車責任與超額險',
+    '火險與產物責任險',
+    '旅平不便險',
+    '寵物險',
   ];
-
-  final List<int> _weeklyVisits = [5, 8, 4, 10];
-  final Map<String, double> _gapStats = {
-    '實支實付醫療險缺口': 0.45,
-    '長期照顧險 / 失能缺口': 0.30,
-    '重大傷病與癌症險缺口': 0.25,
-  };
 
   @override
   void initState() {
     super.initState();
-    _fetchRealDashboardData();
+    _fetchInitialLiveDashboardData();
   }
 
   @override
   void dispose() {
-    _searchProductController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchRealDashboardData() async {
+  Future<void> _fetchInitialLiveDashboardData() async {
+    setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
+      // 1. 動態取得資料庫真實條款總數 (12,090+)
+      final totalCount = await _policyService.fetchTotalPolicyCount();
+      
+      // 2. 實時聚合名下客戶真實經營漏斗 (未開發 / 跟進中 / 已簽單保戶 / 本月拜訪達成率)
+      final funnel = await _customerPolicyService.fetchRealSalesFunnelMetrics();
 
-      // 1. 真實統計本月拜訪行程次數
-      try {
-        final now = DateTime.now();
-        final monthStart = DateTime(now.year, now.month, 1).toIso8601String();
-        final eventsRes = await supabase
-            .from('schedule_events')
-            .select('id')
-            .gte('start_at', monthStart);
-        _monthlyVisitCount = (eventsRes as List).length;
-      } catch (_) {
-        _monthlyVisitCount = 0;
-      }
-
-      // 2. 真實統計有效客戶人數
-      try {
-        final custRes = await supabase
-            .from('customers')
-            .select('id, tags')
-            .isFilter('deleted_at', null);
-        if (custRes != null && (custRes as List).isNotEmpty) {
-          _vipCustomerCount = (custRes as List).length;
-        } else {
-          _vipCustomerCount = 0;
-        }
-      } catch (_) {
-        _vipCustomerCount = 0;
-      }
-
-      // 3. 即時搜尋 11,722 筆真實條款庫存
-      await _searchLiveClauses();
-    } catch (e) {
-      // Fallback
-    } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _totalLiveClausesCount = totalCount;
+          _funnelSummary = funnel;
         });
+      }
+
+      // 3. 載入第一頁實體條款資料
+      await _executeClauseSearch(resetPage: true);
+    } catch (e) {
+      if (mounted) {
+        CustomToast.show(context, '資料載入異常: $e', ToastType.error);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<void> _searchLiveClauses() async {
-    try {
-      final results = await _policyService.searchPolicyClauses(
-        query: _searchProductController.text.trim(),
-        selectedCategories: _activeCategoryFilter == '全部' ? null : [_activeCategoryFilter],
-        limit: 50,
-      );
+  Future<void> _executeClauseSearch({bool resetPage = false}) async {
+    if (resetPage) {
+      _currentPage = 1;
+    }
+    setState(() => _isSearching = true);
 
-      final List<Map<String, dynamic>> list = [];
-      for (var item in results) {
-        list.add({
-          'id': item.id,
-          'title': item.productName,
-          'company': item.companyName,
-          'category': item.category,
-          'waitingDays': item.waitingDays.isEmpty ? '詳見條款規範' : item.waitingDays,
-          'tags': item.tags.isNotEmpty ? item.tags : ['官方報備條款', '實體資料庫連線'],
-          'roomLimit': item.roomLimit.isEmpty ? '2,000 元/日' : item.roomLimit,
-          'surgeryLimit': item.surgeryLimit.isEmpty ? '150,000 元' : item.surgeryLimit,
-          'miscLimit': item.miscLimit.isEmpty ? '120,000 元' : item.miscLimit,
-          'benefitsJson': item.benefitsJson,
-        });
-      }
+    try {
+      final selectedCats = _activeCategory == '全部' ? null : [_activeCategory];
+
+      final result = await _policyService.searchPolicyClausesPaged(
+        query: _searchController.text.trim(),
+        selectedCompany: _activeCompany == '全部公司' ? null : _activeCompany,
+        selectedCategories: selectedCats,
+        page: _currentPage,
+        pageSize: 12,
+      );
 
       if (mounted) {
         setState(() {
-          _catalogProducts.clear();
-          _catalogProducts.addAll(list);
+          _clauseItems = result.items;
+          _filteredCount = result.totalCount;
+          _totalPages = result.totalPages;
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      // ignore
+    } finally {
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
+    }
   }
 
-  void _toggleProductSelection(String prodId) {
+  void _toggleProductSelection(PolicyClauseItem prod) {
     setState(() {
-      if (_selectedProductsForComparison.contains(prodId)) {
-        _selectedProductsForComparison.remove(prodId);
+      final index = _selectedProducts.indexWhere((p) => p.id == prod.id);
+      if (index != -1) {
+        _selectedProducts.removeAt(index);
       } else {
-        if (_selectedProductsForComparison.length >= 4) {
-          CustomToast.show(context, '⚠️ 最多僅能同時選擇 4 款商品進行跨公司比較', ToastType.warning);
+        if (_selectedProducts.length >= 8) {
+          CustomToast.show(context, '⚠️ 最多僅能同時選擇 8 款商品進行橫向並排比較', ToastType.warning);
         } else {
-          _selectedProductsForComparison.add(prodId);
+          _selectedProducts.add(prod);
         }
       }
     });
   }
 
-  void _showClaimCalculatorDialog() {
-    String selectedProductTitle = '三商美邦人壽 心守健康手術醫療終身健康保險 (XSSI)';
-    int roomDays = 5;
-    double surgeryCost = 120000;
-    double miscCost = 80000;
-    double outpatientSurgeryCost = 15000;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) {
-          final roomClaim = roomDays * 2000;
-          final surgeryClaim = surgeryCost > 150000 ? 150000 : surgeryCost;
-          final miscClaim = miscCost > 120000 ? 120000 : miscCost;
-          final outpatientClaim = outpatientSurgeryCost > 15000 ? 15000 : outpatientSurgeryCost;
-          final totalClaim = roomClaim + surgeryClaim + miscClaim + outpatientClaim;
-          final totalExpenses = (roomDays * 3000) + surgeryCost + miscCost + outpatientSurgeryCost;
-          final outOfPocketGap = totalExpenses - totalClaim;
-
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.calculate_rounded, color: Color(0xFF10B981)),
-                SizedBox(width: 8),
-                Text('🧮 實體保單理賠對照與缺口試算引擎', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            content: SizedBox(
-              width: 520,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('1. 選擇試算保單商品：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      value: selectedProductTitle,
-                      menuMaxHeight: 220,
-                      isExpanded: true,
-                      items: _catalogProducts.map((p) {
-                        return DropdownMenuItem<String>(
-                          value: p['title'] as String,
-                          child: Text('${p['company']} - ${p['title']}', style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setDlgState(() => selectedProductTitle = val);
-                      },
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('2. 設定醫療單據金額與住院情境：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                    const SizedBox(height: 8),
-                    Text('🛏️ 一般病房天數：$roomDays 天 (自費差額 3,000元/日)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    Slider(
-                      value: roomDays.toDouble(),
-                      min: 1,
-                      max: 30,
-                      divisions: 29,
-                      onChanged: (val) => setDlgState(() => roomDays = val.toInt()),
-                    ),
-                    Text('🔪 自費微創手術費：${surgeryCost.toInt()} 元', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    Slider(
-                      value: surgeryCost,
-                      min: 10000,
-                      max: 300000,
-                      divisions: 29,
-                      onChanged: (val) => setDlgState(() => surgeryCost = val),
-                    ),
-                    Text('💊 住院醫療雜費/自費藥品耗材：${miscCost.toInt()} 元', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    Slider(
-                      value: miscCost,
-                      min: 10000,
-                      max: 300000,
-                      divisions: 29,
-                      onChanged: (val) => setDlgState(() => miscCost = val),
-                    ),
-                    Text('🩺 門診微創手術花費：${outpatientSurgeryCost.toInt()} 元', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    Slider(
-                      value: outpatientSurgeryCost,
-                      min: 5000,
-                      max: 50000,
-                      divisions: 9,
-                      onChanged: (val) => setDlgState(() => outpatientSurgeryCost = val),
-                    ),
-                    const Divider(height: 20),
-                    const Text('3. 5 大理賠桶條款精算結論明細：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('🛏️ 病房費給付：', style: TextStyle(fontSize: 12)),
-                        Text('${roomClaim.toInt()} 元', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('🔪 手術給付上限：', style: TextStyle(fontSize: 12)),
-                        Text('${surgeryClaim.toInt()} 元', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('💊 醫療雜費給付：', style: TextStyle(fontSize: 12)),
-                        Text('${miscClaim.toInt()} 元', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('🩺 門診手術給付：', style: TextStyle(fontSize: 12)),
-                        Text('${outpatientClaim.toInt()} 元', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF10B981)),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('預估理賠給付金額：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              Text('${totalClaim.toInt()} 元', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('客戶自費保障缺口：', style: TextStyle(fontSize: 11, color: Colors.redAccent)),
-                              Text('${outOfPocketGap > 0 ? outOfPocketGap.toInt() : 0} 元', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: outOfPocketGap > 0 ? Colors.redAccent : const Color(0xFF10B981))),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('關閉')),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  void _showPremiumEstimatorDialog() {
-    int age = 35;
-    bool isMale = true;
-    bool includeRider1 = true; // 實支實付附約
-    bool includeRider2 = true; // 癌症一次金附約
-    bool includeRider3 = false; // 重大傷病附約
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) {
-          final baseMainPremium = 15000 + (age * 300) + (isMale ? 1200 : 0);
-          final rider1Premium = includeRider1 ? (4500 + (age * 80)) : 0;
-          final rider2Premium = includeRider2 ? (3200 + (age * 110)) : 0;
-          final rider3Premium = includeRider3 ? (6800 + (age * 220)) : 0;
-          final totalAnnualPremium = baseMainPremium + rider1Premium + rider2Premium + rider3Premium;
-
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.price_change_rounded, color: Color(0xFF6366F1)),
-                SizedBox(width: 8),
-                Text('💰 跨公司實體保費組合估算器', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            content: SizedBox(
-              width: 480,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('1. 設定被保險人基本條件：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Text('性別：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        ChoiceChip(
-                          label: const Text('👨 男性'),
-                          selected: isMale,
-                          onSelected: (val) => setDlgState(() => isMale = true),
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('👩 女性'),
-                          selected: !isMale,
-                          onSelected: (val) => setDlgState(() => isMale = false),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text('投保年齡：$age 歲', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    Slider(
-                      value: age.toDouble(),
-                      min: 18,
-                      max: 65,
-                      divisions: 47,
-                      onChanged: (val) => setDlgState(() => age = val.toInt()),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('2. 勾選欲組合搭配之附約：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                    CheckboxListTile(
-                      title: const Text('主約：終身醫療險 (保額 1,000元)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      subtitle: Text('估算保費：$baseMainPremium 元/年', style: const TextStyle(fontSize: 11)),
-                      value: true,
-                      onChanged: null,
-                    ),
-                    CheckboxListTile(
-                      title: const Text('➕ 附約 A：實支實付醫療險 (計畫別 HS-20)', style: TextStyle(fontSize: 12)),
-                      subtitle: Text('估算保費：$rider1Premium 元/年', style: const TextStyle(fontSize: 11)),
-                      value: includeRider1,
-                      onChanged: (val) => setDlgState(() => includeRider1 = val ?? false),
-                    ),
-                    CheckboxListTile(
-                      title: const Text('➕ 附約 B：癌症一次給付金 (保額 100萬)', style: TextStyle(fontSize: 12)),
-                      subtitle: Text('估算保費：$rider2Premium 元/年', style: const TextStyle(fontSize: 11)),
-                      value: includeRider2,
-                      onChanged: (val) => setDlgState(() => includeRider2 = val ?? false),
-                    ),
-                    CheckboxListTile(
-                      title: const Text('➕ 附約 C：重大傷病範圍保險金 (保額 100萬)', style: TextStyle(fontSize: 12)),
-                      subtitle: Text('估算保費：$rider3Premium 元/年', style: const TextStyle(fontSize: 11)),
-                      value: includeRider3,
-                      onChanged: (val) => setDlgState(() => includeRider3 = val ?? false),
-                    ),
-                    const Divider(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6366F1).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF6366F1)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('預估首期年繳總保費：', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                          Text('$totalAnnualPremium 元/年', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF6366F1))),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('關閉')),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  void _showComparisonModal() {
-    final selectedList = _catalogProducts.where((p) => _selectedProductsForComparison.contains(p['id'])).toList();
-    if (selectedList.isEmpty) {
-      CustomToast.show(context, '💡 請先在下方勾選要比較的商品 (最多 4 款)', ToastType.warning);
+  void _openComparisonScreen() {
+    if (_selectedProducts.isEmpty) {
+      CustomToast.show(context, '請先在下方勾選要比較的商品 (2~8 款)', ToastType.warning);
       return;
     }
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => PolicyComparisonScreen(
+          initialProducts: _selectedProducts,
         ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('⚔️ 跨公司保單商品比較 (${selectedList.length} 款條款對照)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-              ],
-            ),
-            const Divider(),
-            Expanded(
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: selectedList.map((p) => Container(
-                  width: 240,
-                  margin: const EdgeInsets.only(right: 12),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(p['company'] as String, style: const TextStyle(fontSize: 11, color: Color(0xFF6366F1), fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text(p['title'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 12),
-                        const Text('🛏️ 住院病房費：', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        Text(p['roomLimit'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        const Text('🔪 住院手術費：', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        Text(p['surgeryLimit'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        const Text('💊 醫療雜費/自費：', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        Text(p['miscLimit'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        const Text('⏳ 等待期：', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        Text(p['waitingDays'] as String, style: const TextStyle(fontSize: 12)),
-                        const SizedBox(height: 12),
-                        const Divider(height: 1),
-                        const SizedBox(height: 10),
-                        const Text('🔍 insure80 條款陷阱比對：', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0EA5E9))),
-                        const SizedBox(height: 6),
-                        _buildClauseBadge('健保 2-2-7 手術限制', !(p['title'] as String).contains('手術') ? '無 2-2-7 限制 (優)' : '限定健保2-2-7 (嚴)', !(p['title'] as String).contains('手術') ? const Color(0xFF10B981) : Colors.orange),
-                        _buildClauseBadge('醫療雜費條款形式', '概括式條款 (超過健保全賠)', const Color(0xFF10B981)),
-                        _buildClauseBadge('收據報銷規定', (p['title'] as String).contains('享安全') ? '正本收據' : '接受副本收據理賠', (p['title'] as String).contains('享安全') ? Colors.orange : const Color(0xFF10B981)),
-                      ],
-                    ),
-                  ),
-                )).toList(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildClauseBadge(String label, String value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-          const SizedBox(height: 1),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: color.withValues(alpha: 0.3)),
-            ),
-            child: Text(value, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
-          ),
-        ],
       ),
     );
   }
@@ -620,12 +178,7 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
     final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
     final subTextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-    final filteredProducts = _catalogProducts.where((p) {
-      final matchesCat = _activeCategoryFilter == '全部' || p['category'] == _activeCategoryFilter;
-      final q = _searchProductController.text.trim().toLowerCase();
-      final matchesQuery = q.isEmpty || (p['title'] as String).toLowerCase().contains(q) || (p['company'] as String).toLowerCase().contains(q);
-      return matchesCat && matchesQuery;
-    }).toList();
+    final formatter = NumberFormat('#,###');
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -634,246 +187,317 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : RefreshIndicator(
-                  onRefresh: _fetchRealDashboardData,
+                  onRefresh: _fetchInitialLiveDashboardData,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 90),
+                    padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 100),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Top Header Metrics (Responsive for Desktop vs Mobile)
-                        MediaQuery.of(context).size.width >= 600
-                            ? Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildMetricCard('本月個人拜訪', '$_monthlyVisitCount 次', Icons.event_available_rounded, const Color(0xFF10B981), isDark, cardBg, borderColor, textColor, subTextColor),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildMetricCard('手頭 VIP 客戶', '$_vipCustomerCount 位', Icons.star_rounded, const Color(0xFFF59E0B), isDark, cardBg, borderColor, textColor, subTextColor),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _buildMetricCard('保單健診完成率', '${(_healthCheckPercent * 100).toInt()}%', Icons.pie_chart_rounded, const Color(0xFF6366F1), isDark, cardBg, borderColor, textColor, subTextColor),
-                                  ),
-                                ],
-                              )
-                            : Column(
-                                children: [
-                                  _buildMetricCard('本月個人拜訪', '$_monthlyVisitCount 次', Icons.event_available_rounded, const Color(0xFF10B981), isDark, cardBg, borderColor, textColor, subTextColor),
-                                  const SizedBox(height: 10),
-                                  _buildMetricCard('手頭 VIP 客戶', '$_vipCustomerCount 位', Icons.star_rounded, const Color(0xFFF59E0B), isDark, cardBg, borderColor, textColor, subTextColor),
-                                  const SizedBox(height: 10),
-                                  _buildMetricCard('保單健診完成率', '${(_healthCheckPercent * 100).toInt()}%', Icons.pie_chart_rounded, const Color(0xFF6366F1), isDark, cardBg, borderColor, textColor, subTextColor),
-                                ],
-                              ),
-
-                        const SizedBox(height: 20),
-
-                        // Quick Action Tools Row (跨公司比較 / 理賠試算 / 保費估算)
-                        Text('實用保單對照與計算工具：', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
-                        const SizedBox(height: 10),
+                        // 1. 🔴 頂部真實業務漏斗指標卡 (Sales Funnel & Live DB Metrics)
                         Row(
                           children: [
                             Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _showComparisonModal,
-                                icon: const Icon(Icons.compare_arrows_rounded, size: 16),
-                                label: const Text('跨公司比較', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF6366F1),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
+                              child: _buildFunnelCard(
+                                title: '名下客戶總量',
+                                mainVal: '${_funnelSummary.totalCustomers} 位',
+                                subtitle: '🌟 保戶 ${_funnelSummary.clientsCount} | 💬 跟進 ${_funnelSummary.prospectsCount} | 🎯 未開發 ${_funnelSummary.leadsCount}',
+                                icon: Icons.people_alt_rounded,
+                                color: const Color(0xFF6366F1),
+                                isDark: isDark,
+                                cardBg: cardBg,
+                                borderColor: borderColor,
+                                textColor: textColor,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _showClaimCalculatorDialog,
-                                icon: const Icon(Icons.calculate_rounded, size: 16),
-                                label: const Text('理賠試算', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF10B981),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
+                              child: _buildFunnelCard(
+                                title: '本月拜訪戰況',
+                                mainVal: '${_funnelSummary.monthlyVisitsCompleted} / ${_funnelSummary.monthlyVisitsTotal} 次',
+                                subtitle: '達成率 ${(_funnelSummary.monthlyVisitRate * 100).toInt()}% • 實體行程對接',
+                                icon: Icons.event_available_rounded,
+                                color: const Color(0xFF10B981),
+                                isDark: isDark,
+                                cardBg: cardBg,
+                                borderColor: borderColor,
+                                textColor: textColor,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _showPremiumEstimatorDialog,
-                                icon: const Icon(Icons.price_change_rounded, size: 16),
-                                label: const Text('保費估算', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0EA5E9),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
+                              child: _buildFunnelCard(
+                                title: '推動中拜訪專案',
+                                mainVal: '${_funnelSummary.activeProjectsCount} 個專案',
+                                subtitle: 'CRM 名單勾選核銷進行中',
+                                icon: Icons.assignment_turned_in_rounded,
+                                color: const Color(0xFFF59E0B),
+                                isDark: isDark,
+                                cardBg: cardBg,
+                                borderColor: borderColor,
+                                textColor: textColor,
                               ),
                             ),
                           ],
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
-                        // Search Input Bar (搜尋商品)
-                        TextField(
-                          controller: _searchProductController,
-                          onChanged: (_) => _searchLiveClauses(),
-                          decoration: InputDecoration(
-                            hintText: '搜尋全台 11,722 款保單商品名稱或保險公司...',
-                            prefixIcon: const Icon(Icons.search_rounded),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            filled: true,
-                            fillColor: cardBg,
+                        // 2. 🌸 搜尋列與動態計數 Header (對齊 SafeCheck 截圖 1)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: borderColor),
                           ),
-                        ),
-
-                        const SizedBox(height: 14),
-
-                        // Category Chips (熱門險種分類)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: ['全部', '實支實付醫療險', '癌症險', '重大傷病險', '意外傷害險'].map((cat) {
-                              final isSel = _activeCategoryFilter == cat;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ChoiceChip(
-                                  label: Text(cat, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
-                                  selected: isSel,
-                                  selectedColor: const Color(0xFF6366F1),
-                                  labelStyle: TextStyle(color: isSel ? Colors.white : textColor),
-                                  onSelected: (_) {
-                                    setState(() => _activeCategoryFilter = cat);
-                                    _searchLiveClauses();
-                                  },
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Product Cards Grid
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _catalogProducts.length,
-                          itemBuilder: (ctx, idx) {
-                            final prod = _catalogProducts[idx];
-                            final isChecked = _selectedProductsForComparison.contains(prod['id']);
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: cardBg,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: isChecked ? const Color(0xFFE53E3E) : borderColor, width: isChecked ? 2 : 1),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  Checkbox(
-                                    value: isChecked,
-                                    activeColor: const Color(0xFFE53E3E),
-                                    onChanged: (_) => _toggleProductSelection(prod['id'] as String),
-                                  ),
-                                  const SizedBox(width: 8),
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(prod['company'] as String, style: const TextStyle(fontSize: 11, color: Color(0xFF6366F1), fontWeight: FontWeight.bold)),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(prod['category'] as String, style: TextStyle(fontSize: 10, color: subTextColor)),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(prod['title'] as String, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
-                                        const SizedBox(height: 6),
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 4,
-                                          children: (prod['tags'] as List<String>).map((t) => Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(t, style: const TextStyle(fontSize: 10, color: Color(0xFF10B981))),
-                                          )).toList(),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text('• ${prod['waitingDays']}', style: TextStyle(fontSize: 11, color: subTextColor)),
-                                      ],
+                                    child: TextField(
+                                      controller: _searchController,
+                                      onSubmitted: (_) => _executeClauseSearch(resetPage: true),
+                                      decoration: InputDecoration(
+                                        hintText: '搜尋商品名稱、代碼、保險公司...',
+                                        prefixIcon: const Icon(Icons.search_rounded),
+                                        suffixIcon: _searchController.text.isNotEmpty
+                                            ? IconButton(
+                                                icon: const Icon(Icons.clear_rounded, size: 18),
+                                                onPressed: () {
+                                                  _searchController.clear();
+                                                  _executeClauseSearch(resetPage: true);
+                                                },
+                                              )
+                                            : null,
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _executeClauseSearch(resetPage: true),
+                                    icon: const Icon(Icons.search_rounded, size: 16),
+                                    label: const Text('搜尋', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFE53E3E), // SafeCheck signature red
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
                                   ),
                                 ],
                               ),
-                            );
-                          },
+                              const SizedBox(height: 14),
+
+                              // 動態即時筆數 Badge
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Builder(
+                                    builder: (context) {
+                                      final hasFilter = _activeCategory != '全部' || _activeCompany != '全部公司' || _searchController.text.trim().isNotEmpty;
+                                      final displayCount = hasFilter ? _filteredCount : _totalLiveClausesCount;
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE53E3E).withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.filter_list_rounded, size: 14, color: Color(0xFFE53E3E)),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '篩選 找到 ${formatter.format(displayCount)} 款商品 (資料庫全量 ${formatter.format(_totalLiveClausesCount)} 款)',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFE53E3E)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  if (_selectedProducts.isNotEmpty)
+                                    TextButton.icon(
+                                      onPressed: _openComparisonScreen,
+                                      icon: const Icon(Icons.compare_arrows_rounded, size: 16, color: Color(0xFFE53E3E)),
+                                      label: Text('前往並排比較 (${_selectedProducts.length}/8)', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFE53E3E))),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // 險種大分類 ChoiceChips
+                              const Text('險種分類：', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+                              const SizedBox(height: 6),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: _categoryFilters.map((cat) {
+                                    final isSel = _activeCategory == cat;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: ChoiceChip(
+                                        label: Text(cat, style: TextStyle(fontSize: 11, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+                                        selected: isSel,
+                                        selectedColor: const Color(0xFFE53E3E),
+                                        labelStyle: TextStyle(color: isSel ? Colors.white : textColor),
+                                        onSelected: (_) {
+                                          setState(() => _activeCategory = cat);
+                                          _executeClauseSearch(resetPage: true);
+                                        },
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+
+                        const SizedBox(height: 18),
+
+                        // 3. 🌸 商品卡片網格清單 (對齊 SafeCheck 截圖 2)
+                        _isSearching
+                            ? const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 40),
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            : _clauseItems.isEmpty
+                                ? Container(
+                                    padding: const EdgeInsets.all(40),
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.search_off_rounded, size: 48, color: subTextColor),
+                                        const SizedBox(height: 12),
+                                        Text('未找到符合條件的條款商品', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
+                                        const SizedBox(height: 4),
+                                        Text('請嘗試調整搜尋關鍵字或險種分類', style: TextStyle(fontSize: 12, color: subTextColor)),
+                                      ],
+                                    ),
+                                  )
+                                : LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final crossAxisCount = constraints.maxWidth > 1000
+                                          ? 3
+                                          : constraints.maxWidth > 650
+                                              ? 2
+                                              : 1;
+                                      return GridView.builder(
+                                        shrinkWrap: true,
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: crossAxisCount,
+                                          crossAxisSpacing: 12,
+                                          mainAxisSpacing: 12,
+                                          mainAxisExtent: 220,
+                                        ),
+                                        itemCount: _clauseItems.length,
+                                        itemBuilder: (ctx, idx) {
+                                          final prod = _clauseItems[idx];
+                                          final isSelected = _selectedProducts.any((p) => p.id == prod.id);
+                                          return _buildProductCard(
+                                            prod: prod,
+                                            isSelected: isSelected,
+                                            isDark: isDark,
+                                            cardBg: cardBg,
+                                            borderColor: borderColor,
+                                            textColor: textColor,
+                                            subTextColor: subTextColor,
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+
+                        const SizedBox(height: 16),
+
+                        // 分頁導航控制器
+                        if (_totalPages > 1)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                onPressed: _currentPage > 1
+                                    ? () {
+                                        setState(() => _currentPage--);
+                                        _executeClauseSearch();
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.chevron_left_rounded),
+                              ),
+                              Text('第 $_currentPage / $_totalPages 頁', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+                              IconButton(
+                                onPressed: _currentPage < _totalPages
+                                    ? () {
+                                        setState(() => _currentPage++);
+                                        _executeClauseSearch();
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.chevron_right_rounded),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
                 ),
 
-          // Sticky Top/Bottom Multi-Select Comparison Floating Bar (對齊 safecheck.tw 橘色頂欄: 已選 X/4 款商品)
+          // 4. ⚔️ 底部亮橘色浮動選取列 (對齊 SafeCheck 截圖 2)
           Positioned(
             bottom: 20,
             left: 20,
             right: 20,
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
-              child: _selectedProductsForComparison.isNotEmpty
+              child: _selectedProducts.isNotEmpty
                   ? Container(
-                      key: const ValueKey('active_bar'),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      key: const ValueKey('safecheck_bar'),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE53E3E), // SafeCheck signature orange/red bar
+                        color: const Color(0xFFE53E3E), // SafeCheck signature Orange/Red
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 6)),
+                          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 6)),
                         ],
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                '已選 ${_selectedProductsForComparison.length}/4 款商品',
-                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                              ),
-                            ],
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '已選 ${_selectedProducts.length}/8 款商品',
+                                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _selectedProducts.map((p) => p.id.length > 6 ? p.id.substring(0, 6).toUpperCase() : p.id.toUpperCase()).join('  '),
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           Row(
                             children: [
                               TextButton(
-                                onPressed: () => setState(() => _selectedProductsForComparison.clear()),
+                                onPressed: () => setState(() => _selectedProducts.clear()),
                                 child: const Text('清除', style: TextStyle(color: Colors.white70, fontSize: 13)),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton.icon(
-                                onPressed: _showComparisonModal,
+                                onPressed: _openComparisonScreen,
                                 icon: const Icon(Icons.compare_arrows_rounded, size: 16),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
@@ -896,7 +520,18 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
     );
   }
 
-  Widget _buildMetricCard(String title, String val, IconData icon, Color color, bool isDark, Color cardBg, Color borderColor, Color textColor, Color subTextColor) {
+  // 業務漏斗指標卡
+  Widget _buildFunnelCard({
+    required String title,
+    required String mainVal,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required bool isDark,
+    required Color cardBg,
+    required Color borderColor,
+    required Color textColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -904,28 +539,146 @@ class _DataDashboardTabState extends State<DataDashboardTab> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 22),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+          const SizedBox(height: 10),
+          Text(mainVal, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+          const SizedBox(height: 4),
+          Text(subtitle, style: const TextStyle(fontSize: 10.5, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    );
+  }
+
+  // SafeCheck 風格商品卡片 (對齊 SafeCheck 截圖 2)
+  Widget _buildProductCard({
+    required PolicyClauseItem prod,
+    required bool isSelected,
+    required bool isDark,
+    required Color cardBg,
+    required Color borderColor,
+    required Color textColor,
+    required Color subTextColor,
+  }) {
+    final code = prod.id.length > 8 ? prod.id.substring(0, 8).toUpperCase() : prod.id.toUpperCase();
+
+    return InkWell(
+      onTap: () => _toggleProductSelection(prod),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFE53E3E) : borderColor,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.03), blurRadius: 6, offset: const Offset(0, 3)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontSize: 12, color: subTextColor, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis, softWrap: false),
+                // Top Code & Selection Checkbox
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(code, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFE53E3E) : Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFFE53E3E) : Colors.grey.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        isSelected ? Icons.check : Icons.add,
+                        size: 12,
+                        color: isSelected ? Colors.white : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+
+                // Company & Category
+                Row(
+                  children: [
+                    Text(prod.companyName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE53E3E))),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(prod.category, style: const TextStyle(fontSize: 9.5, color: Color(0xFF6366F1), fontWeight: FontWeight.w500)),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 4),
-                Text(val, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
+
+                // Product Name
+                Text(
+                  prod.productName,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
-          ),
-        ],
+
+            // Bottom Waiting days & limits
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Divider(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text('• ${prod.waitingDays}', style: TextStyle(fontSize: 10.5, color: subTextColor), overflow: TextOverflow.ellipsis),
+                    ),
+                    Text('雜費 ${prod.miscLimit}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -27,7 +27,6 @@ import 'admin_dashboard_tab.dart';
 import 'dev_console_screen.dart';
 import 'relationship_topology_tab.dart';
 import 'data_dashboard_tab.dart';
-import 'schedule_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -80,11 +79,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _isSidebarCollapsed = AppSettings.instance.isSidebarCollapsedByDefault;
     AppSettings.instance.addListener(_handleSettingsChanged);
     _notifService.addListener(_handleNotifChanged);
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      if (mounted) {
-        _fetchEventsForSelectedDate(silent: true);
-      }
-    });
+    if (!isOfflineMode) {
+      try {
+        _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+          if (mounted) {
+            _fetchEventsForSelectedDate(silent: true);
+          }
+        });
+      } catch (_) {}
+    }
     _loadUserProfile();
     _loadSavedMenu().then((_) {
       if (mounted) _fetchEventsForSelectedDate(silent: true);

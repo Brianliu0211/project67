@@ -289,6 +289,55 @@ class PolicyCrawlerService {
     return result.items;
   }
 
+  /// 類別擴展對應表（將前台大分類自動擴展為資料庫實體類別）
+  static List<String> expandCategoryFilter(String selectedCategory) {
+    switch (selectedCategory) {
+      case '手術險':
+        return ['手術醫療終身險', '手術險'];
+      case '日額型醫療險':
+        return ['日額型住院醫療險', '日額型醫療險'];
+      case '實支實付醫療險':
+        return ['實支實付醫療險'];
+      case '癌症險':
+        return ['癌症險', '癌症一次給付金險', '癌症住院療程險'];
+      case '重大傷病險':
+        return ['重大傷病險', '特定傷病險'];
+      case '長照險 / 失能險':
+        return ['長照險 / 失能險', '巴氏量表長照險', '失能扶助險', '長照險', '失能險'];
+      case '意外傷害險':
+        return [
+          '意外傷害險',
+          '個人意外傷害與骨折產險',
+          '骨折傷害險',
+          '意外傷害醫療實支',
+          '意外身故與失能險'
+        ];
+      case '定期壽險':
+        return ['定期壽險', '房貸壽險', '微型照顧保單'];
+      case '終身壽險':
+        return ['終身壽險', '變額萬能壽險', '儲蓄險 / 終身壽險', '儲蓄險/壽險'];
+      case '儲蓄險 / 年金險':
+        return [
+          '美元利變儲蓄險',
+          '台幣分紅保單',
+          '投資型月配息保單',
+          '投資型保單',
+          '儲蓄險',
+          '年金險'
+        ];
+      case '汽機車責任與超額險':
+        return ['汽機車強制險與責任險', '超額責任與防禦險', '汽機車責任險'];
+      case '火險與產物責任險':
+        return ['住宅火災與地震基本險', '商業火險與雇主責任險'];
+      case '旅平不便險':
+        return ['海外旅遊不便與急難救助'];
+      case '寵物險':
+        return ['寵物醫療與侵權責任險'];
+      default:
+        return [selectedCategory];
+    }
+  }
+
   /// 支援多關鍵字分詞交集與動態條件分頁搜尋
   Future<PolicySearchResult> searchPolicyClausesPaged({
     String query = '',
@@ -306,26 +355,35 @@ class PolicyCrawlerService {
           .where((t) => t.isNotEmpty)
           .toList();
 
-      var dataBuilder = _supabase.from('policy_clauses').select();
+      var queryBuilder = _supabase.from('policy_clauses').select('*');
 
       for (var token in tokens) {
         final filter =
             'product_name.ilike.%$token%,company_name.ilike.%$token%,category.ilike.%$token%';
-        dataBuilder = dataBuilder.or(filter);
+        queryBuilder = queryBuilder.or(filter);
       }
 
       if (selectedCompany != null &&
           selectedCompany.isNotEmpty &&
-          selectedCompany != '全部') {
-        dataBuilder = dataBuilder.eq('company_name', selectedCompany);
+          selectedCompany != '全部' &&
+          selectedCompany != '全部公司') {
+        queryBuilder = queryBuilder.eq('company_name', selectedCompany);
       }
 
       if (selectedCategories != null && selectedCategories.isNotEmpty) {
-        dataBuilder = dataBuilder.inFilter('category', selectedCategories);
+        final List<String> expanded = [];
+        for (var cat in selectedCategories) {
+          expanded.addAll(expandCategoryFilter(cat));
+        }
+        queryBuilder = queryBuilder.inFilter('category', expanded.toSet().toList());
       }
 
-      final res = await dataBuilder.order('product_name');
-      final List allRaw = res as List;
+      final from = (page - 1) * pageSize;
+      final to = from + pageSize - 1;
+
+      final res = await queryBuilder.order('product_name').range(from, to).count(CountOption.exact);
+      final List allRaw = res.data as List;
+      final int totalCount = res.count;
 
       var items = allRaw
           .map((e) => PolicyClauseItem.fromJson(e as Map<String, dynamic>))
@@ -339,14 +397,8 @@ class PolicyCrawlerService {
             items.where((i) => pcCompanies.contains(i.companyName)).toList();
       }
 
-      final int totalCount = items.length;
-      final int from = (page - 1) * pageSize;
-      final int to = math.min(from + pageSize, totalCount);
-      final pagedItems =
-          (from < totalCount) ? items.sublist(from, to) : <PolicyClauseItem>[];
-
       return PolicySearchResult(
-        items: pagedItems,
+        items: items,
         totalCount: totalCount,
         page: page,
         pageSize: pageSize,
