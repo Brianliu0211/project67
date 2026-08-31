@@ -141,6 +141,7 @@
   "calendar_back_to_today": "Today",
   "calendar_view_timeline": "Timeline",
   "calendar_view_month": "Month Grid",
+  "calendar_view_agenda": "Agenda List",
   "calendar_no_events": "No events scheduled for today",
   "schedule_detail_title": "Event Details",
   "create_project": "Create Project",
