@@ -732,16 +732,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   },
                                 )
                               : _activeMenu == '今日行程'
-                                  ? ScheduleTab(
-                                      isWideScreen: isWideScreen,
-                                      isDark: isDark,
-                                      primaryColor: primaryColor,
-                                      onMenuChanged: (menu) {
-                                        setState(() {
-                                          _activeMenu = menu;
-                                        });
-                                      },
-                                    )
+                                  ? _buildScheduleView(
+                                      isWideScreen, isDark, primaryColor)
                                   : _activeMenu == '新聞頭條'
                                       ? const InsuranceNewsTab()
                                       : _activeMenu == '客戶管理'
