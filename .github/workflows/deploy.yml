@@ -48,8 +48,8 @@ jobs:
       - name: Build Vercel Project Structure
         run: vercel build --prod --token=$VERCEL_TOKEN
 
-      - name: Inject Flutter Web Build Artifacts
-        run: cp -r build/web/* .vercel/output/static/
+      - name: Sync Flutter Web Build to Vercel Output
+        run: rsync -av build/web/ .vercel/output/static/
 
       - name: Deploy Prebuilt Artifacts to Vercel Production
         run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
