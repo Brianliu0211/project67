@@ -88,6 +88,7 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
     try {
       final total = await _policyService.fetchTotalPolicyCount();
       final stats = await _policyService.fetchCompanyBreakdown();
+      final lastSynced = await _policyService.fetchLatestCrawledAt();
       final rssList = await _rssService.getRssSources();
       final prefs = await SharedPreferences.getInstance();
       final showFastDemo = prefs.getBool('dev_show_fast_demo_login') ?? true;
@@ -96,6 +97,7 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
         setState(() {
           _totalPolicyCount = total;
           _companyStats = stats;
+          _crawlerLastSynced = lastSynced;
           _rssSources = rssList;
           _showFastDemoLogin = showFastDemo;
           _isLoadingStats = false;
@@ -146,17 +148,24 @@ class _DevConsoleScreenState extends State<DevConsoleScreen> {
     final res = await _policyService.runIncrementalSync();
 
     if (mounted) {
+      final isOk = res['success'] == true;
       setState(() {
         _isSyncingPolicies = false;
         _crawlerHttpCode = res['httpCode'] ?? 200;
         _crawlerLatencyMs = res['durationMs'] ?? 185;
         _crawlerLastSynced = res['lastSynced'] ?? '剛才';
         _totalPolicyCount = res['totalCount'] ?? _totalPolicyCount;
-        _crawlerStatusLabel = '🟢 [正常] HTTP $_crawlerHttpCode OK (${_crawlerLatencyMs}ms)';
+        _crawlerStatusLabel = isOk
+            ? '🟢 [正常] HTTP $_crawlerHttpCode OK (${_crawlerLatencyMs}ms)'
+            : '🔴 [異常] HTTP $_crawlerHttpCode (${_crawlerLatencyMs}ms)';
+        _crawlerStatusColor = isOk ? const Color(0xFF10B981) : Colors.redAccent;
       });
 
-      // Show non-intrusive comfortable feedback
-      _showIncrementalFeedbackToast(res['addedCount'] ?? 6370);
+      if (isOk) {
+        _showIncrementalFeedbackToast(res['addedCount'] ?? 0);
+      } else {
+        CustomToast.show(context, '⚠️ 增量校對提醒：${res['error'] ?? '連線失敗 (HTTP $_crawlerHttpCode)'}', ToastType.error);
+      }
       _triggerPolicySearch();
     }
   }
