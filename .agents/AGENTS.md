@@ -11,9 +11,9 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
   - For new Dart/Flutter packages: add under the "專案相依套件" section, describing its exact role in the project.
 - **Timing**: Perform this update immediately after modifying configuration files (like `pubspec.yaml`) or running install commands.
 
-### Developer Log Update (`docs/03_開發日誌/`)
-- **Rule**: Whenever the user requests you to write a development log, you **MUST** create a new file in [docs/03_開發日誌/YYYY-MM/](docs/03_開發日誌/) (e.g. `docs/03_開發日誌/2026-08/`) named in the format `YYYYMMDD_Title.md` (e.g., `20260802_進度表大模組重構.md`), using short, concise titles.
-- **Specification Compliance**: You **MUST** strictly follow all rules and templates defined in [開發日誌規範.md](docs/03_開發日誌/開發日誌規範.md).
+### Developer Log Update (`docs/01_開發日誌/`)
+- **Rule**: Whenever the user requests you to write a development log, you **MUST** create a new file in [docs/01_開發日誌/YYYY-MM/](docs/01_開發日誌/) (e.g. `docs/01_開發日誌/2026-08/`) named in the format `YYYYMMDD_Title.md` (e.g., `20260802_進度表大模組重構.md`), using short, concise titles.
+- **Specification Compliance**: You **MUST** strictly follow all rules and templates defined in [開發日誌規範.md](docs/01_開發日誌/開發日誌規範.md).
 - **Multiple Logs Per Day**: If multiple dev logs are written on the same day, each log should use a distinct functional title (e.g., `20260714_客戶卡片UI刻劃.md` and `20260714_Supabase串接與RLS測試.md`). Do NOT use sequential numbering.
 
 ### Shortcut Guide Update (`docs/00_公共規格/開發人員快捷指令.md`)
@@ -29,10 +29,10 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
 
 ### Actions
 1. **前置安全檢查 (Check Previous Closing Status)**：在執行任何開工動作前，**必須**先檢查本地 Git 倉庫狀態（如執行 `git status`）。若偵測到當前工作目錄有未提交的變更，或前次開發分支尚未執行收工與合併流程，**必須**主動發出黃色/橙色警示，提醒專案人員先進行「收工」或合併，待確認安全後始得繼續開工。
-2. **確認開發者身分與工作區 (強制常駐點選彈窗)**：**必須【強制呼叫 `ask_question` 互動選單工具】**，彈出互動選項讓專案人員直接點選身分（`我是 蘿蔔 (lobo)` 或 `我是 巨獸 (beast)`），以鎖定對應的分支前綴與沙盒路徑，徹底免去手動打字負擔。
-3. **巡檢個人工作區新靈感 (Read-Only Scan)**：唯讀巡檢 `docs/01_蘿蔔_工作區/想法存放區/` 與 `docs/02_巨獸_工作區/想法存放區/`，若發現全新未討論靈感，詢問是否提報摘要至 `docs/進度.md` 萬能收件匣。（注意：AI 嚴禁修改或刪除人類工作區原始筆記）。
+2. **確認開發者身分與工作區 (強制常駐點選彈窗)**：**必須【強制呼叫 `ask_question` 互動選單工具】**，彈出互動選項讓專案人員直接點選身分（`我是 蘿蔔 (lobo)`、`我是 巨獸 (beast)`、`我是 沛沛 (peihan)` 或 `我是 小陳 (chen)`），以鎖定對應的分支前綴與沙盒路徑，徹底免去手動打字負擔。
+3. **巡檢個人工作區新靈感 (Read-Only Scan)**：唯讀巡檢 `docs/03_蘿蔔_工作區/想法存放區/`、`docs/04_巨獸_工作區/想法存放區/`、`docs/05_沛沛_工作區/想法存放區/` 與 `docs/06_小陳_工作區/想法存放區/`，若發現全新未討論靈感，詢問是否提報摘要至 `docs/進度.md` 萬能收件匣。（注意：AI 嚴禁修改或刪除人類工作區原始筆記）。
 4. **對齊進度表任務 (強制常駐點選彈窗)**：讀取 [進度.md](docs/進度.md) 並**透過 `ask_question` 彈窗**展示當前未完成的大模組任務列表，讓開發者能直接點選本次要進行的任務。
-5. **全景地圖影響力評估 (Map-Driven Impact Analysis)**：選定任務後，AI **必須強制唯讀讀取** `docs/01_蘿蔔_工作區/想法存放區/專案全景地圖_草稿.md`，並針對該任務輸出「雙向邏輯影響力評估清單」，明確指出將牽連哪些其他模組或角色權限。
+5. **全景地圖影響力評估 (Map-Driven Impact Analysis)**：選定任務後，AI **必須強制唯讀讀取** `docs/03_蘿蔔_工作區/想法存放區/專案全景地圖_草稿.md`，並針對該任務輸出「雙向邏輯影響力評估清單」，明確指出將牽連哪些其他模組或角色權限。
 6. **大任務微型拆解協定 (Task Decomposition Protocol)**：當開發者選定特定大模組任務時，AI **必須**自動進行 4 階段微型拆解（`(1) Schema/RLS` $\rightarrow$ `(2) Service/邏輯層` $\rightarrow$ `(3) UI組件` $\rightarrow$ `(4) 驗證`），將大任務拆為微型 Tickets 並展示於對話與 sub-task 脈絡中，避免一次變更規模過大。
 7. **建議分支名稱**：若為程式碼開發，生成格式為 `feature/username-featurename` 的分支名稱（例如：`feature/lobo-customer-list-ui`）。
 8. **提供分支指令/介面操作指引**：引導 GitHub Desktop 建立特徵分支（純文件類修改除外）。
@@ -54,10 +54,10 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
    - **UI 規範驗證**：若改動 UI，確認符合 `main_spec.md` 之 Toast / 彈窗與主題標準。
    - **工具包同步**：若新增 Package/SDK，確認已同步更新至 `docs/工具包.md`。
    - **Null-Safety 防護**：確認核心流程具備 Exception 捕獲與防空值處理。
-3. **撰寫開發日誌與 Handoff 條文**: Create a new development log in [docs/03_開發日誌/](docs/03_開發日誌/) following the established specification. **MUST** include a dedicated `[Handoff 狀態條言]` section at the end of the log documenting exact session context, current state, key decisions, and recommended next steps for seamless cross-developer/agent handoff.
+3. **撰寫開發日誌與 Handoff 條文**: Create a new development log in [docs/01_開發日誌/](docs/01_開發日誌/) following the established specification. **MUST** include a dedicated `[Handoff 狀態條言]` section at the end of the log documenting exact session context, current state, key decisions, and recommended next steps for seamless cross-developer/agent handoff.
 4. **更新進度表與全景地圖 (Dual-Sync)**: 
    - 勾選 [進度.md](docs/進度.md) 內已完成的項目 (`[x]`)，並處理孵化器升級。
-   - **強制將今日實作完成的功能，同步更新至** `docs/01_蘿蔔_工作區/想法存放區/專案全景地圖_草稿.md` 的【現況實體區】與【角色權限與操作旅程】中，確保地圖永不漂移。
+   - **強制將今日實作完成的功能，同步更新至** `docs/03_蘿蔔_工作區/想法存放區/專案全景地圖_草稿.md` 的【現況實體區】與【角色權限與操作旅程】中，確保地圖永不漂移。
 5. **產出 Git Commit 訊息與分支指引**: Generate a ready-to-paste **Summary** and **Description** for GitHub Desktop, strictly following the conventions defined in [Git提交訊息規範.md](docs/00_公共規格/Git提交訊息規範.md)，並**明確輸出對應的特徵分支名稱（若為純文件則明確輸出 `main` 分支）**。
 6. **智慧提交分流引導 (Fast-Track vs Standard PR)**：
    - **純文件修訂 (Fast-Track 快速通道)**：直接引導在 GitHub Desktop 將分支切換至 `main`，提交並推送至 `main` 主線分支（免發起 PR）。
@@ -180,7 +180,7 @@ This file defines guidelines and constraints specific to the `insurance_helper` 
    - **Type A (雙向自動對齊)**：`AGENTS.md` $\Leftrightarrow$ `開發人員快捷指令.md` / `手冊.md`
    - **Type B (單向唯讀巡檢 - 人類領地)**：`個人工作區` $\rightarrow$ `進度.md` (AI 僅讀取，不改動人類筆記)
    - **Type C (按需實體對齊)**：`lib/` + `*.sql` + `開發日誌` $\rightarrow$ `main_spec.md` (輸入 `對齊` 時觸發)
-   - **Type D (里程碑自動備份)**：`lib/` $\rightarrow$ `04_專題報告/` (有改 Code 時收工自動備份 Mermaid/ERD)
+   - **Type D (里程碑自動備份)**：`lib/` $\rightarrow$ `02_專題報告/` (有改 Code 時收工自動備份 Mermaid/ERD)
 
 ---
 
