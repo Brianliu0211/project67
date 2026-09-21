@@ -29,8 +29,8 @@
 
 ### 1. 使用者個人檔案表 (`public.profiles`)
 - **用途**: 儲存業務員（App 使用者）的基本資訊，與 `auth.users` 進行 1-to-1 串接。
-- **關鍵欄位**: `id` (UUID, 參考 `auth.users`), `email`, `full_name`, `avatar_url`, `role` (`admin`/`dev`/`agent`), `is_google_connected` (BOOLEAN), `connected_providers` (TEXT[]), `updated_at`。
-- **觸發器**: 當 `auth.users` 新增帳號時自動建立 Profile 並寫入初始角色與連線狀態。
+- **關鍵欄位**: `id` (UUID, 參考 `auth.users`), `email`, `full_name`, `avatar_url`, `role` (`admin`/`dev`/`agent`), `status` (`active`/`pending`/`suspended`), `team_id` (UUID), `team_name` (TEXT), `is_google_connected` (BOOLEAN), `connected_providers` (TEXT[]), `updated_at`。
+- **觸發器**: 當 `auth.users` 新增帳號時自動建立 Profile 並寫入初始角色、團隊與連線狀態。
 
 ### 2. 客戶資料表 (`public.customers`)
 - **用途**: 儲存業務員所擁有的客戶基本檔案（支援名片化 3D 翻轉與詳情檢視）。
@@ -40,12 +40,13 @@
   - `name` (TEXT, 必填), `nickname` (TEXT), `phone` (TEXT), `email` (TEXT)
   - `avatar_url` (TEXT, 客戶大頭貼照片 URL)
   - `notes` (TEXT, 滾動備註)
+  - `custom_attributes` (JSONB, 預設 `'{}'::jsonb`, 具 GIN 索引，支援動態擴展屬性與無損雙向往返匯入匯出)
   - `deleted_at` (TIMESTAMPTZ, 可為空): **軟刪除標記**。非空表示位於垃圾桶中。
   - `created_at` / `updated_at` (TIMESTAMPTZ)
-- **RLS 策略**: `auth.uid() = profile_id`。
+- **RLS 策略**: `auth.uid() = profile_id`，同團隊 Admin 具跨表檢視與更新權限。
 
 ### 3. 專屬行程排程表 (`public.schedule_events`)
-- **用途**: 提供首頁行事曆「月網格」與「日時間軸 (Side-by-Side 重疊並排演算法)」之行程管理。
+- **用途**: 提供首頁行事曆「月網格」與「日時間軸 (Side-by-Side 重疊並排演算法)」之行程管理，並支援 Google 日曆雙向同步。
 - **關鍵欄位**:
   - `id` (UUID, 主鍵)
   - `profile_id` (UUID, 參考 `profiles.id`)
@@ -53,6 +54,8 @@
   - `event_date` (DATE), `start_time` (TIME), `end_time` (TIME)
   - `location` (TEXT), `event_type` (TEXT: 會議談判/客戶拜訪/提醒/個人行程)
   - `is_all_day` (BOOLEAN)
+  - `sync_status` (TEXT: `local_only`/`synced`/`pending_push`/`pending_delete`)
+  - `google_calendar_id` (TEXT), `google_event_id` (TEXT) (具唯一複合索引 `idx_schedule_events_google_sync`)
   - `created_at` / `updated_at` (TIMESTAMPTZ)
 
 ### 4. 專案拜訪清單表 (`public.visit_projects` & `public.visit_project_customers`)
@@ -85,6 +88,21 @@
 - **用途**: 提供 Phase 7 保險新聞管線自訂 RSS 來源動態管理，支援開發者於後台進行連線 Ping 測試與即時開關。
 - **關鍵欄位**: `id` (UUID), `source_name` (TEXT), `rss_url` (TEXT), `category` (TEXT), `is_active` (BOOLEAN), `health_status` (TEXT), `created_at` / `updated_at` (TIMESTAMPTZ)。
 - **RLS 策略**: 全團隊 `authenticated` 登入者唯讀 (`SELECT`)，來源管理 (`INSERT`/`UPDATE`/`DELETE`) 僅限 `admin` / `dev` 與後端 Service Role。
+
+### 11. 拜訪歷史日誌表 (`public.visit_logs`)
+- **用途**: 記錄每次客戶拜訪的類型、結果與備註，並設定 Trigger 當行程/提醒完成時自動寫入日誌。
+- **關鍵欄位**: `id` (UUID), `user_id` (UUID, 參考 `auth.users`), `customer_id` (UUID, 參考 `customers.id`), `reminder_id` (UUID, 參考 `reminders.id`), `visit_type` (`首談`/`跟進`/`送件`/`售後服務`/`其他`), `outcome` (`成功`/`拒絕`/`待跟進`/`未接觸`/`其他`), `notes` (TEXT), `created_at` (TIMESTAMPTZ)。
+- **RLS 策略**: `auth.uid() = user_id`，使用者僅能存取自己的拜訪紀錄。
+
+### 12. 系統通知與主管指派表 (`public.notifications`)
+- **用途**: 儲存指派通知、主管備註、AI 智慧預警與系統公告。
+- **關鍵欄位**: `id` (UUID), `profile_id` (UUID, 參考 `profiles.id`), `sender_name` (TEXT), `title` (TEXT), `content` (TEXT), `type` (`customer_reassigned`/`manager_task_note`/`ai_smart_alert`/`system_notice`), `is_read` (BOOLEAN), `target_customer_id` (UUID), `created_at` (TIMESTAMPTZ)。
+- **RLS 策略**: 使用者僅能查看與更新自己的通知；管理員與系統服務端具寫入權限。
+
+### 13. 客戶社交角色與人脈網絡表 (`public.customer_relationships`)
+- **用途**: 提供黑曜石風格動態人脈拓撲網絡，記錄客戶間的雙向角色關係（親眷、職場、社團、合夥等），支援子圖群島佈局與三軌道避障演算法。
+- **關鍵欄位**: `id` (UUID), `user_id` (UUID, 參考 `auth.users`), `source_customer_id` (UUID, 參考 `customers.id`), `target_customer_id` (UUID, 參考 `customers.id`), `relationship_type` (`family`/`workplace`/`social`/`other`), `relationship_detail` (TEXT, 如夫妻、父子、社友、合夥人), `created_at` (TIMESTAMPTZ)。
+- **約束與 RLS**: 具備檢查約束 `chk_no_self_relationship`（禁止自關聯），RLS 策略 `auth.uid() = user_id`。
 
 ---
 
@@ -238,3 +256,31 @@
 7. **`對齊`**：對比現有程式碼、Supabase Schema 與 `進度.md`，自動將最新資料表、團隊架構與系統規範補全至本主規格書 (`main_spec.md`)。
 8. **`book`**：渲染 Mermaid 視覺化全專案文檔關係地圖與說明 4 種連動型態。
 9. **`自我修復`**：當發現 AI 行為瑕疵、邏輯死角或與原本系統設計違背時觸發。AI 將自動進行「根因剖析 ➔ 修訂 `.agents/AGENTS.md` 條文 ➔ 全套連動更新 `開發人員快捷指令.md` / `開發人員手冊.md` / `main_spec.md` / `進度.md` ➔ 報告修復結果與全新防呆邏輯」。
+
+---
+
+## 🛡️ 反向專業防護與嚴謹架構設計協定 (Architectural Rigor Protocol)
+
+### 核心原則
+AI Agent 不僅是代碼編寫工具，更是專案的 **「資深軟體架構師 (Lead Software Architect)」**。嚴禁盲目執行違背現實軟體工程邏輯的捷徑寫法。
+
+### 強制執行條款
+1. **嚴禁「敷衍型偷懶/捷徑寫法 (No Shortcut Mockups)」**：
+   - 嚴禁為了「快速在畫面上展示」而採用違背真實軟體架構的硬塞寫法（例如在業務員個人頁面隨手放置全系統角色切換 ChoiceChip）。
+   - 所有角色權限 (RBAC)、資料庫存取與頁面路由，必須符合現實商業系統的**權限隔離與安全邊界**。
+2. **反向專業審查與質疑 (Proactive Architectural Challenge)**：
+   - 當專案人員提出新需求或選定開發任務時，AI **必須先站在架構師立場進行反向提問與邊界梳理**，主動提出以下問題：
+     - 💡 *「這個功能真正的使用者是誰？權限邊界如何劃分？」*
+     - 💡 *「在真實商業場景中，這個流程會遇到哪些資料安全或邏輯漏洞？」*
+     - 💡 *「我們是否有未考慮到的邊界情境 (Edge Cases) 或資料庫 RLS 權限問題？」*
+3. **全景地圖與架構規劃優先 (Map-Driven Architecture Plan First)**：
+   - 凡涉及 RBAC 權限、資料庫 Schema 變動或跨模組路由時，**絕對禁止直接撰寫實體程式碼**。
+   - 必須先至 `專案全景地圖_草稿.md` 的【未來藍圖區】寫下「影響力評估」，並產出「角色/功能對照矩陣」與「路由分流藍圖」，經專案人員確認架構嚴謹性且影響範圍無誤後，始得寫入實體代碼。
+4. **拒絕幻想未實作功能 (No Hallucination of Unbuilt Features)**：
+   - 嚴禁憑空幻想或過度解讀尚未被做出來的功能。必須嚴格基於目前實體程式碼的現狀與已確定的規格進行回答與設計。
+5. **全域架構思維 (Holistic Architecture Thinking)**：
+   - 必須好好根據系統設計的「角色」、「目的」、「功能性」、「完整性」、「正確性」以及「雙向邏輯」，去全面思考整個架構。
+6. **落實雙向邏輯設計 (Bidirectional Logic Design)**：
+   - 「雙向邏輯」的定義：當與使用者討論功能，或被要求開發新功能時，必須考量到(a) 實際發生的畫面，(b) 實際被使用的操作直覺邏輯，(c) 此功能創造後會與哪些現有模組產生「聯動」，以達到正確的雙向功能。
+   - 舉例：若原本只有「老師」角色，現在追加「學生」角色，必須思考雙向的關聯性——老師能對學生做哪些操作？反過來學生對老師又能做什麼？這兩者的權限與視圖絕對不可能一樣，必須明確切分並考量對應的連動變化。
+
