@@ -673,6 +673,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
+                    if (_activeMenu == '今日行程')
+                      IconButton(
+                        icon: const Icon(Icons.add, size: 26),
+                        color: primaryColor,
+                        tooltip: context.l10n('event_add_title'),
+                        onPressed: () => _openAddEditEventDialog(),
+                      ),
                     Stack(
                       alignment: Alignment.center,
                       children: [
