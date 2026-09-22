@@ -18,6 +18,7 @@ class ScheduleEventDialog extends StatefulWidget {
   final String? initialTitle;
   final String? initialEventType;
   final String? initialCustomerId;
+  final bool? isBottomSheet;
 
   const ScheduleEventDialog({
     super.key,
@@ -26,6 +27,7 @@ class ScheduleEventDialog extends StatefulWidget {
     this.initialTitle,
     this.initialEventType,
     this.initialCustomerId,
+    this.isBottomSheet,
   });
 
   @override
@@ -731,6 +733,59 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
             ],
           ),
         ],
+      );
+    }
+
+    final bool isMobile = widget.isBottomSheet ?? (MediaQuery.of(context).size.width < 768);
+
+    if (isMobile) {
+      return Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 頂部小把手 (Drag handle indicator)
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: buildFormColumn(),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 

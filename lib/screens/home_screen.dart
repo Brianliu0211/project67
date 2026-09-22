@@ -167,13 +167,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openAddEditEventDialog([ScheduleEvent? event]) async {
-    final result = await showDialog<dynamic>(
-      context: context,
-      builder: (ctx) => ScheduleEventDialog(
-        initialDate: _selectedDate,
-        eventToEdit: event,
-      ),
-    );
+    final bool isMobile = MediaQuery.of(context).size.width < 768;
+    final result = isMobile
+        ? await showModalBottomSheet<dynamic>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            backgroundColor: Colors.transparent,
+            builder: (ctx) => ScheduleEventDialog(
+              initialDate: _selectedDate,
+              eventToEdit: event,
+              isBottomSheet: true,
+            ),
+          )
+        : await showDialog<dynamic>(
+            context: context,
+            builder: (ctx) => ScheduleEventDialog(
+              initialDate: _selectedDate,
+              eventToEdit: event,
+            ),
+          );
 
     if (result != null && mounted) {
       _fetchEventsForSelectedDate();
@@ -673,13 +686,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
-                    if (_activeMenu == '今日行程')
+                    if (_activeMenu == '今日行程') ...[
+                      IconButton(
+                        icon: Icon(Icons.refresh, size: 24, color: textColor),
+                        tooltip: '重新整理',
+                        onPressed: () => _fetchEventsForSelectedDate(),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.add, size: 26),
                         color: primaryColor,
                         tooltip: context.l10n('event_add_title'),
                         onPressed: () => _openAddEditEventDialog(),
                       ),
+                    ],
                     Stack(
                       alignment: Alignment.center,
                       children: [
@@ -1487,11 +1506,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildWeeklyCalendarStrip(isDark, textColor, subTextColor, borderColor, primaryColor),
                     Expanded(
-                      child: _calendarViewMode == 'month_grid'
-                          ? _buildMonthGridView(isDark, borderColor, primaryColor)
-                          : _calendarViewMode == 'agenda'
-                              ? _buildAgendaListView(isDark, borderColor, primaryColor)
-                              : _buildScheduleTimeline(),
+                      child: RefreshIndicator(
+                        onRefresh: () async => _fetchEventsForSelectedDate(),
+                        color: primaryColor,
+                        child: _calendarViewMode == 'month_grid'
+                            ? _buildMonthGridView(isDark, borderColor, primaryColor)
+                            : _calendarViewMode == 'agenda'
+                                ? _buildAgendaListView(isDark, borderColor, primaryColor)
+                                : _buildScheduleTimeline(),
+                      ),
                     ),
                   ],
                 ),
@@ -2044,6 +2067,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Month Grid Weeks List
         Expanded(
           child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(8),
             itemCount: weekGrid.length,
             itemBuilder: (context, weekIdx) {
@@ -2278,36 +2302,44 @@ class _HomeScreenState extends State<HomeScreen> {
     upcomingEvents.sort((a, b) => a.startAt.compareTo(b.startAt));
 
     if (upcomingEvents.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.event_available, size: 64, color: primaryColor.withValues(alpha: 0.3)),
-            const SizedBox(height: 16),
-            Text(
-              '${DateFormat('yyyy/MM/dd', AppSettings.instance.language).format(_selectedDate)} 起暫無未來排定行程',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white70 : Colors.black87,
+      return LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.event_available, size: 64, color: primaryColor.withValues(alpha: 0.3)),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${DateFormat('yyyy/MM/dd', AppSettings.instance.language).format(_selectedDate)} 起暫無未來排定行程',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '點擊「新增行程」或語音助理排定新拜訪',
+                    style: TextStyle(fontSize: 13, color: isDark ? Colors.white30 : Colors.black54),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _openAddEditEventDialog(),
+                    icon: const Icon(Icons.add),
+                    label: Text(context.l10n('event_add_title')),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '點擊「新增行程」或語音助理排定新拜訪',
-              style: TextStyle(fontSize: 13, color: isDark ? Colors.white30 : Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => _openAddEditEventDialog(),
-              icon: const Icon(Icons.add),
-              label: Text(context.l10n('event_add_title')),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
+          ),
         ),
       );
     }
@@ -2322,6 +2354,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final dateKeys = groupedEvents.keys.toList();
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       itemCount: dateKeys.length,
       itemBuilder: (context, index) {
@@ -2512,32 +2545,40 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (_events.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.event_available, size: 64, color: primaryColor.withValues(alpha: 0.3)),
-            const SizedBox(height: 16),
-            Text(
-              '本日暫無排定行程',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white70 : Colors.black87,
+      return LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.event_available, size: 64, color: primaryColor.withValues(alpha: 0.3)),
+                  const SizedBox(height: 16),
+                  Text(
+                    '本日暫無排定行程',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '點擊左側或下方按鈕新增第一個行程',
+                    style: TextStyle(fontSize: 13, color: isDark ? Colors.white30 : Colors.black54),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _openAddEditEventDialog(),
+                    icon: const Icon(Icons.add),
+                    label: Text(context.l10n('event_add_title')),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '點擊左側或下方按鈕新增第一個行程',
-              style: TextStyle(fontSize: 13, color: isDark ? Colors.white30 : Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => _openAddEditEventDialog(),
-              icon: const Icon(Icons.add),
-              label: Text(context.l10n('event_add_title')),
-            ),
-          ],
+          ),
         ),
       );
     }
@@ -2554,6 +2595,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _selectedDate.day == DateTime.now().day;
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       child: LayoutBuilder(
         builder: (context, constraints) {

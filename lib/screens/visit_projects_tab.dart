@@ -435,14 +435,30 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
                       IconButton(
                         icon: const Icon(Icons.calendar_month, color: Color(0xFF0369A1), size: 20),
                         onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (ctx) => ScheduleEventDialog(
-                              initialDate: DateTime.now(),
-                              initialTitle: '拜訪: ${project['title']}',
-                              initialEventType: 'customer_visit',
-                            ),
-                          );
+                          final bool isMobile = MediaQuery.of(context).size.width < 768;
+                          if (isMobile) {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (ctx) => ScheduleEventDialog(
+                                initialDate: DateTime.now(),
+                                initialTitle: '拜訪: ${project['title']}',
+                                initialEventType: 'customer_visit',
+                                isBottomSheet: true,
+                              ),
+                            );
+                          } else {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => ScheduleEventDialog(
+                                initialDate: DateTime.now(),
+                                initialTitle: '拜訪: ${project['title']}',
+                                initialEventType: 'customer_visit',
+                              ),
+                            );
+                          }
                         },
                         tooltip: '排入行程',
                       ),
