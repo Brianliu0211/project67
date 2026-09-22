@@ -201,6 +201,31 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _openRoutePlannerDialog({required DateTime date, required List<ScheduleEvent> events}) {
+    final bool isMobile = MediaQuery.of(context).size.width < 768;
+    if (isMobile) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => RoutePlannerDialog(
+          selectedDate: date,
+          events: events,
+          isBottomSheet: true,
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (ctx) => RoutePlannerDialog(
+          selectedDate: date,
+          events: events,
+        ),
+      );
+    }
+  }
+
   Future<void> _openVoiceSchedulerDialog() async {
     if (isOfflineMode) {
       CustomToast.show(context, '⚠️ 離線預覽模式：語音排程需要雲端 AI 連線，請在連線模式下使用。', ToastType.warning);
@@ -1613,15 +1638,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         ElevatedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => RoutePlannerDialog(
-                                selectedDate: _selectedDate,
-                                events: _events,
-                              ),
-                            );
-                          },
+                          onPressed: () => _openRoutePlannerDialog(
+                            date: _selectedDate,
+                            events: _events,
+                          ),
                           icon: const Icon(Icons.alt_route, size: 14, color: Colors.white),
                           label: const Text('路線規劃', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                           style: ElevatedButton.styleFrom(
@@ -1816,15 +1836,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     // 路線規劃按鈕
                     ElevatedButton.icon(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => RoutePlannerDialog(
-                            selectedDate: _selectedDate,
-                            events: _events,
-                          ),
-                        );
-                      },
+                      onPressed: () => _openRoutePlannerDialog(
+                        date: _selectedDate,
+                        events: _events,
+                      ),
                       icon: const Icon(Icons.alt_route, size: 16, color: Colors.white),
                       label: const Text('路線規劃', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                       style: ElevatedButton.styleFrom(
@@ -2494,15 +2509,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                   tooltip: '路線導航',
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (ctx) => RoutePlannerDialog(
-                                        selectedDate: event.startAt,
-                                        events: [event],
-                                      ),
-                                    );
-                                  },
+                                  onPressed: () => _openRoutePlannerDialog(
+                                    date: event.startAt,
+                                    events: [event],
+                                  ),
                                 ),
                               IconButton(
                                 icon: Icon(Icons.edit_outlined, size: 20, color: isDark ? Colors.white60 : Colors.black54),
