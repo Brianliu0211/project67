@@ -72,6 +72,37 @@ void main() {
       expect(completedEvent.tag, 'VIP客戶');
       expect(event.isCompleted, isFalse); // 不可變性 (Immutability)
     });
+
+    test('3. eventType 白名單標準化測試 (消除 Postgres 23514 報錯)', () {
+      // 1. 'visit' 自動標準化為 'customer_visit'
+      expect(ScheduleEvent.normalizeEventType('visit'), 'customer_visit');
+      expect(ScheduleEvent.normalizeEventType('customer_visit'), 'customer_visit');
+
+      // 2. 'reminder' 自動標準化為 'follow_up'
+      expect(ScheduleEvent.normalizeEventType('reminder'), 'follow_up');
+      expect(ScheduleEvent.normalizeEventType('follow_up'), 'follow_up');
+
+      // 3. 有關聯客戶但傳入 null 或 personal 時自動升級
+      expect(ScheduleEvent.normalizeEventType(null, hasCustomer: true), 'customer_visit');
+      expect(ScheduleEvent.normalizeEventType('personal', hasCustomer: true), 'customer_visit');
+      expect(ScheduleEvent.normalizeEventType(null, hasCustomer: false), 'personal');
+
+      // 4. ScheduleEvent toJson 輸出必然符合資料庫 CHECK 約束白名單
+      final eventWithCustomer = ScheduleEvent(
+        id: 'test-1',
+        profileId: 'user-1',
+        customerId: 'cust-1',
+        title: '拜訪客戶',
+        startAt: DateTime.now(),
+        endAt: DateTime.now().add(const Duration(hours: 1)),
+        eventType: 'visit', // 前端舊值
+      );
+      final json = eventWithCustomer.toJson();
+      expect(json['event_type'], 'customer_visit'); // 自動標準化為合法白名單
+
+      const allowedDbEventTypes = {'personal', 'customer_visit', 'meeting', 'follow_up', 'general'};
+      expect(allowedDbEventTypes.contains(json['event_type']), isTrue);
+    });
   });
 
   group('⚙️ ScheduleService Business Logic Tests', () {

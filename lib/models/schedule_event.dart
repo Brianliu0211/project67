@@ -39,6 +39,29 @@ class ScheduleEvent {
 
   bool get isGoogleSynced => googleEventId != null && googleEventId!.isNotEmpty;
 
+  /// 將行程類型標準化為資料庫 CHECK 約束允許的白名單值
+  /// 白名單: 'personal', 'customer_visit', 'meeting', 'follow_up', 'general'
+  static String normalizeEventType(String? type, {bool hasCustomer = false}) {
+    if (type == null || type.isEmpty) {
+      return hasCustomer ? 'customer_visit' : 'personal';
+    }
+    switch (type) {
+      case 'visit':
+      case 'customer_visit':
+        return 'customer_visit';
+      case 'reminder':
+      case 'follow_up':
+        return 'follow_up';
+      case 'meeting':
+        return 'meeting';
+      case 'general':
+        return 'general';
+      case 'personal':
+      default:
+        return hasCustomer ? 'customer_visit' : 'personal';
+    }
+  }
+
   factory ScheduleEvent.fromJson(Map<String, dynamic> json) {
     return ScheduleEvent(
       id: (json['id'] as String?) ?? '',
@@ -52,7 +75,7 @@ class ScheduleEvent {
       latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
       longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
       tag: json['tag'] as String?,
-      eventType: json['event_type'] as String? ?? 'personal',
+      eventType: normalizeEventType(json['event_type'] as String?, hasCustomer: json['customer_id'] != null),
       isCompleted: json['is_completed'] as bool? ?? false,
       description: json['description'] as String?,
       googleEventId: json['google_event_id'] as String?,
@@ -75,7 +98,7 @@ class ScheduleEvent {
       'latitude': latitude,
       'longitude': longitude,
       'tag': tag,
-      'event_type': eventType,
+      'event_type': normalizeEventType(eventType, hasCustomer: customerId != null),
       'is_completed': isCompleted,
       'description': description,
       'google_event_id': googleEventId,

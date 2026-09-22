@@ -18,6 +18,7 @@ class ScheduleEventDialog extends StatefulWidget {
   final String? initialTitle;
   final String? initialEventType;
   final String? initialCustomerId;
+  final bool? isBottomSheet;
 
   const ScheduleEventDialog({
     super.key,
@@ -26,6 +27,7 @@ class ScheduleEventDialog extends StatefulWidget {
     this.initialTitle,
     this.initialEventType,
     this.initialCustomerId,
+    this.isBottomSheet,
   });
 
   @override
@@ -228,6 +230,22 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
       final user = Supabase.instance.client.auth.currentUser;
       final profileId = user?.id ?? 'offline-user';
 
+      // 行程類型判定：關聯客戶時對齊資料庫白名單 'customer_visit'
+      String calculatedEventType;
+      if (widget.eventToEdit != null) {
+        final oldType = widget.eventToEdit!.eventType;
+        // 若原本為個人行程但編輯時選擇了關聯客戶，自動升級為 customer_visit
+        if ((oldType == 'personal' || oldType.isEmpty) && _selectedCustomerId != null) {
+          calculatedEventType = 'customer_visit';
+        } else {
+          calculatedEventType = ScheduleEvent.normalizeEventType(oldType, hasCustomer: _selectedCustomerId != null);
+        }
+      } else {
+        calculatedEventType = widget.initialEventType != null
+            ? ScheduleEvent.normalizeEventType(widget.initialEventType, hasCustomer: _selectedCustomerId != null)
+            : (_selectedCustomerId != null ? 'customer_visit' : 'personal');
+      }
+
       final eventToSave = ScheduleEvent(
         id: widget.eventToEdit?.id ?? '',
         profileId: widget.eventToEdit?.profileId ?? profileId,
@@ -239,7 +257,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
         latitude: _selectedLat,
         longitude: _selectedLng,
         tag: _tagController.text.trim().isEmpty ? null : _tagController.text.trim(),
-        eventType: widget.eventToEdit?.eventType ?? widget.initialEventType ?? (_selectedCustomerId != null ? 'visit' : 'personal'),
+        eventType: calculatedEventType,
         isCompleted: widget.eventToEdit?.isCompleted ?? false,
         description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
         googleEventId: widget.eventToEdit?.googleEventId,
@@ -631,9 +649,18 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
                     color: Color(0xFF0284C7),
                     size: 22,
                   ),
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  visualDensity: VisualDensity.compact,
+                  splashRadius: 20,
                   onPressed: () => _openInteractiveMapModal(context),
                 ),
               ),
+              suffixIconConstraints: const BoxConstraints(
+                minWidth: 42,
+                minHeight: 42,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
             ),
           ),
@@ -715,6 +742,59 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
             ],
           ),
         ],
+      );
+    }
+
+    final bool isMobile = widget.isBottomSheet ?? (MediaQuery.of(context).size.width < 768);
+
+    if (isMobile) {
+      return Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 頂部小把手 (Drag handle indicator)
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: buildFormColumn(),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
