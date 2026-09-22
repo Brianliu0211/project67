@@ -440,7 +440,7 @@ class _VisitProjectsTabState extends State<VisitProjectsTab> {
                             builder: (ctx) => ScheduleEventDialog(
                               initialDate: DateTime.now(),
                               initialTitle: '拜訪: ${project['title']}',
-                              initialEventType: 'visit',
+                              initialEventType: 'customer_visit',
                             ),
                           );
                         },

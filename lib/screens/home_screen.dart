@@ -2756,9 +2756,12 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'meeting':
         return Colors.orange;
       case 'visit':
+      case 'customer_visit':
         return Colors.blue;
       case 'reminder':
+      case 'follow_up':
         return Colors.purple;
+      case 'general':
       case 'personal':
       default:
         return defaultColor;
@@ -2770,9 +2773,12 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'meeting':
         return isDark ? const Color(0xFF7C2D12).withOpacity(0.5) : const Color(0xFFFFEDD5);
       case 'visit':
+      case 'customer_visit':
         return isDark ? const Color(0xFF1E3A8A).withOpacity(0.5) : const Color(0xFFDBEAFE);
       case 'reminder':
+      case 'follow_up':
         return isDark ? const Color(0xFF581C87).withOpacity(0.5) : const Color(0xFFF3E8FF);
+      case 'general':
       case 'personal':
       default:
         return isDark ? const Color(0xFF1F2937).withOpacity(0.5) : const Color(0xFFF3F4F6);
@@ -2784,9 +2790,12 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'meeting':
         return '會議談判';
       case 'visit':
+      case 'customer_visit':
         return '客戶拜訪';
       case 'reminder':
-        return '客戶拜訪';
+      case 'follow_up':
+        return '跟進提醒';
+      case 'general':
       case 'personal':
       default:
         return '個人行程';

@@ -228,6 +228,22 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
       final user = Supabase.instance.client.auth.currentUser;
       final profileId = user?.id ?? 'offline-user';
 
+      // 行程類型判定：關聯客戶時對齊資料庫白名單 'customer_visit'
+      String calculatedEventType;
+      if (widget.eventToEdit != null) {
+        final oldType = widget.eventToEdit!.eventType;
+        // 若原本為個人行程但編輯時選擇了關聯客戶，自動升級為 customer_visit
+        if ((oldType == 'personal' || oldType.isEmpty) && _selectedCustomerId != null) {
+          calculatedEventType = 'customer_visit';
+        } else {
+          calculatedEventType = ScheduleEvent.normalizeEventType(oldType, hasCustomer: _selectedCustomerId != null);
+        }
+      } else {
+        calculatedEventType = widget.initialEventType != null
+            ? ScheduleEvent.normalizeEventType(widget.initialEventType, hasCustomer: _selectedCustomerId != null)
+            : (_selectedCustomerId != null ? 'customer_visit' : 'personal');
+      }
+
       final eventToSave = ScheduleEvent(
         id: widget.eventToEdit?.id ?? '',
         profileId: widget.eventToEdit?.profileId ?? profileId,
@@ -239,7 +255,7 @@ class _ScheduleEventDialogState extends State<ScheduleEventDialog> {
         latitude: _selectedLat,
         longitude: _selectedLng,
         tag: _tagController.text.trim().isEmpty ? null : _tagController.text.trim(),
-        eventType: widget.eventToEdit?.eventType ?? widget.initialEventType ?? (_selectedCustomerId != null ? 'visit' : 'personal'),
+        eventType: calculatedEventType,
         isCompleted: widget.eventToEdit?.isCompleted ?? false,
         description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
         googleEventId: widget.eventToEdit?.googleEventId,
