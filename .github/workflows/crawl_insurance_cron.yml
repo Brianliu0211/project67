@@ -24,8 +24,11 @@ jobs:
           
           ANON_KEY="${SUPABASE_ANON_KEY:-sb_publishable_hEIRyFKMgmbB2qVOVioGBQ_61oJxceL}"
           
+          # Clean and normalize base URL (strip /rest/v1 or trailing slashes if present)
+          BASE_URL=$(echo "$SUPABASE_URL" | sed 's/\/rest\/v1\/*$//' | sed 's/\/*$//')
+          
           response=$(curl -s -w "\n%{http_code}" -X POST \
-            "${SUPABASE_URL}/functions/v1/crawl-insurance-products" \
+            "${BASE_URL}/functions/v1/crawl-insurance-products" \
             -H "Content-Type: application/json" \
             -H "apikey: ${ANON_KEY}" \
             -H "Authorization: Bearer ${ANON_KEY}" \
