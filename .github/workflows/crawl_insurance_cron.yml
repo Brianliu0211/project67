@@ -14,6 +14,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           CRAWLER_CRON_SECRET: ${{ secrets.CRAWLER_CRON_SECRET }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           echo "Triggering crawl-insurance-products Edge Function..."
           if [ -z "$SUPABASE_URL" ] || [ -z "$CRAWLER_CRON_SECRET" ]; then
@@ -21,9 +22,13 @@ jobs:
             exit 1
           fi
           
+          ANON_KEY="${SUPABASE_ANON_KEY:-sb_publishable_hEIRyFKMgmbB2qVOVioGBQ_61oJxceL}"
+          
           response=$(curl -s -w "\n%{http_code}" -X POST \
             "${SUPABASE_URL}/functions/v1/crawl-insurance-products" \
             -H "Content-Type: application/json" \
+            -H "apikey: ${ANON_KEY}" \
+            -H "Authorization: Bearer ${ANON_KEY}" \
             -H "x-crawler-secret: ${CRAWLER_CRON_SECRET}")
           
           http_code=$(echo "$response" | tail -n 1)
